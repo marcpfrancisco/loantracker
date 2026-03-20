@@ -1,9 +1,11 @@
 import { createBrowserRouter, redirect } from "react-router";
 import { requireAuth, requireAdmin, requireGuest } from "@/lib/loaders";
+import DashboardLayout from "@/components/layout/DashboardLayout";
 import LoginPage from "@/pages/LoginPage";
 import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import DashboardPage from "@/pages/DashboardPage";
+import LoansPage from "@/pages/LoansPage";
 import LoanDetailPage from "@/pages/LoanDetailPage";
 import AdminPage from "@/pages/AdminPage";
 
@@ -14,7 +16,7 @@ export const router = createBrowserRouter([
     loader: () => redirect("/dashboard"),
   },
 
-  // ── Guest-only routes (redirect away if already authenticated) ────────────
+  // ── Guest-only routes ──────────────────────────────────────────────────────
   {
     path: "login",
     loader: requireGuest,
@@ -26,30 +28,34 @@ export const router = createBrowserRouter([
     Component: ForgotPasswordPage,
   },
 
-  // Reset password is intentionally NOT behind requireGuest —
-  // the recovery link from Supabase lands here and establishes a session
-  // in the same page load, so we must allow access before session resolves.
+  // Recovery link must allow access before session resolves — no requireGuest
   {
     path: "reset-password",
     Component: ResetPasswordPage,
   },
 
-  // ── Protected routes ───────────────────────────────────────────────────────
+  // ── Protected layout shell ─────────────────────────────────────────────────
   {
-    path: "dashboard",
     loader: requireAuth,
-    Component: DashboardPage,
-  },
-  {
-    path: "loans/:id",
-    loader: requireAuth,
-    Component: LoanDetailPage,
-  },
-
-  // ── Admin-only routes ──────────────────────────────────────────────────────
-  {
-    path: "admin",
-    loader: requireAdmin,
-    Component: AdminPage,
+    Component: DashboardLayout,
+    children: [
+      {
+        path: "dashboard",
+        Component: DashboardPage,
+      },
+      {
+        path: "loans",
+        Component: LoansPage,
+      },
+      {
+        path: "loans/:id",
+        Component: LoanDetailPage,
+      },
+      {
+        path: "admin",
+        loader: requireAdmin,
+        Component: AdminPage,
+      },
+    ],
   },
 ]);

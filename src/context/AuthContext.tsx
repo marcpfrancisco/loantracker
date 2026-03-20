@@ -1,10 +1,4 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useEffect, useState, type ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib";
 import type { Tables } from "@/types/database";
@@ -18,7 +12,8 @@ interface AuthContextValue {
   signOut: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+export const AuthContext = createContext<AuthContextValue | null>(null);
+export type { AuthContextValue };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -27,11 +22,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Fetch the public profile row for the current user
   async function fetchProfile(userId: string) {
-    const { data } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("id", userId)
-      .single();
+    const { data } = await supabase.from("profiles").select("*").eq("id", userId).single();
     setProfile(data);
   }
 
@@ -46,16 +37,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     // Keep session in sync with Supabase Auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, next) => {
-        setSession(next);
-        if (next?.user) {
-          void fetchProfile(next.user.id);
-        } else {
-          setProfile(null);
-        }
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, next) => {
+      setSession(next);
+      if (next?.user) {
+        void fetchProfile(next.user.id);
+      } else {
+        setProfile(null);
       }
-    );
+    });
 
     return () => subscription.unsubscribe();
   }, []);
@@ -69,10 +60,4 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
-}
-
-export function useAuth(): AuthContextValue {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used within <AuthProvider>");
-  return ctx;
 }

@@ -1,5 +1,7 @@
-// Auto-generated from Supabase schema. Keep in sync with migrations/001_initial_schema.sql
-// To regenerate: npx supabase gen types typescript --project-id <your-project-id> > src/types/database.ts
+// Manually maintained — mirrors Supabase schema in migrations/001_initial_schema.sql
+// To regenerate automatically: npx supabase gen types typescript --project-id <id> > src/types/database.ts
+
+// ── Enum types ────────────────────────────────────────────────────────────────
 
 export type UserRole = "admin" | "borrower";
 export type RegionType = "PH" | "UAE";
@@ -9,6 +11,10 @@ export type PaymentStatus = "unpaid" | "pending" | "paid";
 export type CreditSourceType = "e_wallet" | "credit_card" | "bnpl" | "bank_transfer";
 export type LoanType = "tabby" | "sloan" | "gloan" | "spaylater" | "credit_card" | "custom";
 export type ProofStatus = "pending" | "approved" | "rejected";
+
+// ── Database interface (matches supabase-js GenericSchema shape exactly) ──────
+// The Relationships array is required by supabase-js v2 type machinery.
+// Without it, partial .select() calls infer `never` instead of the row type.
 
 export interface Database {
   public: {
@@ -40,6 +46,7 @@ export interface Database {
           avatar_url?: string | null;
           updated_at?: string;
         };
+        Relationships: [];
       };
       credit_sources: {
         Row: {
@@ -68,6 +75,7 @@ export interface Database {
           is_active?: boolean;
           updated_at?: string;
         };
+        Relationships: [];
       };
       loans: {
         Row: {
@@ -126,6 +134,22 @@ export interface Database {
           ended_at?: string | null;
           updated_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: "loans_borrower_id_fkey";
+            columns: ["borrower_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "loans_source_id_fkey";
+            columns: ["source_id"];
+            isOneToOne: false;
+            referencedRelation: "credit_sources";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       installments: {
         Row: {
@@ -163,6 +187,15 @@ export interface Database {
           paid_at?: string | null;
           updated_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: "installments_loan_id_fkey";
+            columns: ["loan_id"];
+            isOneToOne: false;
+            referencedRelation: "loans";
+            referencedColumns: ["id"];
+          },
+        ];
       };
       payment_proofs: {
         Row: {
@@ -200,12 +233,43 @@ export interface Database {
           reviewed_at?: string | null;
           updated_at?: string;
         };
+        Relationships: [
+          {
+            foreignKeyName: "payment_proofs_installment_id_fkey";
+            columns: ["installment_id"];
+            isOneToOne: false;
+            referencedRelation: "installments";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "payment_proofs_submitted_by_fkey";
+            columns: ["submitted_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
       };
     };
+    Views: Record<never, never>;
+    Functions: Record<never, never>;
+    Enums: {
+      user_role: UserRole;
+      region_type: RegionType;
+      currency_type: CurrencyType;
+      loan_status: LoanStatus;
+      payment_status: PaymentStatus;
+      credit_source_type: CreditSourceType;
+      loan_type: LoanType;
+      proof_status: ProofStatus;
+    };
+    CompositeTypes: Record<never, never>;
   };
 }
 
-// Convenience helper — mirrors Supabase's generated Tables<T> utility
+// ── Convenience helpers ───────────────────────────────────────────────────────
+// Mirror the shape that `supabase gen types` produces.
+
 export type Tables<T extends keyof Database["public"]["Tables"]> =
   Database["public"]["Tables"][T]["Row"];
 

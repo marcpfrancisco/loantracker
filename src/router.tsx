@@ -8,6 +8,7 @@ import DashboardPage from "@/pages/DashboardPage";
 import LoansPage from "@/pages/LoansPage";
 import LoanDetailPage from "@/pages/LoanDetailPage";
 import AdminPage from "@/pages/AdminPage";
+import ProfilePage from "@/pages/ProfilePage";
 
 export const router = createBrowserRouter([
   // ── Root redirect ──────────────────────────────────────────────────────────
@@ -55,6 +56,10 @@ export const router = createBrowserRouter([
         path: "admin",
         loader: requireAdmin,
         Component: AdminPage,
+      },
+      {
+        path: "profile",
+        Component: ProfilePage,
       },
     ],
   },

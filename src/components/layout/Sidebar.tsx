@@ -1,7 +1,8 @@
-import { NavLink } from "react-router";
+import { NavLink, useNavigate } from "react-router";
 import { motion } from "framer-motion";
 import { LockKeyhole, LogOut, Sun, Moon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/context/ThemeContext";
 import { navItems } from "./navItems";
@@ -15,9 +16,23 @@ function getInitials(name: string): string {
     .slice(0, 2);
 }
 
+function resolveAvatarUrl(avatarUrl: string | null, userId: string): string | null {
+  if (!avatarUrl) return null;
+  if (avatarUrl.startsWith("dicebear:")) {
+    const rest = avatarUrl.slice("dicebear:".length);
+    const lastColon = rest.lastIndexOf(":");
+    const style = lastColon >= 0 ? rest.slice(0, lastColon) : rest;
+    const variant = lastColon >= 0 ? rest.slice(lastColon + 1) : "1";
+    const seed = variant === "2" ? `${userId}_v2` : userId;
+    return `https://api.dicebear.com/9.x/${style}/svg?seed=${encodeURIComponent(seed)}`;
+  }
+  return supabase.storage.from("avatars").getPublicUrl(avatarUrl).data.publicUrl;
+}
+
 export function Sidebar() {
   const { profile, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const navigate = useNavigate();
   const isAdmin = profile?.role === "admin";
 
   const visibleItems = navItems.filter((item) => !item.adminOnly || isAdmin);
@@ -77,12 +92,26 @@ export function Sidebar() {
       {/* User section */}
       {profile && (
         <div className="border-border/60 border-t px-3 py-4">
-          <div className="mb-2 flex items-center gap-3 px-3">
-            {/* Avatar with initials */}
-            <div className="bg-primary/15 text-primary flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
-              {getInitials(profile.full_name)}
-            </div>
-            <div className="min-w-0">
+          <button
+            onClick={() => void navigate("/profile")}
+            className="mb-2 flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-muted/50"
+          >
+            {/* Avatar */}
+            {(() => {
+              const src = resolveAvatarUrl(profile.avatar_url, profile.id);
+              return src ? (
+                <img
+                  src={src}
+                  alt={profile.full_name}
+                  className="h-8 w-8 shrink-0 rounded-full object-cover"
+                />
+              ) : (
+                <div className="bg-primary/15 text-primary flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
+                  {getInitials(profile.full_name)}
+                </div>
+              );
+            })()}
+            <div className="min-w-0 text-left">
               <p className="text-foreground truncate text-sm font-medium">
                 {profile.full_name}
               </p>
@@ -92,7 +121,7 @@ export function Sidebar() {
                 <RegionBadge region={profile.region} />
               </div>
             </div>
-          </div>
+          </button>
           <button
             onClick={toggleTheme}
             className="text-muted-foreground hover:text-foreground hover:bg-muted/50 flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors"

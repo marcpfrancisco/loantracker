@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { LockKeyhole, Sun, Moon, LogOut } from "lucide-react";
+import { useNavigate } from "react-router";
+import { LockKeyhole, Sun, Moon, LogOut, UserCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/context/ThemeContext";
 
@@ -13,9 +15,23 @@ function getInitials(name: string): string {
     .slice(0, 2);
 }
 
+function resolveAvatarUrl(avatarUrl: string | null, userId: string): string | null {
+  if (!avatarUrl) return null;
+  if (avatarUrl.startsWith("dicebear:")) {
+    const rest = avatarUrl.slice("dicebear:".length);
+    const lastColon = rest.lastIndexOf(":");
+    const style = lastColon >= 0 ? rest.slice(0, lastColon) : rest;
+    const variant = lastColon >= 0 ? rest.slice(lastColon + 1) : "1";
+    const seed = variant === "2" ? `${userId}_v2` : userId;
+    return `https://api.dicebear.com/9.x/${style}/svg?seed=${encodeURIComponent(seed)}`;
+  }
+  return supabase.storage.from("avatars").getPublicUrl(avatarUrl).data.publicUrl;
+}
+
 export function TopBar() {
   const { profile, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const navigate = useNavigate();
   const [showMenu, setShowMenu] = useState(false);
 
   return (
@@ -38,10 +54,17 @@ export function TopBar() {
           <div className="relative">
             <button
               onClick={() => setShowMenu((v) => !v)}
-              className="bg-primary/15 text-primary flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-xs font-semibold"
+              className="bg-primary/15 text-primary flex h-8 w-8 cursor-pointer items-center justify-center overflow-hidden rounded-full text-xs font-semibold"
               aria-label="Account menu"
             >
-              {getInitials(profile.full_name)}
+              {(() => {
+                const src = resolveAvatarUrl(profile.avatar_url, profile.id);
+                return src ? (
+                  <img src={src} alt={profile.full_name} className="h-full w-full object-cover" />
+                ) : (
+                  getInitials(profile.full_name)
+                );
+              })()}
             </button>
 
             {showMenu && (
@@ -66,6 +89,13 @@ export function TopBar() {
 
                   {/* Actions */}
                   <div className="p-1">
+                    <button
+                      onClick={() => { void navigate("/profile"); setShowMenu(false); }}
+                      className="text-muted-foreground hover:text-foreground hover:bg-muted/50 flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors"
+                    >
+                      <UserCircle className="h-4 w-4" />
+                      My Profile
+                    </button>
                     <button
                       onClick={() => { toggleTheme(); setShowMenu(false); }}
                       className="text-muted-foreground hover:text-foreground hover:bg-muted/50 flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors"

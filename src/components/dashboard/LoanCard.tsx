@@ -1,10 +1,21 @@
 import { useNavigate } from "react-router";
 import { motion } from "framer-motion";
-import { CalendarClock, ChevronRight } from "lucide-react";
+import { CalendarClock, ChevronRight, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { cardVariants } from "@/lib/animations";
-import type { MyLoan } from "@/hooks/useMyLoans";
 import type { LoanStatus, CreditSourceType } from "@/types/database";
+
+export interface LoanCardData {
+  id: string;
+  currency: string;
+  principal: number;
+  installments_total: number;
+  status: LoanStatus;
+  credit_source: { name: string; type: CreditSourceType };
+  paidCount: number;
+  pendingCount: number;
+  nextDueDate: string | null;
+}
 
 const statusStyles: Record<LoanStatus, string> = {
   active: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
@@ -42,10 +53,11 @@ function formatDueDate(dateStr: string): string {
 }
 
 interface LoanCardProps {
-  loan: MyLoan;
+  loan: LoanCardData;
+  borrowerName?: string;
 }
 
-export function LoanCard({ loan }: LoanCardProps) {
+export function LoanCard({ loan, borrowerName }: LoanCardProps) {
   const navigate = useNavigate();
   const progress = loan.installments_total > 0 ? loan.paidCount / loan.installments_total : 0;
   const isOverdue =
@@ -79,6 +91,14 @@ export function LoanCard({ loan }: LoanCardProps) {
         </div>
       </div>
 
+      {/* Borrower name — admin view only */}
+      {borrowerName && (
+        <div className="flex items-center gap-1.5">
+          <User className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
+          <span className="text-muted-foreground truncate text-xs">{borrowerName}</span>
+        </div>
+      )}
+
       {/* Principal */}
       <div>
         <p className="text-foreground text-xl font-semibold tracking-tight">
@@ -91,7 +111,7 @@ export function LoanCard({ loan }: LoanCardProps) {
       <div className="space-y-1.5">
         <div className="flex items-center justify-between text-xs">
           <span className="text-muted-foreground">
-            {loan.paidCount} / {loan.installments_total} installments paid
+            {loan.paidCount} / {loan.installments_total} paid
           </span>
           <span className="text-muted-foreground">{Math.round(progress * 100)}%</span>
         </div>

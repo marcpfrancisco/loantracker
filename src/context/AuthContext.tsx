@@ -39,12 +39,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Keep session in sync with Supabase Auth state changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, next) => {
+    } = supabase.auth.onAuthStateChange((event, next) => {
       setSession(next);
       if (next?.user) {
         void fetchProfile(next.user.id);
       } else {
         setProfile(null);
+        // Redirect to login on manual signOut OR automatic session expiry
+        if (event === "SIGNED_OUT") {
+          window.location.replace("/login");
+        }
       }
     });
 

@@ -1,9 +1,11 @@
-import { Users, CreditCard, FileCheck, AlertCircle } from "lucide-react";
+import { useState } from "react";
+import { Users, CreditCard, FileCheck, AlertCircle, UserPlus } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAdminStats } from "@/hooks/useAdminStats";
 import { useAdminBorrowers } from "@/hooks/useAdminBorrowers";
 import { StatCard } from "@/components/admin/StatCard";
 import { BorrowersList } from "@/components/admin/BorrowersList";
+import { InviteBorrowerDrawer } from "@/components/admin/InviteBorrowerDrawer";
 import { cardVariants } from "@/lib/animations";
 
 function formatCurrency(amount: number, currency: "PHP" | "AED"): string {
@@ -17,13 +19,23 @@ function formatCurrency(amount: number, currency: "PHP" | "AED"): string {
 export default function AdminPage() {
   const { data: stats, isLoading: statsLoading, error: statsError } = useAdminStats();
   const { data: borrowers = [], isLoading: borrowersLoading } = useAdminBorrowers();
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-6">
       {/* Page header */}
-      <div>
-        <h1 className="text-foreground text-xl font-semibold tracking-tight">Admin Dashboard</h1>
-        <p className="text-muted-foreground mt-1 text-sm">Overview of all loans and borrowers.</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-foreground text-xl font-semibold tracking-tight">Admin Dashboard</h1>
+          <p className="text-muted-foreground mt-1 text-sm">Overview of all loans and borrowers.</p>
+        </div>
+        <button
+          onClick={() => setInviteOpen(true)}
+          className="bg-primary text-primary-foreground hover:bg-primary/90 flex cursor-pointer items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium shadow-sm transition-colors"
+        >
+          <UserPlus className="h-4 w-4" />
+          <span className="hidden sm:inline">Invite Borrower</span>
+        </button>
       </div>
 
       {/* Error state */}
@@ -96,6 +108,8 @@ export default function AdminPage() {
       <motion.div variants={cardVariants} initial="hidden" animate="visible">
         <BorrowersList borrowers={borrowers} loading={borrowersLoading} />
       </motion.div>
+
+      <InviteBorrowerDrawer open={inviteOpen} onClose={() => setInviteOpen(false)} />
     </div>
   );
 }

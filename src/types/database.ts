@@ -202,7 +202,8 @@ export interface Database {
           id: string;
           installment_id: string;
           submitted_by: string;
-          file_url: string;
+          file_url: string | null;
+          note: string | null;
           status: ProofStatus;
           admin_note: string | null;
           reviewed_by: string | null;
@@ -214,7 +215,8 @@ export interface Database {
           id?: string;
           installment_id: string;
           submitted_by: string;
-          file_url: string;
+          file_url?: string | null;
+          note?: string | null;
           status?: ProofStatus;
           admin_note?: string | null;
           reviewed_by?: string | null;
@@ -226,7 +228,8 @@ export interface Database {
           id?: string;
           installment_id?: string;
           submitted_by?: string;
-          file_url?: string;
+          file_url?: string | null;
+          note?: string | null;
           status?: ProofStatus;
           admin_note?: string | null;
           reviewed_by?: string | null;
@@ -252,7 +255,12 @@ export interface Database {
       };
     };
     Views: Record<never, never>;
-    Functions: Record<never, never>;
+    Functions: {
+      get_user_confirmation_statuses: {
+        Args: Record<never, never>;
+        Returns: { id: string; is_confirmed: boolean }[];
+      };
+    };
     Enums: {
       user_role: UserRole;
       region_type: RegionType;

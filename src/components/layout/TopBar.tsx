@@ -1,6 +1,8 @@
-import { LockKeyhole } from "lucide-react";
+import { useState } from "react";
+import { LockKeyhole, Sun, Moon, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { useTheme } from "@/context/ThemeContext";
 
 function getInitials(name: string): string {
   return name
@@ -12,7 +14,9 @@ function getInitials(name: string): string {
 }
 
 export function TopBar() {
-  const { profile } = useAuth();
+  const { profile, signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
+  const [showMenu, setShowMenu] = useState(false);
 
   return (
     <header className="border-border/60 bg-background/80 flex h-14 shrink-0 items-center justify-between border-b px-4 backdrop-blur-sm md:hidden">
@@ -26,18 +30,63 @@ export function TopBar() {
         </span>
       </div>
 
-      {/* Right: region badge + avatar */}
-      {profile && (
-        <div className="flex items-center gap-2">
-          <RegionBadge region={profile.region} />
-          <div
-            className="bg-primary/15 text-primary flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold"
-            title={profile.full_name}
-          >
-            {getInitials(profile.full_name)}
+      {/* Right: region badge + avatar menu */}
+      <div className="flex items-center gap-2">
+        {profile && <RegionBadge region={profile.region} />}
+
+        {profile && (
+          <div className="relative">
+            <button
+              onClick={() => setShowMenu((v) => !v)}
+              className="bg-primary/15 text-primary flex h-8 w-8 cursor-pointer items-center justify-center rounded-full text-xs font-semibold"
+              aria-label="Account menu"
+            >
+              {getInitials(profile.full_name)}
+            </button>
+
+            {showMenu && (
+              <>
+                {/* Invisible backdrop to close on outside click */}
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setShowMenu(false)}
+                />
+
+                {/* Dropdown */}
+                <div className="bg-card border-border/60 absolute right-0 top-10 z-50 w-52 overflow-hidden rounded-xl border shadow-xl">
+                  {/* User info */}
+                  <div className="border-border/60 border-b px-4 py-3">
+                    <p className="text-foreground text-sm font-medium">{profile.full_name}</p>
+                    <div className="mt-0.5 flex items-center gap-1.5">
+                      <span className="text-muted-foreground text-xs capitalize">{profile.role}</span>
+                      <span className="text-border">·</span>
+                      <RegionBadge region={profile.region} />
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="p-1">
+                    <button
+                      onClick={() => { toggleTheme(); setShowMenu(false); }}
+                      className="text-muted-foreground hover:text-foreground hover:bg-muted/50 flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors"
+                    >
+                      {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                      {theme === "dark" ? "Light mode" : "Dark mode"}
+                    </button>
+                    <button
+                      onClick={() => { void signOut(); setShowMenu(false); }}
+                      className="text-muted-foreground hover:text-foreground hover:bg-muted/50 flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      Sign out
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </header>
   );
 }

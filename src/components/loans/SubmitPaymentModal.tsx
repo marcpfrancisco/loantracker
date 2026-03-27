@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { X, Upload, FileText, ImageIcon, Loader2, AlertCircle } from "lucide-react";
+import { X, Upload, FileText, ImageIcon, Loader2, AlertCircle, Paperclip } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubmitPaymentProof } from "@/hooks/useSubmitPaymentProof";
@@ -32,6 +32,7 @@ export function SubmitPaymentModal({
   const { profile } = useAuth();
   const { mutateAsync: submitProof, isPending } = useSubmitPaymentProof(loanId);
 
+  const [note, setNote] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
@@ -40,6 +41,7 @@ export function SubmitPaymentModal({
 
   function handleClose() {
     if (isPending) return;
+    setNote("");
     setFile(null);
     setPreview(null);
     setFileError(null);
@@ -80,13 +82,21 @@ export function SubmitPaymentModal({
     if (dropped) validateAndSet(dropped);
   }
 
+  function removeFile() {
+    setFile(null);
+    setPreview(null);
+    setFileError(null);
+    if (inputRef.current) inputRef.current.value = "";
+  }
+
   async function handleSubmit() {
-    if (!file || !profile) return;
+    if (!profile || !note.trim()) return;
 
     await submitProof({
       installmentId,
       loanId,
       borrowerId: profile.id,
+      note: note.trim(),
       file,
     });
 
@@ -94,6 +104,7 @@ export function SubmitPaymentModal({
   }
 
   const isImage = file?.type.startsWith("image/");
+  const canSubmit = note.trim().length > 0 && !fileError && !isPending;
 
   return (
     <AnimatePresence>
@@ -124,7 +135,7 @@ export function SubmitPaymentModal({
               <div>
                 <h2 className="text-foreground font-semibold">Submit Payment</h2>
                 <p className="text-muted-foreground mt-0.5 text-xs">
-                  Installment #{installmentNo} — attach your receipt
+                  Installment #{installmentNo}
                 </p>
               </div>
               <button
@@ -138,44 +149,76 @@ export function SubmitPaymentModal({
 
             {/* Body */}
             <div className="space-y-4 p-5">
-              {/* Drop zone */}
-              <div
-                onClick={() => !isPending && inputRef.current?.click()}
-                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                onDragLeave={() => setIsDragging(false)}
-                onDrop={handleDrop}
-                className={cn(
-                  "flex cursor-pointer flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed p-6 transition-colors",
-                  isDragging
-                    ? "border-primary/60 bg-primary/5"
-                    : "border-border/60 hover:border-border hover:bg-muted/30",
-                  isPending && "pointer-events-none opacity-50"
-                )}
-              >
-                {/* Preview or placeholder */}
+              {/* Note — required */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-foreground text-xs font-medium">
+                  Payment note <span className="text-rose-400">*</span>
+                </label>
+                <textarea
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  rows={3}
+                  placeholder="e.g. Paid via GCash on Mar 27, ref #12345…"
+                  disabled={isPending}
+                  className="bg-muted/50 border-border/60 focus:border-primary/60 w-full resize-none rounded-lg border px-3 py-2 text-sm outline-none transition-colors placeholder:text-muted-foreground/50 disabled:opacity-50"
+                  autoFocus
+                />
+              </div>
+
+              {/* Receipt upload — optional */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-foreground text-xs font-medium">
+                  Receipt{" "}
+                  <span className="text-muted-foreground font-normal">(optional)</span>
+                </label>
+
                 {file ? (
-                  isImage && preview ? (
-                    <img
-                      src={preview}
-                      alt="Receipt preview"
-                      className="max-h-40 w-full rounded-lg object-contain"
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="bg-primary/10 flex h-12 w-12 items-center justify-center rounded-xl">
-                        <FileText className="text-primary h-6 w-6" />
-                      </div>
-                      <p className="text-foreground text-sm font-medium">{file.name}</p>
+                  /* File selected — show info row */
+                  <div className="border-border/60 flex items-center gap-3 rounded-xl border px-3 py-2.5">
+                    <div className="bg-primary/10 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg">
+                      {isImage
+                        ? <ImageIcon className="text-primary h-4 w-4" />
+                        : <FileText className="text-primary h-4 w-4" />
+                      }
                     </div>
-                  )
+                    {isImage && preview ? (
+                      <img
+                        src={preview}
+                        alt="Receipt preview"
+                        className="h-8 w-8 shrink-0 rounded object-cover"
+                      />
+                    ) : null}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-foreground truncate text-xs font-medium">{file.name}</p>
+                      <p className="text-muted-foreground text-xs">{formatBytes(file.size)}</p>
+                    </div>
+                    <button
+                      onClick={removeFile}
+                      disabled={isPending}
+                      className="text-muted-foreground hover:text-foreground cursor-pointer rounded p-1 transition-colors disabled:opacity-50"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 ) : (
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="bg-muted flex h-12 w-12 items-center justify-center rounded-xl">
-                      <ImageIcon className="text-muted-foreground h-6 w-6" />
-                    </div>
+                  /* Drop zone */
+                  <div
+                    onClick={() => !isPending && inputRef.current?.click()}
+                    onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                    onDragLeave={() => setIsDragging(false)}
+                    onDrop={handleDrop}
+                    className={cn(
+                      "flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed px-4 py-5 transition-colors",
+                      isDragging
+                        ? "border-primary/60 bg-primary/5"
+                        : "border-border/60 hover:border-border hover:bg-muted/30",
+                      isPending && "pointer-events-none opacity-50"
+                    )}
+                  >
+                    <Paperclip className="text-muted-foreground h-5 w-5" />
                     <div className="text-center">
                       <p className="text-foreground text-sm font-medium">
-                        Drop file or click to upload
+                        Attach receipt
                       </p>
                       <p className="text-muted-foreground mt-0.5 text-xs">
                         JPG, PNG, WebP, HEIC, PDF · max {MAX_SIZE_MB} MB
@@ -183,31 +226,15 @@ export function SubmitPaymentModal({
                     </div>
                   </div>
                 )}
-              </div>
 
-              {/* File info */}
-              {file && (
-                <div className="border-border/60 flex items-center justify-between rounded-lg border px-3 py-2">
-                  <div className="flex min-w-0 items-center gap-2">
-                    {isImage
-                      ? <ImageIcon className="text-muted-foreground h-4 w-4 shrink-0" />
-                      : <FileText className="text-muted-foreground h-4 w-4 shrink-0" />
-                    }
-                    <span className="text-foreground truncate text-xs">{file.name}</span>
+                {/* Validation error */}
+                {fileError && (
+                  <div className="flex items-center gap-2 text-xs text-rose-400">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                    {fileError}
                   </div>
-                  <span className="text-muted-foreground ml-2 shrink-0 text-xs">
-                    {formatBytes(file.size)}
-                  </span>
-                </div>
-              )}
-
-              {/* Validation error */}
-              {fileError && (
-                <div className="flex items-center gap-2 text-xs text-rose-400">
-                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                  {fileError}
-                </div>
-              )}
+                )}
+              </div>
 
               <input
                 ref={inputRef}
@@ -229,13 +256,13 @@ export function SubmitPaymentModal({
               </button>
               <button
                 onClick={() => void handleSubmit()}
-                disabled={!file || !!fileError || isPending}
+                disabled={!canSubmit}
                 className="bg-primary text-primary-foreground flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-opacity disabled:opacity-50"
               >
                 {isPending ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
-                    Uploading…
+                    Submitting…
                   </>
                 ) : (
                   <>

@@ -11,14 +11,15 @@ export interface ReviewProofPayload {
   action: "approve" | "reject";
   adminNote: string;
   reviewedBy: string;
+  fileUrl: string | null;
 }
 
 async function reviewProof(payload: ReviewProofPayload): Promise<void> {
-  const { proofId, installmentId, action, adminNote, reviewedBy } = payload;
+  const { proofId, installmentId, action, adminNote, reviewedBy, fileUrl } = payload;
 
   const newInstallmentStatus: PaymentStatus = action === "approve" ? "paid" : "unpaid";
 
-  // 1. Update payment_proof record
+  // 1. Update payment_proof record (clear file_url on rejection — Edge Function handles actual deletion)
   const { error: proofError } = await supabase
     .from("payment_proofs")
     .update({
@@ -26,6 +27,7 @@ async function reviewProof(payload: ReviewProofPayload): Promise<void> {
       admin_note: adminNote || null,
       reviewed_by: reviewedBy,
       reviewed_at: new Date().toISOString(),
+      ...(action === "reject" ? { file_url: null } : {}),
     })
     .eq("id", proofId);
 
@@ -41,6 +43,14 @@ async function reviewProof(payload: ReviewProofPayload): Promise<void> {
     .eq("id", installmentId);
 
   if (installError) throw installError;
+
+  // 3. On rejection: fire-and-forget Edge Function to delete file + notify borrower
+  //    Not awaited — rejection succeeds even if notification fails
+  if (action === "reject") {
+    void supabase.functions.invoke("notify-rejection", {
+      body: { installmentId, adminNote, fileUrl },
+    });
+  }
 }
 
 export function useReviewProof(loanId: string) {
@@ -78,7 +88,7 @@ export function useReviewProof(loanId: string) {
     },
 
     onSuccess: (_data, { action, installmentId }) => {
-      toast.success(action === "approve" ? "Payment approved." : "Payment rejected.");
+      toast.success(action === "approve" ? "Payment approved." : "Payment rejected — borrower notified.");
       void queryClient.invalidateQueries({ queryKey: ["proof", installmentId] });
       void queryClient.invalidateQueries({ queryKey: ["loans"] });
       void queryClient.invalidateQueries({ queryKey: ["my-loans"] });

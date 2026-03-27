@@ -10,7 +10,6 @@ export async function requireAuth() {
     data: { session },
   } = await supabase.auth.getSession();
   if (!session) throw redirect("/login");
-  console.log(session, "data");
   return session;
 }
 

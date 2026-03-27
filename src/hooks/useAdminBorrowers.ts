@@ -9,18 +9,29 @@ export interface BorrowerSummary {
   created_at: string;
   totalLoans: number;
   activeLoans: number;
+  isConfirmed: boolean;
 }
 
 async function fetchAdminBorrowers(): Promise<BorrowerSummary[]> {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, full_name, region, created_at, loans!loans_borrower_id_fkey(id, status)")
-    .eq("role", "borrower")
-    .order("created_at", { ascending: false });
+  // Fetch all profiles (borrowers + admin) and their confirmation status in parallel
+  const [profilesResult, confirmationResult] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, full_name, region, created_at, loans!loans_borrower_id_fkey(id, status)")
+      .order("created_at", { ascending: false }),
+    supabase.rpc("get_user_confirmation_statuses"),
+  ]);
 
-  if (error) throw error;
+  if (profilesResult.error) throw profilesResult.error;
 
-  return (data ?? []).map((p) => {
+  const confirmationMap = new Map<string, boolean>(
+    (confirmationResult.data ?? []).map((r: { id: string; is_confirmed: boolean }) => [
+      r.id,
+      r.is_confirmed,
+    ])
+  );
+
+  return (profilesResult.data ?? []).map((p) => {
     const loans = p.loans ?? [];
     return {
       id: p.id,
@@ -29,6 +40,7 @@ async function fetchAdminBorrowers(): Promise<BorrowerSummary[]> {
       created_at: p.created_at,
       totalLoans: loans.length,
       activeLoans: loans.filter((l) => l.status === "active").length,
+      isConfirmed: confirmationMap.get(p.id) ?? false,
     };
   });
 }

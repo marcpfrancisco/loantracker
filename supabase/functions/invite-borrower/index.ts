@@ -75,8 +75,11 @@ Deno.serve(async (req: Request) => {
     }
 
     // ── 5. Send invite using the already-created admin client ─────────────────
+    const siteUrl = Deno.env.get("SITE_URL") ?? "http://localhost:5173";
+
     const { error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
       data: { full_name, region },
+      options: { redirectTo: `${siteUrl}/reset-password` },
     });
 
     if (inviteError) {

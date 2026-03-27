@@ -27,28 +27,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    // Hydrate session on mount
-    supabase.auth.getSession().then(({ data: { session: initial } }) => {
-      setSession(initial);
-      if (initial?.user) {
-        void fetchProfile(initial.user.id);
-      }
-      setLoading(false);
-    });
-
-    // Keep session in sync with Supabase Auth state changes
+    // Single source of truth: onAuthStateChange fires INITIAL_SESSION immediately
+    // on mount (synchronously from localStorage), so no need for a separate getSession() call.
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, next) => {
       setSession(next);
+
       if (next?.user) {
-        void fetchProfile(next.user.id);
+        // TOKEN_REFRESHED fires on tab focus every hour — profile data hasn't changed.
+        // Only re-fetch when the user identity actually changes.
+        if (event !== "TOKEN_REFRESHED") {
+          void fetchProfile(next.user.id);
+        }
       } else {
         setProfile(null);
-        // Redirect to login on manual signOut OR automatic session expiry
         if (event === "SIGNED_OUT") {
           window.location.replace("/login");
         }
+      }
+
+      // INITIAL_SESSION fires exactly once on mount (session present or null).
+      if (event === "INITIAL_SESSION") {
+        setLoading(false);
       }
     });
 

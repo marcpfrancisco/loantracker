@@ -33,7 +33,8 @@ export function StatCard({ icon: Icon, label, value, sub, accent = "default", lo
         <div>
           <p className="text-foreground text-2xl font-semibold tracking-tight">{value}</p>
           <p className="text-muted-foreground mt-0.5 text-sm">{label}</p>
-          {sub && <p className="text-muted-foreground/70 mt-1 text-xs">{sub}</p>}
+          {/* Always render sub row to keep all cards the same height */}
+          <p className="text-muted-foreground/70 mt-1 text-xs">{sub ?? "\u00A0"}</p>
         </div>
       )}
     </div>

@@ -129,7 +129,9 @@ interface AddLoanDrawerProps {
 }
 
 export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
-  const { data: borrowers = [] } = useAdminBorrowers();
+  const { data: allBorrowers = [] } = useAdminBorrowers();
+  // Only confirmed accounts can be assigned loans
+  const borrowers = allBorrowers.filter((b) => b.isConfirmed);
   const { mutateAsync: createLoan, isPending } = useCreateLoan();
 
   const {

@@ -1,8 +1,9 @@
 import { NavLink } from "react-router";
 import { motion } from "framer-motion";
-import { LockKeyhole, LogOut } from "lucide-react";
+import { LockKeyhole, LogOut, Sun, Moon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
+import { useTheme } from "@/context/ThemeContext";
 import { navItems } from "./navItems";
 
 function getInitials(name: string): string {
@@ -16,6 +17,7 @@ function getInitials(name: string): string {
 
 export function Sidebar() {
   const { profile, signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const isAdmin = profile?.role === "admin";
 
   const visibleItems = navItems.filter((item) => !item.adminOnly || isAdmin);
@@ -91,6 +93,13 @@ export function Sidebar() {
               </div>
             </div>
           </div>
+          <button
+            onClick={toggleTheme}
+            className="text-muted-foreground hover:text-foreground hover:bg-muted/50 flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors"
+          >
+            {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            {theme === "dark" ? "Light mode" : "Dark mode"}
+          </button>
           <button
             onClick={() => void signOut()}
             className="text-muted-foreground hover:text-foreground hover:bg-muted/50 flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors"

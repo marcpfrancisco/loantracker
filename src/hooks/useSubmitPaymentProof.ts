@@ -7,35 +7,43 @@ export interface SubmitProofPayload {
   installmentId: string;
   loanId: string;
   borrowerId: string;
-  file: File;
+  note: string;
+  file: File | null;
 }
 
 async function submitPaymentProof(payload: SubmitProofPayload): Promise<void> {
-  const { installmentId, loanId, borrowerId, file } = payload;
+  const { installmentId, loanId, borrowerId, note, file } = payload;
 
-  // Path: {borrowerId}/{loanId}/{installmentId}/{timestamp}.{ext}
-  // First segment must equal auth.uid() to satisfy RLS policy
-  const ext = file.name.split(".").pop() ?? "jpg";
-  const path = `${borrowerId}/${loanId}/${installmentId}/${Date.now()}.${ext}`;
+  let filePath: string | null = null;
 
-  // 1. Upload file to Supabase Storage
-  const { error: uploadError } = await supabase.storage
-    .from("payment-receipts")
-    .upload(path, file, { cacheControl: "3600", upsert: false });
+  // 1. Upload file to Supabase Storage (optional)
+  if (file) {
+    // Path: {borrowerId}/{loanId}/{installmentId}/{timestamp}.{ext}
+    // First segment must equal auth.uid() to satisfy RLS policy
+    const ext = file.name.split(".").pop() ?? "jpg";
+    filePath = `${borrowerId}/${loanId}/${installmentId}/${Date.now()}.${ext}`;
 
-  if (uploadError) throw uploadError;
+    const { error: uploadError } = await supabase.storage
+      .from("payment-receipts")
+      .upload(filePath, file, { cacheControl: "3600", upsert: false });
 
-  // 2. Insert payment_proof row (store PATH, not full URL)
+    if (uploadError) throw uploadError;
+  }
+
+  // 2. Insert payment_proof row
   const { error: proofError } = await supabase.from("payment_proofs").insert({
     installment_id: installmentId,
     submitted_by: borrowerId,
-    file_url: path,
+    file_url: filePath,
+    note,
     status: "pending",
   });
 
   if (proofError) {
     // Clean up uploaded file on DB insert failure
-    await supabase.storage.from("payment-receipts").remove([path]);
+    if (filePath) {
+      await supabase.storage.from("payment-receipts").remove([filePath]);
+    }
     throw proofError;
   }
 

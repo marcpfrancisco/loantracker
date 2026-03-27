@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { X, ExternalLink, Loader2, AlertCircle, FileText, ChevronLeft } from "lucide-react";
+import { X, ExternalLink, Loader2, AlertCircle, FileText, ChevronLeft, MessageSquare, Paperclip } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useProof } from "@/hooks/useProof";
@@ -51,6 +51,7 @@ export function ReviewProofModal({
       action: "approve",
       adminNote: "",
       reviewedBy: profile.id,
+      fileUrl: null,
     });
     handleClose();
   }
@@ -64,11 +65,12 @@ export function ReviewProofModal({
       action: "reject",
       adminNote: adminNote.trim(),
       reviewedBy: profile.id,
+      fileUrl: proof.file_url,
     });
     handleClose();
   }
 
-  const isImage = proof ? isImageUrl(proof.file_url) : false;
+  const isImage = proof?.file_url ? isImageUrl(proof.file_url) : false;
 
   return (
     <AnimatePresence>
@@ -145,30 +147,46 @@ export function ReviewProofModal({
               {/* Proof viewer */}
               {!proofLoading && proof && (
                 <div className="space-y-4">
-                  {/* Image preview */}
-                  {isImage && proof.signedUrl ? (
-                    <div className="overflow-hidden rounded-xl border border-border/60">
-                      <img
-                        src={proof.signedUrl}
-                        alt="Payment receipt"
-                        className={cn(
-                          "w-full object-contain",
-                          view === "rejecting" ? "max-h-40" : "max-h-72"
-                        )}
-                      />
+                  {/* Borrower note */}
+                  {proof.note && (
+                    <div className="bg-muted/40 border-border/60 flex gap-2.5 rounded-xl border px-3 py-2.5">
+                      <MessageSquare className="text-muted-foreground mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      <p className="text-foreground text-sm">{proof.note}</p>
                     </div>
+                  )}
+
+                  {/* Receipt */}
+                  {proof.file_url ? (
+                    isImage && proof.signedUrl ? (
+                      <div className="overflow-hidden rounded-xl border border-border/60">
+                        <img
+                          src={proof.signedUrl}
+                          alt="Payment receipt"
+                          className={cn(
+                            "w-full object-contain",
+                            view === "rejecting" ? "max-h-40" : "max-h-72"
+                          )}
+                        />
+                      </div>
+                    ) : (
+                      /* PDF / unsupported */
+                      <div className="border-border/60 bg-muted/30 flex items-center gap-3 rounded-xl border p-4">
+                        <div className="bg-primary/10 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg">
+                          <FileText className="text-primary h-5 w-5" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-foreground truncate text-sm font-medium">
+                            {proof.file_url.split("/").pop()}
+                          </p>
+                          <p className="text-muted-foreground text-xs">PDF document</p>
+                        </div>
+                      </div>
+                    )
                   ) : (
-                    /* PDF / unsupported */
-                    <div className="border-border/60 bg-muted/30 flex items-center gap-3 rounded-xl border p-4">
-                      <div className="bg-primary/10 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg">
-                        <FileText className="text-primary h-5 w-5" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-foreground truncate text-sm font-medium">
-                          {proof.file_url.split("/").pop()}
-                        </p>
-                        <p className="text-muted-foreground text-xs">PDF document</p>
-                      </div>
+                    /* No receipt attached */
+                    <div className="border-border/60 bg-muted/20 flex items-center gap-2.5 rounded-xl border px-3 py-2.5">
+                      <Paperclip className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
+                      <p className="text-muted-foreground text-xs">No receipt attached</p>
                     </div>
                   )}
 

@@ -1,4 +1,6 @@
-import { CalendarClock, Clock } from "lucide-react";
+import { useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { CalendarClock, ChevronDown, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { UpcomingInstallment } from "@/hooks/useUpcomingInstallments";
 
@@ -42,73 +44,122 @@ function SkeletonRow() {
 interface UpcomingPaymentsProps {
   installments: UpcomingInstallment[];
   loading?: boolean;
+  showBorrower?: boolean;
 }
 
-export function UpcomingPayments({ installments, loading }: UpcomingPaymentsProps) {
+export function UpcomingPayments({ installments, loading, showBorrower }: UpcomingPaymentsProps) {
+  const [isOpen, setIsOpen] = useState(true);
+
   return (
     <div className="bg-card border-border/60 overflow-hidden rounded-xl border">
-      {/* Header */}
-      <div className="border-border/60 flex items-center gap-2.5 border-b px-4 py-3.5">
-        <CalendarClock className="text-muted-foreground h-4 w-4" />
-        <h2 className="text-foreground text-sm font-semibold">Upcoming Payments</h2>
-      </div>
+      {/* Header — click to collapse */}
+      <button
+        onClick={() => setIsOpen((v) => !v)}
+        className="border-border/60 flex w-full cursor-pointer items-center gap-2.5 border-b px-4 py-3.5 transition-colors hover:bg-muted/30"
+      >
+        <CalendarClock className="text-muted-foreground h-4 w-4 shrink-0" />
+        <h2 className="text-foreground flex-1 text-left text-sm font-semibold">Upcoming Payments</h2>
 
-      {/* Body */}
-      {loading ? (
-        <div className="divide-border/40 divide-y">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <SkeletonRow key={i} />
-          ))}
-        </div>
-      ) : installments.length === 0 ? (
-        <div className="text-muted-foreground px-4 py-10 text-center text-sm">
-          No upcoming payments.
-        </div>
-      ) : (
-        <div className="divide-border/40 divide-y">
-          {installments.map((inst) => {
-            const { label, urgent } = formatDueDate(inst.due_date);
-            return (
-              <div key={inst.id} className="flex items-center gap-3 px-4 py-3">
-                {/* Icon */}
-                <div
-                  className={cn(
-                    "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
-                    inst.status === "pending"
-                      ? "bg-amber-500/15 text-amber-400"
-                      : urgent
-                        ? "bg-rose-500/15 text-rose-400"
-                        : "bg-muted text-muted-foreground"
-                  )}
-                >
-                  <Clock className="h-4 w-4" />
-                </div>
+        {!loading && installments.length > 0 && (
+          <span className="bg-primary/10 text-primary rounded-full px-2 py-0.5 text-xs font-medium">
+            {installments.length}
+          </span>
+        )}
 
-                {/* Info */}
-                <div className="min-w-0 flex-1">
-                  <p className="text-foreground truncate text-sm font-medium">
-                    {inst.source_name}
-                  </p>
-                  <p className="text-muted-foreground text-xs">
-                    Installment #{inst.installment_no}
-                    {inst.status === "pending" && (
-                      <span className="text-amber-400 ml-1">· pending review</span>
-                    )}
-                  </p>
-                </div>
+        <ChevronDown
+          className={cn(
+            "text-muted-foreground h-4 w-4 shrink-0 transition-transform duration-200",
+            isOpen ? "rotate-0" : "-rotate-90"
+          )}
+        />
+      </button>
 
-                {/* Amount + due */}
-                <div className="shrink-0 text-right">
-                  <p className="text-foreground text-sm font-semibold">
-                    {formatCurrency(inst.amount, inst.currency)}
-                  </p>
-                  <p className={cn("text-xs", urgent ? "font-medium text-rose-400" : "text-muted-foreground")}>
-                    {label}
-                  </p>
-                </div>
+      {/* Collapsible body */}
+      <AnimatePresence initial={false}>
+        {isOpen && (
+          <motion.div
+            key="body"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+            style={{ overflow: "hidden" }}
+          >
+            {loading ? (
+              <div className="divide-border/40 divide-y">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <SkeletonRow key={i} />
+                ))}
               </div>
-            );
-          })}
+            ) : installments.length === 0 ? (
+              <div className="text-muted-foreground px-4 py-10 text-center text-sm">
+                No upcoming payments.
+              </div>
+            ) : (
+              <div className="divide-border/40 divide-y">
+                {installments.map((inst) => {
+                  const { label, urgent } = formatDueDate(inst.due_date);
+                  return (
+                    <div key={inst.id} className="flex items-center gap-3 px-4 py-3">
+                      {/* Icon */}
+                      <div
+                        className={cn(
+                          "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+                          inst.status === "pending"
+                            ? "bg-amber-500/15 text-amber-400"
+                            : urgent
+                              ? "bg-rose-500/15 text-rose-400"
+                              : "bg-muted text-muted-foreground"
+                        )}
+                      >
+                        <Clock className="h-4 w-4" />
+                      </div>
+
+                      {/* Info */}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-foreground truncate text-sm font-medium">
+                          {inst.source_name}
+                        </p>
+                        <p className="text-muted-foreground text-xs">
+                          {showBorrower && inst.borrower_name ? (
+                            <span className="text-foreground/70">{inst.borrower_name} · </span>
+                          ) : null}
+                          Installment #{inst.installment_no}
+                          {inst.status === "pending" && (
+                            <span className="ml-1 text-amber-400">· pending review</span>
+                          )}
+                        </p>
+                      </div>
+
+                      {/* Amount + due */}
+                      <div className="shrink-0 text-right">
+                        <p className="text-foreground text-sm font-semibold">
+                          {formatCurrency(inst.amount, inst.currency)}
+                        </p>
+                        <p
+                          className={cn(
+                            "text-xs",
+                            urgent ? "font-medium text-rose-400" : "text-muted-foreground"
+                          )}
+                        >
+                          {label}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Collapsed summary pill */}
+      {!isOpen && !loading && installments.length > 0 && (
+        <div className="px-4 py-2.5">
+          <p className="text-muted-foreground text-xs">
+            {installments.length} payment{installments.length !== 1 ? "s" : ""} upcoming
+          </p>
         </div>
       )}
     </div>

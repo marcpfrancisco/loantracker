@@ -9,12 +9,14 @@ import LoansPage from "@/pages/LoansPage";
 import LoanDetailPage from "@/pages/LoanDetailPage";
 import AdminPage from "@/pages/AdminPage";
 import ProfilePage from "@/pages/ProfilePage";
+import { RouteErrorPage } from "@/components/ErrorBoundary";
 
 export const router = createBrowserRouter([
   // ── Root redirect ──────────────────────────────────────────────────────────
   {
     index: true,
     loader: () => redirect("/dashboard"),
+    errorElement: <RouteErrorPage />,
   },
 
   // ── Guest-only routes ──────────────────────────────────────────────────────
@@ -39,6 +41,7 @@ export const router = createBrowserRouter([
   {
     loader: requireAuth,
     Component: DashboardLayout,
+    errorElement: <RouteErrorPage />,
     children: [
       {
         path: "dashboard",

@@ -1,14 +1,17 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { X, Loader2 } from "lucide-react";
+import { X, Loader2, CalendarDays } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Resolver } from "react-hook-form";
 import { cn } from "@/lib/utils";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAdminBorrowers } from "@/hooks/useAdminBorrowers";
 import { useCreditSources } from "@/hooks/useCreditSources";
 import { useCreateLoan } from "@/hooks/useCreateLoan";
+import { getLoanTypesForSource, getLoanTypeConfig } from "@/types/schema";
 import type { LoanType, RegionType, CurrencyType } from "@/types/database";
 
 // ── Schema ────────────────────────────────────────────────────────────────────
@@ -16,16 +19,22 @@ import type { LoanType, RegionType, CurrencyType } from "@/types/database";
 const addLoanSchema = z.object({
   borrower_id: z.string().min(1, "Select a borrower"),
   source_id: z.string().min(1, "Select a credit source"),
-  loan_type: z.enum(["tabby", "sloan", "gloan", "spaylater", "credit_card", "custom"]),
+  loan_type: z.enum([
+    "tabby",
+    "sloan",
+    "gloan",
+    "spaylater",
+    "credit_card",
+    "custom",
+    "lazcredit",
+    "maribank_credit",
+  ]),
   principal: z.coerce.number({ message: "Enter a valid amount" }).positive("Must be positive"),
   interest_rate: z.preprocess(
     (v) => (v === "" || v == null ? null : Number(v)),
     z.number().min(0).max(100).nullable()
   ),
-  service_fee: z.preprocess(
-    (v) => (v === "" || v == null ? 0 : Number(v)),
-    z.number().min(0)
-  ),
+  service_fee: z.preprocess((v) => (v === "" || v == null ? 0 : Number(v)), z.number().min(0)),
   installments_total: z.coerce
     .number({ message: "Enter count" })
     .int()
@@ -39,7 +48,6 @@ const addLoanSchema = z.object({
   notes: z.string().optional(),
 });
 
-// Explicit output type — z.preprocess fields lose their output type via inference
 type FormData = {
   borrower_id: string;
   source_id: string;
@@ -53,43 +61,16 @@ type FormData = {
   notes?: string;
 };
 
-// ── Loan type templates ───────────────────────────────────────────────────────
-
-interface Template {
-  installments_total: number;
-  interest_rate: number | null;
-  service_fee: number;
-  region: RegionType | null;
-}
-
-const TEMPLATES: Record<LoanType, Template> = {
-  tabby:       { installments_total: 4,  interest_rate: 0,    service_fee: 0, region: "UAE" },
-  sloan:       { installments_total: 3,  interest_rate: null, service_fee: 0, region: "PH"  },
-  gloan:       { installments_total: 3,  interest_rate: null, service_fee: 0, region: "PH"  },
-  spaylater:   { installments_total: 3,  interest_rate: null, service_fee: 0, region: "PH"  },
-  credit_card: { installments_total: 12, interest_rate: null, service_fee: 0, region: null  },
-  custom:      { installments_total: 1,  interest_rate: null, service_fee: 0, region: null  },
-};
-
-const LOAN_TYPE_OPTIONS: { value: LoanType; label: string }[] = [
-  { value: "tabby",       label: "Tabby"       },
-  { value: "sloan",       label: "SLoan"       },
-  { value: "gloan",       label: "GLoan"       },
-  { value: "spaylater",   label: "SPayLater"   },
-  { value: "credit_card", label: "Credit Card" },
-  { value: "custom",      label: "Custom"      },
-];
-
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function regionToCurrency(region: RegionType): CurrencyType {
   return region === "UAE" ? "AED" : "PHP";
 }
 
-function loanTypeAllowedForRegion(type: LoanType, region: RegionType | null): boolean {
-  if (region === null) return true;
-  const tpl = TEMPLATES[type];
-  return tpl.region === null || tpl.region === region;
+function ordinal(n: number): string {
+  const s = ["th", "st", "nd", "rd"];
+  const v = n % 100;
+  return `${n}${s[(v - 20) % 10] ?? s[v] ?? s[0]}`;
 }
 
 // ── Field components ──────────────────────────────────────────────────────────
@@ -130,9 +111,10 @@ interface AddLoanDrawerProps {
 
 export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
   const { data: allBorrowers = [] } = useAdminBorrowers();
-  // Only confirmed accounts can be assigned loans
   const borrowers = allBorrowers.filter((b) => b.isConfirmed);
   const { mutateAsync: createLoan, isPending } = useCreateLoan();
+  const [dueDateOpen, setDueDateOpen] = useState(false);
+  const [startDateOpen, setStartDateOpen] = useState(false);
 
   const {
     register,
@@ -158,31 +140,115 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
   });
 
   const watchedBorrowerId = watch("borrower_id");
+  const watchedSourceId = watch("source_id");
   const watchedLoanType = watch("loan_type");
+  const watchedInstallments = watch("installments_total");
+  const watchedDueDay = watch("due_day_of_month");
 
   const selectedBorrower = borrowers.find((b) => b.id === watchedBorrowerId) ?? null;
   const borrowerRegion = selectedBorrower?.region ?? null;
 
-  const { data: creditSources = [] } = useCreditSources(borrowerRegion);
+  const {
+    data: creditSources = [],
+    isLoading: sourcesLoading,
+    error: sourcesError,
+  } = useCreditSources(borrowerRegion);
 
-  // Apply template when loan type changes
-  useEffect(() => {
-    const tpl = TEMPLATES[watchedLoanType];
-    setValue("installments_total", tpl.installments_total, { shouldValidate: false });
-    if (tpl.interest_rate !== null) {
-      setValue("interest_rate", tpl.interest_rate, { shouldValidate: false });
-    }
-    setValue("service_fee", tpl.service_fee, { shouldValidate: false });
-  }, [watchedLoanType, setValue]);
+  const selectedSource = creditSources.find((s) => s.id === watchedSourceId) ?? null;
+  const availableLoanTypes = selectedSource ? getLoanTypesForSource(selectedSource.name) : [];
+  const activeConfig = selectedSource
+    ? getLoanTypeConfig(selectedSource.name, watchedLoanType)
+    : null;
+  const availableDurations = activeConfig?.available_durations ?? [];
+  const hasStampTax = !!activeConfig?.stamp_tax_tiers;
 
   // Reset source when borrower changes
   useEffect(() => {
     setValue("source_id", "", { shouldValidate: false });
   }, [watchedBorrowerId, setValue]);
 
+  // Auto-select first loan type when source changes
+  useEffect(() => {
+    const source = creditSources.find((s) => s.id === watchedSourceId);
+    if (!source) return;
+    const types = getLoanTypesForSource(source.name);
+    if (types.length > 0) {
+      setValue("loan_type", types[0].loan_type, { shouldValidate: false });
+    }
+  }, [watchedSourceId, creditSources, setValue]);
+
+  // Apply template fields when loan type or source changes
+  useEffect(() => {
+    if (!selectedSource) return;
+    const config = getLoanTypeConfig(selectedSource.name, watchedLoanType);
+    if (!config) return;
+
+    setValue("installments_total", config.installments_total, { shouldValidate: false });
+    setValue("interest_rate", config.interest_rate ?? null, { shouldValidate: false });
+    setValue("service_fee", config.service_fee, { shouldValidate: false });
+    setValue("due_day_of_month", config.due_day_of_month ?? null, { shouldValidate: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedLoanType, watchedSourceId, setValue]);
+
+  // Recompute stamp tax when installments_total changes (e.g. Maribank)
+  useEffect(() => {
+    if (!selectedSource) return;
+    const config = getLoanTypeConfig(selectedSource.name, watchedLoanType);
+    if (!config?.stamp_tax_tiers) return;
+
+    const months = Number(watchedInstallments);
+    const tier = config.stamp_tax_tiers.find((t) => t.months === months);
+    if (tier) {
+      setValue("service_fee", tier.amount, { shouldValidate: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedInstallments, setValue]);
+
+  const watchedStartedAt = watch("started_at");
+
   function handleClose() {
     reset();
+    setDueDateOpen(false);
+    setStartDateOpen(false);
     onClose();
+  }
+
+  function handleDaySelect(date: Date | undefined) {
+    setValue("due_day_of_month", date ? date.getDate() : null, { shouldValidate: true });
+    setDueDateOpen(false);
+  }
+
+  function handleStartDateSelect(date: Date | undefined) {
+    if (date) {
+      // Format as YYYY-MM-DD in local time (avoid UTC offset shifting the day)
+      const y = date.getFullYear();
+      const m = String(date.getMonth() + 1).padStart(2, "0");
+      const d = String(date.getDate()).padStart(2, "0");
+      setValue("started_at", `${y}-${m}-${d}`, { shouldValidate: true });
+    }
+    setStartDateOpen(false);
+  }
+
+  // Calendar selected date — represent the chosen day in the current month
+  const calendarSelected = watchedDueDay
+    ? new Date(new Date().getFullYear(), new Date().getMonth(), watchedDueDay)
+    : undefined;
+
+  // Start date calendar — parse YYYY-MM-DD in local time
+  const startDateSelected = watchedStartedAt
+    ? (() => {
+        const [y, mo, d] = watchedStartedAt.split("-").map(Number);
+        return new Date(y, mo - 1, d);
+      })()
+    : undefined;
+
+  function formatStartDate(dateStr: string): string {
+    const [y, mo, d] = dateStr.split("-").map(Number);
+    return new Date(y, mo - 1, d).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
   }
 
   async function onSubmit(data: FormData) {
@@ -206,8 +272,8 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
     handleClose();
   }
 
-  const isTabby = watchedLoanType === "tabby";
   const currencyLabel = borrowerRegion ? regionToCurrency(borrowerRegion) : "PHP / AED";
+  const showLoanTypeSelector = selectedSource && availableLoanTypes.length > 1;
 
   return (
     <AnimatePresence>
@@ -257,10 +323,9 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
               className="flex flex-1 flex-col overflow-hidden"
             >
               <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
-
-                {/* ── Borrower & Source ─────────────────────────────── */}
+                {/* ── Borrower + Credit Source ───────────────────────── */}
                 <section className="space-y-4">
-                  <h3 className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+                  <h3 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
                     Borrower
                   </h3>
 
@@ -277,15 +342,20 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
 
                   <FieldWrapper
                     label="Credit Source"
-                    error={errors.source_id?.message}
+                    error={
+                      sourcesError ? "Failed to load credit sources" : errors.source_id?.message
+                    }
                     hint={!borrowerRegion ? "Select a borrower first" : undefined}
                   >
                     <select
                       {...register("source_id")}
-                      disabled={!borrowerRegion}
-                      className={cn(selectClass, !borrowerRegion && "opacity-50")}
+                      disabled={!borrowerRegion || sourcesLoading}
+                      className={cn(
+                        selectClass,
+                        (!borrowerRegion || sourcesLoading) && "opacity-50"
+                      )}
                     >
-                      <option value="">Select source…</option>
+                      <option value="">{sourcesLoading ? "Loading…" : "Select source…"}</option>
                       {creditSources.map((s) => (
                         <option key={s.id} value={s.id}>
                           {s.name}
@@ -295,36 +365,37 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
                   </FieldWrapper>
                 </section>
 
-                {/* ── Loan Type ─────────────────────────────────────── */}
-                <section className="space-y-4">
-                  <h3 className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
-                    Loan Type
-                  </h3>
+                {/* ── Loan Type (only when source has multiple types) ── */}
+                {showLoanTypeSelector && (
+                  <section className="space-y-4">
+                    <h3 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+                      Loan Type
+                    </h3>
+                    <div className="grid grid-cols-3 gap-2">
+                      {availableLoanTypes.map((opt) => (
+                        <button
+                          key={opt.loan_type}
+                          type="button"
+                          onClick={() =>
+                            setValue("loan_type", opt.loan_type, { shouldValidate: true })
+                          }
+                          className={cn(
+                            "cursor-pointer rounded-lg border px-3 py-2 text-xs font-medium transition-colors",
+                            watchedLoanType === opt.loan_type
+                              ? "bg-primary/15 border-primary/40 text-primary"
+                              : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
+                          )}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+                )}
 
-                  <div className="grid grid-cols-3 gap-2">
-                    {LOAN_TYPE_OPTIONS.filter((opt) =>
-                      loanTypeAllowedForRegion(opt.value, borrowerRegion)
-                    ).map((opt) => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => setValue("loan_type", opt.value, { shouldValidate: true })}
-                        className={cn(
-                          "cursor-pointer rounded-lg border px-3 py-2 text-xs font-medium transition-colors",
-                          watchedLoanType === opt.value
-                            ? "bg-primary/15 border-primary/40 text-primary"
-                            : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
-                        )}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </section>
-
-                {/* ── Loan Details ──────────────────────────────────── */}
+                {/* ── Loan Details ───────────────────────────────────── */}
                 <section className="space-y-4">
-                  <h3 className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+                  <h3 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
                     Loan Details
                   </h3>
 
@@ -346,6 +417,7 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
                     <FieldWrapper
                       label="Interest Rate (%)"
                       error={errors.interest_rate?.message}
+                      hint="Monthly add-on rate"
                     >
                       <input
                         {...register("interest_rate")}
@@ -353,15 +425,15 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
                         step="0.01"
                         min="0"
                         max="100"
-                        placeholder={isTabby ? "0" : "e.g. 3.5"}
-                        readOnly={isTabby}
-                        className={cn(inputClass, isTabby && "opacity-50")}
+                        placeholder="e.g. 2.95"
+                        className={inputClass}
                       />
                     </FieldWrapper>
 
                     <FieldWrapper
                       label="Service Fee"
                       error={errors.service_fee?.message}
+                      hint={hasStampTax ? "Auto from stamp tax" : undefined}
                     >
                       <input
                         {...register("service_fee")}
@@ -375,37 +447,112 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
+                    {/* Installments — select from available durations */}
                     <FieldWrapper
                       label="Installments"
                       error={errors.installments_total?.message}
+                      hint={hasStampTax ? "Updates stamp tax" : undefined}
                     >
-                      <input
+                      <select
                         {...register("installments_total")}
-                        type="number"
-                        min="1"
-                        max="60"
-                        className={inputClass}
-                      />
+                        disabled={availableDurations.length === 0}
+                        className={cn(selectClass, availableDurations.length === 0 && "opacity-50")}
+                      >
+                        {availableDurations.length === 0 ? (
+                          <option value="">—</option>
+                        ) : (
+                          availableDurations.map((d) => (
+                            <option key={d} value={d}>
+                              {d}{" "}
+                              {d === 4 && selectedSource?.name === "Tabby" ? "payments" : "months"}
+                            </option>
+                          ))
+                        )}
+                      </select>
                     </FieldWrapper>
 
-                    <FieldWrapper
-                      label="Due Day of Month"
-                      error={errors.due_day_of_month?.message}
-                      hint="Optional — for credit cards"
-                    >
-                      <input
-                        {...register("due_day_of_month")}
-                        type="number"
-                        min="1"
-                        max="31"
-                        placeholder="e.g. 15"
-                        className={inputClass}
-                      />
+                    {/* Due Day — calendar popover */}
+                    <FieldWrapper label="Due Day of Month" error={errors.due_day_of_month?.message}>
+                      {/* Hidden input keeps RHF in sync */}
+                      <input type="hidden" {...register("due_day_of_month")} />
+
+                      <Popover open={dueDateOpen} onOpenChange={setDueDateOpen}>
+                        <PopoverTrigger
+                          className={cn(
+                            inputClass,
+                            "flex cursor-pointer items-center justify-between text-left",
+                            !watchedDueDay && "text-muted-foreground/50"
+                          )}
+                        >
+                          <span>
+                            {watchedDueDay
+                              ? `${ordinal(watchedDueDay)} of the month`
+                              : "Pick a day…"}
+                          </span>
+                          <CalendarDays className="text-muted-foreground h-4 w-4 shrink-0" />
+                        </PopoverTrigger>
+                        <PopoverContent
+                          className="w-auto p-0"
+                          align="start"
+                          side="bottom"
+                          sideOffset={4}
+                        >
+                          <Calendar
+                            mode="single"
+                            selected={calendarSelected}
+                            onSelect={handleDaySelect}
+                            initialFocus
+                          />
+                          {watchedDueDay && (
+                            <div className="border-border/60 border-t px-3 py-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setValue("due_day_of_month", null, { shouldValidate: true });
+                                  setDueDateOpen(false);
+                                }}
+                                className="text-muted-foreground hover:text-foreground cursor-pointer text-xs transition-colors"
+                              >
+                                Clear
+                              </button>
+                            </div>
+                          )}
+                        </PopoverContent>
+                      </Popover>
                     </FieldWrapper>
                   </div>
 
                   <FieldWrapper label="Start Date" error={errors.started_at?.message}>
-                    <input {...register("started_at")} type="date" className={inputClass} />
+                    {/* Hidden input keeps RHF in sync */}
+                    <input type="hidden" {...register("started_at")} />
+
+                    <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
+                      <PopoverTrigger
+                        className={cn(
+                          inputClass,
+                          "flex cursor-pointer items-center justify-between text-left",
+                          !watchedStartedAt && "text-muted-foreground/50"
+                        )}
+                      >
+                        <span>
+                          {watchedStartedAt ? formatStartDate(watchedStartedAt) : "Pick a date…"}
+                        </span>
+                        <CalendarDays className="text-muted-foreground h-4 w-4 shrink-0" />
+                      </PopoverTrigger>
+                      <PopoverContent
+                        className="w-auto p-0"
+                        align="start"
+                        side="bottom"
+                        sideOffset={4}
+                      >
+                        <Calendar
+                          mode="single"
+                          selected={startDateSelected}
+                          onSelect={handleStartDateSelect}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </FieldWrapper>
 
                   <FieldWrapper label="Notes" error={errors.notes?.message}>

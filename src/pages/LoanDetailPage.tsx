@@ -13,12 +13,14 @@ import type { LoanStatus, LoanType, CreditSourceType, PaymentStatus } from "@/ty
 // ── Lookup maps ───────────────────────────────────────────────────────────────
 
 const loanTypeLabels: Record<LoanType, string> = {
-  tabby:       "Tabby",
-  sloan:       "SLoan",
-  gloan:       "GLoan",
-  spaylater:   "SPayLater",
-  credit_card: "Credit Card",
-  custom:      "Custom",
+  tabby:            "Tabby",
+  sloan:            "SLoan",
+  gloan:            "GLoan",
+  spaylater:        "SPayLater",
+  credit_card:      "Credit Card",
+  custom:           "Custom",
+  lazcredit:        "LazCredit",
+  maribank_credit:  "Maribank Credit",
 };
 
 const sourceTypeLabels: Record<CreditSourceType, string> = {

@@ -9,7 +9,7 @@ export type CurrencyType = "PHP" | "AED";
 export type LoanStatus = "active" | "completed" | "defaulted" | "cancelled";
 export type PaymentStatus = "unpaid" | "pending" | "paid";
 export type CreditSourceType = "e_wallet" | "credit_card" | "bnpl" | "bank_transfer";
-export type LoanType = "tabby" | "sloan" | "gloan" | "spaylater" | "credit_card" | "custom";
+export type LoanType = "tabby" | "sloan" | "gloan" | "spaylater" | "credit_card" | "custom" | "lazcredit" | "maribank_credit";
 export type ProofStatus = "pending" | "approved" | "rejected";
 
 // ── Database interface (matches supabase-js GenericSchema shape exactly) ──────

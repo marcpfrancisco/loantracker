@@ -27,5 +27,7 @@ export function useCreditSources(region: RegionType | null) {
   return useQuery({
     queryKey: ["credit-sources", region],
     queryFn: () => fetchCreditSources(region),
+    enabled: region !== null,
+    staleTime: 1000 * 60 * 5, // credit sources rarely change
   });
 }

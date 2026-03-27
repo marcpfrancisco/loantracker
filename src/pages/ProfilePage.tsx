@@ -135,6 +135,58 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
+// ── Skeleton ──────────────────────────────────────────────────────────────────
+
+function ProfilePageSkeleton() {
+  return (
+    <div className="mx-auto max-w-2xl space-y-5 p-6">
+      <div className="bg-muted h-6 w-28 animate-pulse rounded" />
+
+      {/* Basic Info card */}
+      <div className="bg-card border-border/60 overflow-hidden rounded-xl border">
+        <div className="border-border/60 border-b px-5 py-4">
+          <div className="bg-muted h-4 w-20 animate-pulse rounded" />
+        </div>
+        <div className="space-y-6 px-5 py-5">
+          <div className="flex flex-col items-center gap-4">
+            <div className="bg-muted h-20 w-20 animate-pulse rounded-full" />
+            <div className="flex gap-2">
+              <div className="bg-muted h-7 w-28 animate-pulse rounded-lg" />
+              <div className="bg-muted h-7 w-28 animate-pulse rounded-lg" />
+            </div>
+          </div>
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="space-y-1.5">
+                <div className="bg-muted h-3 w-16 animate-pulse rounded" />
+                <div className="bg-muted h-9 w-full animate-pulse rounded-lg" />
+              </div>
+            ))}
+          </div>
+          <div className="bg-muted h-9 w-28 animate-pulse rounded-lg" />
+        </div>
+      </div>
+
+      {/* Account Settings card */}
+      <div className="bg-card border-border/60 overflow-hidden rounded-xl border">
+        <div className="border-border/60 border-b px-5 py-4">
+          <div className="bg-muted h-4 w-32 animate-pulse rounded" />
+        </div>
+        <div className="space-y-4 px-5 py-5">
+          <div className="bg-muted h-3 w-28 animate-pulse rounded" />
+          {[1, 2].map((i) => (
+            <div key={i} className="space-y-1.5">
+              <div className="bg-muted h-3 w-20 animate-pulse rounded" />
+              <div className="bg-muted h-9 w-full animate-pulse rounded-lg" />
+            </div>
+          ))}
+          <div className="bg-muted h-9 w-36 animate-pulse rounded-lg" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function ProfilePage() {
@@ -256,7 +308,7 @@ export default function ProfilePage() {
   const activeLoans = loans.filter((l) => l.status === "active");
   const pastLoans = loans.filter((l) => l.status !== "active");
 
-  if (!profile) return null;
+  if (!profile) return <ProfilePageSkeleton />;
 
   const inputClass =
     "bg-muted/50 border-border/60 focus:border-primary/60 w-full rounded-lg border px-3 py-2 text-sm outline-none transition-colors placeholder:text-muted-foreground/50 disabled:opacity-50 disabled:cursor-not-allowed";

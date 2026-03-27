@@ -200,7 +200,7 @@ export default function AdminPage() {
             value={
               statsLoading
                 ? "—"
-                : formatCurrency(stats?.portfolioOutstanding.PHP ?? 0, "PHP")
+                : formatCurrency(stats?.portfolioOutstanding?.PHP ?? 0, "PHP")
             }
             loading={statsLoading}
             accent="blue"
@@ -213,7 +213,7 @@ export default function AdminPage() {
             value={
               statsLoading
                 ? "—"
-                : formatCurrency(stats?.portfolioOutstanding.AED ?? 0, "AED")
+                : formatCurrency(stats?.portfolioOutstanding?.AED ?? 0, "AED")
             }
             loading={statsLoading}
             accent="amber"

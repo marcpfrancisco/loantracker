@@ -46,9 +46,15 @@ export function TopBar() {
         </span>
       </div>
 
-      {/* Right: region badge + avatar menu */}
+      {/* Right: theme toggle + avatar menu */}
       <div className="flex items-center gap-2">
-        {profile && <RegionBadge region={profile.region} />}
+        <button
+          onClick={toggleTheme}
+          className="text-muted-foreground hover:text-foreground hover:bg-muted/50 flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg transition-colors"
+          aria-label="Toggle theme"
+        >
+          {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </button>
 
         {profile && (
           <div className="relative">
@@ -95,13 +101,6 @@ export function TopBar() {
                     >
                       <UserCircle className="h-4 w-4" />
                       My Profile
-                    </button>
-                    <button
-                      onClick={() => { toggleTheme(); setShowMenu(false); }}
-                      className="text-muted-foreground hover:text-foreground hover:bg-muted/50 flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors"
-                    >
-                      {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                      {theme === "dark" ? "Light mode" : "Dark mode"}
                     </button>
                     <button
                       onClick={() => { void signOut(); setShowMenu(false); }}

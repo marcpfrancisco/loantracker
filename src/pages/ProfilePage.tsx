@@ -152,13 +152,9 @@ export default function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ── Basic info state ───────────────────────────────────────────────────────
-  const [fullName, setFullName] = useState(profile?.full_name ?? "");
+  const [fullName, setFullName] = useState(() => profile?.full_name ?? "");
 
   const { mutate: updateProfile, isPending: updatingProfile } = useUpdateProfile();
-
-  useEffect(() => {
-    if (profile?.full_name) setFullName(profile.full_name);
-  }, [profile?.full_name]);
 
   useEffect(() => {
     return () => {

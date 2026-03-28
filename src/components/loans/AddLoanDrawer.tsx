@@ -194,7 +194,6 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedLoanType, watchedSourceId, setValue]);
 
-
   const watchedStartedAt = watch("started_at");
 
   function handleClose() {
@@ -288,7 +287,7 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", bounce: 0.1, duration: 0.4 }}
-            className="bg-background border-border/60 fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l shadow-2xl sm:w-[480px]"
+            className="bg-background border-border/60 fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l shadow-2xl sm:w-120"
           >
             {/* Header */}
             <div className="border-border/60 flex shrink-0 items-center justify-between border-b px-5 py-4">
@@ -424,7 +423,11 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
                     <FieldWrapper
                       label={isMaribank ? "Stamp Tax" : "Service Fee"}
                       error={errors.service_fee?.message}
-                      hint={isMaribank ? "Enter actual amount from Maribank app — varies by principal" : undefined}
+                      hint={
+                        isMaribank
+                          ? "Enter actual amount from Maribank app — varies by principal"
+                          : undefined
+                      }
                     >
                       <input
                         {...register("service_fee")}
@@ -439,10 +442,7 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
 
                   <div className="grid grid-cols-2 gap-3">
                     {/* Installments — select from available durations */}
-                    <FieldWrapper
-                      label="Installments"
-                      error={errors.installments_total?.message}
-                    >
+                    <FieldWrapper label="Installments" error={errors.installments_total?.message}>
                       <select
                         {...register("installments_total")}
                         disabled={availableDurations.length === 0}

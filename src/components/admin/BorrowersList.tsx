@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { AnimatePresence, motion } from "framer-motion";
-import { Users, ChevronDown } from "lucide-react";
+import { Users, ChevronDown, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BorrowerSummary } from "@/hooks/useAdminBorrowers";
+import { LoanStatementDrawer } from "./LoanStatementDrawer";
 
 interface BorrowersListProps {
   borrowers: BorrowerSummary[];
@@ -46,8 +47,11 @@ function SkeletonRow() {
 export function BorrowersList({ borrowers, loading }: BorrowersListProps) {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(true);
+  const [statementBorrowerId, setStatementBorrowerId] = useState<string | null>(null);
+  const [statementBorrowerName, setStatementBorrowerName] = useState("");
 
   return (
+    <>
     <div className="bg-card border-border/60 overflow-hidden rounded-xl border">
       {/* Header — click to collapse */}
       <button
@@ -103,12 +107,12 @@ export function BorrowersList({ borrowers, loading }: BorrowersListProps) {
                       : undefined;
 
                   return (
-                    <div key={b.id} className="group relative">
+                    <div key={b.id} className="group relative flex items-center">
                       <button
                         onClick={() => isClickable && void navigate(`/loans?borrower=${b.id}`)}
                         disabled={!isClickable}
                         className={cn(
-                          "flex w-full items-center gap-3 px-4 py-3 text-left transition-colors",
+                          "flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left transition-colors",
                           isClickable
                             ? "hover:bg-muted/40 cursor-pointer"
                             : "cursor-not-allowed opacity-60"
@@ -152,6 +156,21 @@ export function BorrowersList({ borrowers, loading }: BorrowersListProps) {
                         )}
                       </button>
 
+                      {/* Statement button — only for confirmed borrowers with loans */}
+                      {b.isConfirmed && b.totalLoans > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setStatementBorrowerId(b.id);
+                            setStatementBorrowerName(b.full_name);
+                          }}
+                          className="text-muted-foreground hover:text-primary hover:bg-muted/50 mr-3 flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg opacity-0 transition-all group-hover:opacity-100"
+                          aria-label={`View statement for ${b.full_name}`}
+                        >
+                          <FileText className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+
                       {/* Tooltip */}
                       {tooltipLabel && (
                         <div className="pointer-events-none absolute top-1/2 right-4 -translate-y-1/2 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
@@ -178,5 +197,12 @@ export function BorrowersList({ borrowers, loading }: BorrowersListProps) {
         </div>
       )}
     </div>
+
+    <LoanStatementDrawer
+      borrowerId={statementBorrowerId}
+      borrowerName={statementBorrowerName}
+      onClose={() => setStatementBorrowerId(null)}
+    />
+    </>
   );
 }

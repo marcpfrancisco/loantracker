@@ -253,6 +253,151 @@ export interface Database {
           },
         ];
       };
+      expense_tabs: {
+        Row: {
+          id: string;
+          borrower_id: string;
+          currency: CurrencyType;
+          region: RegionType;
+          title: string;
+          status: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          borrower_id: string;
+          currency: CurrencyType;
+          region: RegionType;
+          title: string;
+          status?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          borrower_id?: string;
+          currency?: CurrencyType;
+          region?: RegionType;
+          title?: string;
+          status?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "expense_tabs_borrower_id_fkey";
+            columns: ["borrower_id"];
+            isOneToOne: true;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      expense_periods: {
+        Row: {
+          id: string;
+          tab_id: string;
+          period: string;
+          is_locked: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tab_id: string;
+          period: string;
+          is_locked?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          tab_id?: string;
+          period?: string;
+          is_locked?: boolean;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "expense_periods_tab_id_fkey";
+            columns: ["tab_id"];
+            isOneToOne: false;
+            referencedRelation: "expense_tabs";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      expense_items: {
+        Row: {
+          id: string;
+          period_id: string;
+          description: string;
+          amount: number;
+          is_already_split: boolean;
+          borrower_owes: number;
+          entry_date: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          period_id: string;
+          description: string;
+          amount: number;
+          is_already_split?: boolean;
+          borrower_owes: number;
+          entry_date?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          period_id?: string;
+          description?: string;
+          amount?: number;
+          is_already_split?: boolean;
+          borrower_owes?: number;
+          entry_date?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "expense_items_period_id_fkey";
+            columns: ["period_id"];
+            isOneToOne: false;
+            referencedRelation: "expense_periods";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      expense_payments: {
+        Row: {
+          id: string;
+          period_id: string;
+          amount: number;
+          notes: string | null;
+          payment_date: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          period_id: string;
+          amount: number;
+          notes?: string | null;
+          payment_date: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          period_id?: string;
+          amount?: number;
+          notes?: string | null;
+          payment_date?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "expense_payments_period_id_fkey";
+            columns: ["period_id"];
+            isOneToOne: false;
+            referencedRelation: "expense_periods";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<never, never>;
     Functions: {

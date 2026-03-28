@@ -20,6 +20,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useMyLoans } from "@/hooks/useMyLoans";
 import { useUpdateProfile } from "@/hooks/useUpdateProfile";
 import { useChangePassword } from "@/hooks/useChangePassword";
+import { RegionLabel } from "@/components/ui/region-badge";
 import type { LoanStatus, CreditSourceType, LoanType } from "@/types/database";
 
 // ── DiceBear ──────────────────────────────────────────────────────────────────
@@ -464,7 +465,7 @@ export default function ProfilePage() {
             <div className="bg-muted/50 border-border/60 flex items-center gap-2 rounded-lg border px-3 py-2 text-sm">
               <MapPin className="text-muted-foreground h-4 w-4 shrink-0" />
               <span className="text-foreground">
-                {profile.region === "PH" ? "🇵🇭 Philippines" : "🇦🇪 UAE"}
+                <RegionLabel region={profile.region} />
               </span>
             </div>
             <p className="text-muted-foreground text-xs">

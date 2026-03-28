@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { LockKeyhole, Sun, Moon, LogOut, UserCircle } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/context/ThemeContext";
+import { RegionBadge } from "@/components/ui/region-badge";
 
 function getInitials(name: string): string {
   return name
@@ -120,20 +120,3 @@ export function TopBar() {
   );
 }
 
-function RegionBadge({ region }: { region: string }) {
-  const styles =
-    region === "UAE"
-      ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
-      : "bg-blue-500/15 text-blue-400 border-blue-500/30";
-
-  return (
-    <span
-      className={cn(
-        "rounded border px-1.5 py-0.5 text-[10px] font-medium",
-        styles
-      )}
-    >
-      {region}
-    </span>
-  );
-}

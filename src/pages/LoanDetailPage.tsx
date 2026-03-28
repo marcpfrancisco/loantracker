@@ -8,6 +8,7 @@ import { useLoanDetail } from "@/hooks/useLoanDetail";
 import { useUpdateInstallment } from "@/hooks/useUpdateInstallment";
 import { useUpdateLoanStatus } from "@/hooks/useUpdateLoanStatus";
 import { InstallmentRow } from "@/components/loans/InstallmentRow";
+import { RegionLabel } from "@/components/ui/region-badge";
 import type { LoanStatus, LoanType, CreditSourceType, PaymentStatus } from "@/types/database";
 
 // ── Lookup maps ───────────────────────────────────────────────────────────────
@@ -197,7 +198,7 @@ export default function LoanDetailPage() {
             <div>
               <p className="text-muted-foreground text-[10px]">Region</p>
               <p className="text-foreground text-xs font-medium">
-                {loan.region === "PH" ? "🇵🇭 Philippines" : "🇦🇪 UAE"}
+                <RegionLabel region={loan.region} />
               </p>
             </div>
           </div>

@@ -17,6 +17,7 @@ import { cardVariants } from "@/lib/animations";
 import { useBorrowerDetail } from "@/hooks/useBorrowerDetail";
 import { useCreateExpenseTab } from "@/hooks/useExpenseTabMutations";
 import { LoanStatementDrawer } from "@/components/admin/LoanStatementDrawer";
+import { RegionBadge } from "@/components/ui/region-badge";
 import type { CurrencyType } from "@/types/database";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -222,16 +223,7 @@ export default function BorrowerDetailPage() {
                 )}
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-2">
-                <span
-                  className={cn(
-                    "rounded border px-1.5 py-0.5 text-[10px] font-medium",
-                    borrower.region === "UAE"
-                      ? "border-amber-500/30 bg-amber-500/15 text-amber-400"
-                      : "border-blue-500/30 bg-blue-500/15 text-blue-400"
-                  )}
-                >
-                  {borrower.region}
-                </span>
+                <RegionBadge region={borrower.region} />
                 <span className="text-muted-foreground text-xs capitalize">{borrower.role}</span>
                 <span className="text-border text-xs">·</span>
                 <span className="text-muted-foreground text-xs">

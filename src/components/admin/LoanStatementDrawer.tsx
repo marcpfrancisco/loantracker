@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import { useBorrowerStatement } from "@/hooks/useBorrowerStatement";
 import type { StatementLoan } from "@/hooks/useBorrowerStatement";
 import { exportStatementCSV, printStatementPDF } from "@/lib/statementExport";
+import { RegionBadge } from "@/components/ui/region-badge";
 import type { PaymentStatus, LoanStatus } from "@/types/database";
 
 // ── Formatters ────────────────────────────────────────────────────────────────
@@ -286,7 +287,9 @@ export function LoanStatementDrawer({ borrowerId, borrowerName, onClose }: LoanS
                     </div>
                     <div>
                       <p className="text-muted-foreground text-[10px] uppercase tracking-widest">Region</p>
-                      <p className="text-foreground mt-0.5 text-sm font-medium">{statement.borrower.region}</p>
+                      <div className="mt-1">
+                        <RegionBadge region={statement.borrower.region} />
+                      </div>
                     </div>
                     <div>
                       <p className="text-muted-foreground text-[10px] uppercase tracking-widest">Total Loans</p>

@@ -14,6 +14,8 @@ import {
   CalendarPlus,
   ChevronLeft,
   ChevronRight,
+  Download,
+  TableProperties,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -31,6 +33,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { exportExpenseTabCSV, printExpenseTabPDF } from "@/lib/statementExport";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -615,15 +618,38 @@ export default function ExpenseTabDetailPage() {
     <div className="mx-auto flex max-w-2xl flex-col" style={{ height: "calc(100vh - 4rem)" }}>
       {/* ── Header ──────────────────────────────────────────────── */}
       <div className="shrink-0 space-y-4 p-6 pb-0">
-        {/* Back */}
-        <button
-          type="button"
-          onClick={() => void navigate("/tabs")}
-          className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-sm transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Tabs
-        </button>
+        {/* Back + export actions */}
+        <div className="flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => void navigate("/tabs")}
+            className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-sm transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Tabs
+          </button>
+
+          {tab.periods.length > 0 && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => exportExpenseTabCSV(tab)}
+                className="border-border/60 text-muted-foreground hover:text-foreground flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-colors"
+              >
+                <TableProperties className="h-3.5 w-3.5" />
+                CSV
+              </button>
+              <button
+                type="button"
+                onClick={() => printExpenseTabPDF(tab)}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors"
+              >
+                <Download className="h-3.5 w-3.5" />
+                PDF
+              </button>
+            </div>
+          )}
+        </div>
 
         {/* Totals */}
         <div className="bg-card border-border/60 rounded-2xl border p-4">

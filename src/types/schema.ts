@@ -114,11 +114,8 @@ export const CREDIT_SOURCE_CONFIGS: CreditSourceConfig[] = [
     /**
      * Maribank — PH digital bank offering personal cash loans
      * Monthly add-on rate: 2.95%
-     * Processing fee: PHP 0.00
-     * Stamp tax by duration:
-     *   3 months  → PHP  77.07
-     *   6 months  → PHP 152.49
-     *   12 months → PHP 299.25
+     * Stamp tax: varies by principal — admin must enter the actual amount
+     *            shown in the Maribank app per loan (not a fixed value).
      * Default due date: 30th of the month
      */
     name: "Maribank",
@@ -131,13 +128,8 @@ export const CREDIT_SOURCE_CONFIGS: CreditSourceConfig[] = [
         installments_total: 3,
         available_durations: [3, 6, 12],
         interest_rate: 2.95,
-        service_fee: 77.07, // default: 3-month stamp tax
+        service_fee: 0,
         due_day_of_month: 30,
-        stamp_tax_tiers: [
-          { months: 3,  amount:  77.07 },
-          { months: 6,  amount: 152.49 },
-          { months: 12, amount: 299.25 },
-        ],
       },
     ],
   },

@@ -106,27 +106,28 @@ Deno.serve(async (req: Request) => {
       return Response.json({ error: "Borrower email not found" }, { status: 404, headers: corsHeaders });
     }
 
-    // ── 7. Send rejection email via Resend ─────────────────────────────────────
-    const resendKey = Deno.env.get("RESEND_API_KEY");
+    // ── 7. Send rejection email via Brevo ──────────────────────────────────────
+    const brevoKey = Deno.env.get("BREVO_API_KEY");
 
-    if (!resendKey) {
-      console.warn("[notify-rejection] RESEND_API_KEY not set — skipping email");
+    if (!brevoKey) {
+      console.warn("[notify-rejection] BREVO_API_KEY not set — skipping email");
       return Response.json({ ok: true, email_sent: false }, { headers: corsHeaders });
     }
 
-    const fromEmail = Deno.env.get("RESEND_FROM_EMAIL") ?? "Loan Tracker <noreply@loantracker.app>";
+    const fromEmail = Deno.env.get("BREVO_FROM_EMAIL") ?? "noreply@loantracker.app";
+    const fromName  = Deno.env.get("BREVO_FROM_NAME")  ?? "Loan Tracker";
 
-    const emailRes = await fetch("https://api.resend.com/emails", {
+    const emailRes = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${resendKey}`,
+        "api-key": brevoKey,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: fromEmail,
-        to: borrowerUser.email,
-        subject: `Payment proof rejected — ${sourceName} Installment #${installmentNo}`,
-        html: buildRejectionEmail(borrowerName, sourceName, installmentNo, adminNote),
+        sender:      { name: fromName, email: fromEmail },
+        to:          [{ email: borrowerUser.email, name: borrowerName }],
+        subject:     `Payment proof rejected — ${sourceName} Installment #${installmentNo}`,
+        htmlContent: buildRejectionEmail(borrowerName, sourceName, installmentNo, adminNote),
       }),
     });
 

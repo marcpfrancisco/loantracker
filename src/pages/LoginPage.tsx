@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
@@ -20,11 +21,25 @@ const loginSchema = z.object({
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+const REMEMBER_KEY = "remember_me";
+const REMEMBER_EMAIL_KEY = "remembered_email";
+
+function getSavedEmail(): string {
+  return localStorage.getItem(REMEMBER_KEY) === "1"
+    ? (localStorage.getItem(REMEMBER_EMAIL_KEY) ?? "")
+    : "";
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [rememberMe, setRememberMe] = useState(
+    () => localStorage.getItem(REMEMBER_KEY) === "1"
+  );
 
   const {
     register,
@@ -32,7 +47,7 @@ export default function LoginPage() {
     formState: { errors, isSubmitting },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: "", password: "" },
+    defaultValues: { email: getSavedEmail(), password: "" },
   });
 
   const onSubmit = async (values: LoginFormData) => {
@@ -47,6 +62,14 @@ export default function LoginPage() {
       // Keep the message generic — do not distinguish "wrong email" vs "wrong password"
       setServerError("Invalid email or password. Please try again.");
       return;
+    }
+
+    if (rememberMe) {
+      localStorage.setItem(REMEMBER_KEY, "1");
+      localStorage.setItem(REMEMBER_EMAIL_KEY, values.email);
+    } else {
+      localStorage.removeItem(REMEMBER_KEY);
+      localStorage.removeItem(REMEMBER_EMAIL_KEY);
     }
 
     void navigate("/dashboard", { replace: true });
@@ -114,9 +137,8 @@ export default function LoginPage() {
                     Forgot password?
                   </Link>
                 </div>
-                <Input
+                <PasswordInput
                   id="password"
-                  type="password"
                   autoComplete="current-password"
                   placeholder="••••••••"
                   aria-invalid={!!errors.password}
@@ -125,6 +147,23 @@ export default function LoginPage() {
                 {errors.password && (
                   <p className="text-destructive text-xs">{errors.password.message}</p>
                 )}
+              </div>
+
+              {/* Remember me */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="remember-me"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="accent-primary h-3.5 w-3.5 cursor-pointer"
+                />
+                <label
+                  htmlFor="remember-me"
+                  className="text-muted-foreground cursor-pointer select-none text-sm"
+                >
+                  Remember me
+                </label>
               </div>
 
               {/* Server error */}

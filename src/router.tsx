@@ -1,4 +1,4 @@
-import { createBrowserRouter, redirect } from "react-router";
+import { createBrowserRouter, redirect, type LoaderFunctionArgs } from "react-router";
 import { requireAuth, requireAdmin, requireGuest } from "@/lib/loaders";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import LoginPage from "@/pages/LoginPage";
@@ -13,9 +13,21 @@ import { RouteErrorPage } from "@/components/ErrorBoundary";
 
 export const router = createBrowserRouter([
   // ── Root redirect ──────────────────────────────────────────────────────────
+  // Forward Supabase auth params to /reset-password so recovery/invite links
+  // that point to the Site URL root don't lose their code on redirect.
   {
     index: true,
-    loader: () => redirect("/dashboard"),
+    loader: ({ request }: LoaderFunctionArgs) => {
+      const url = new URL(request.url);
+      const code      = url.searchParams.get("code");
+      const tokenHash = url.searchParams.get("token_hash");
+      const type      = url.searchParams.get("type");
+
+      if (code || (tokenHash && type)) {
+        return redirect(`/reset-password?${url.searchParams.toString()}`);
+      }
+      return redirect("/dashboard");
+    },
     errorElement: <RouteErrorPage />,
   },
 

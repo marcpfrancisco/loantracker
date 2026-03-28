@@ -6,6 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/context/ThemeContext";
 import { navItems } from "./navItems";
+import { RegionBadge } from "@/components/ui/region-badge";
 
 function getInitials(name: string): string {
   return name
@@ -142,15 +143,3 @@ export function Sidebar() {
   );
 }
 
-function RegionBadge({ region }: { region: string }) {
-  const styles =
-    region === "UAE"
-      ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
-      : "bg-blue-500/15 text-blue-400 border-blue-500/30";
-
-  return (
-    <span className={cn("rounded border px-1 py-0 text-[10px] font-medium", styles)}>
-      {region}
-    </span>
-  );
-}

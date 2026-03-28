@@ -10,11 +10,14 @@ import {
   Receipt,
   AlertCircle,
   Loader2,
+  FileText,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { cardVariants } from "@/lib/animations";
 import { useBorrowerDetail } from "@/hooks/useBorrowerDetail";
 import { useCreateExpenseTab } from "@/hooks/useExpenseTabMutations";
+import { LoanStatementDrawer } from "@/components/admin/LoanStatementDrawer";
+import { RegionBadge } from "@/components/ui/region-badge";
 import type { CurrencyType } from "@/types/database";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -157,6 +160,7 @@ export default function BorrowerDetailPage() {
   const navigate = useNavigate();
   const { data: borrower, isLoading, error } = useBorrowerDetail(id);
   const [showCreateTab, setShowCreateTab] = useState(false);
+  const [showStatement, setShowStatement] = useState(false);
 
   if (isLoading) {
     return (
@@ -205,18 +209,21 @@ export default function BorrowerDetailPage() {
 
             {/* Info */}
             <div className="min-w-0 flex-1">
-              <h1 className="text-foreground text-lg font-semibold">{borrower.full_name}</h1>
+              <div className="flex items-start justify-between gap-2">
+                <h1 className="text-foreground text-lg font-semibold">{borrower.full_name}</h1>
+                {borrower.loans.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowStatement(true)}
+                    className="border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/40 flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-colors"
+                  >
+                    <FileText className="h-3.5 w-3.5" />
+                    Statement
+                  </button>
+                )}
+              </div>
               <div className="mt-1 flex flex-wrap items-center gap-2">
-                <span
-                  className={cn(
-                    "rounded border px-1.5 py-0.5 text-[10px] font-medium",
-                    borrower.region === "UAE"
-                      ? "border-amber-500/30 bg-amber-500/15 text-amber-400"
-                      : "border-blue-500/30 bg-blue-500/15 text-blue-400"
-                  )}
-                >
-                  {borrower.region}
-                </span>
+                <RegionBadge region={borrower.region} />
                 <span className="text-muted-foreground text-xs capitalize">{borrower.role}</span>
                 <span className="text-border text-xs">·</span>
                 <span className="text-muted-foreground text-xs">
@@ -354,6 +361,13 @@ export default function BorrowerDetailPage() {
           onCreated={(tabId) => void navigate(`/tabs/${tabId}`)}
         />
       )}
+
+      {/* Loan Statement Drawer */}
+      <LoanStatementDrawer
+        borrowerId={showStatement ? (id ?? null) : null}
+        borrowerName={borrower.full_name}
+        onClose={() => setShowStatement(false)}
+      />
     </div>
   );
 }

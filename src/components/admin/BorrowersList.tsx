@@ -5,6 +5,7 @@ import { Users, ChevronDown, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BorrowerSummary } from "@/hooks/useAdminBorrowers";
 import { LoanStatementDrawer } from "./LoanStatementDrawer";
+import { RegionBadge } from "@/components/ui/region-badge";
 
 interface BorrowersListProps {
   borrowers: BorrowerSummary[];
@@ -18,17 +19,6 @@ function getInitials(name: string): string {
     .join("")
     .toUpperCase()
     .slice(0, 2);
-}
-
-function RegionBadge({ region }: { region: string }) {
-  const styles =
-    region === "UAE"
-      ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
-      : "bg-blue-500/15 text-blue-400 border-blue-500/30";
-
-  return (
-    <span className={cn("rounded border px-1.5 py-0.5 text-[10px] font-medium", styles)}>{region}</span>
-  );
 }
 
 function SkeletonRow() {

@@ -140,8 +140,8 @@ Set the required secrets:
 
 ```bash
 npx supabase secrets set SITE_URL=https://your-domain.com
-npx supabase secrets set RESEND_API_KEY=re_your_api_key
-npx supabase secrets set RESEND_FROM_EMAIL=noreply@yourdomain.com
+npx supabase secrets set BREVO_API_KEY=re_your_api_key
+npx supabase secrets set BREVO_FROM_EMAIL=noreply@yourdomain.com
 ```
 
 ### 9. Configure Supabase Auth redirect URLs

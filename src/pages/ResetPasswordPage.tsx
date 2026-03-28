@@ -9,8 +9,8 @@ import { supabase } from "@/lib/supabase";
 import { cardVariants } from "@/lib/animations";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
@@ -35,14 +35,17 @@ export default function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
 
   // Read URL params once — these are set by the Supabase email link
-  const tokenHash = searchParams.get("token_hash");
-  const flowType = searchParams.get("type"); // 'recovery' | 'invite'
-  const code = searchParams.get("code");
-  const isInvite = flowType === "invite";
+  const tokenHash    = searchParams.get("token_hash");
+  const flowType     = searchParams.get("type"); // 'recovery' | 'invite'
+  const code         = searchParams.get("code");
+  // Set by AuthContext when the SDK fires PASSWORD_RECOVERY (session already established)
+  const isRecovery   = searchParams.get("recovery") === "1";
+  const isInvite     = flowType === "invite";
 
-  // Derive initial state synchronously — no need for an effect for the invalid case
   const hasValidParams =
-    !!(tokenHash && (flowType === "recovery" || flowType === "invite")) || !!code;
+    !!(tokenHash && (flowType === "recovery" || flowType === "invite")) ||
+    !!code ||
+    isRecovery;
 
   const [pageState, setPageState] = useState<PageState>(hasValidParams ? "loading" : "invalid");
   const [serverError, setServerError] = useState<string | null>(null);
@@ -62,7 +65,11 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     if (!hasValidParams) return;
 
-    if (tokenHash && (flowType === "recovery" || flowType === "invite")) {
+    if (isRecovery) {
+      // Session was already established by the SDK (PASSWORD_RECOVERY event).
+      // Skip verification — go straight to the form.
+      setPageState("form");
+    } else if (tokenHash && (flowType === "recovery" || flowType === "invite")) {
       void supabase.auth
         .verifyOtp({ token_hash: tokenHash, type: flowType })
         .then(({ error }) => setPageState(error ? "invalid" : "form"));
@@ -71,7 +78,7 @@ export default function ResetPasswordPage() {
         .exchangeCodeForSession(code)
         .then(({ error }) => setPageState(error ? "invalid" : "form"));
     }
-  }, [hasValidParams, tokenHash, flowType, code]);
+  }, [hasValidParams, isRecovery, tokenHash, flowType, code]);
 
   // ── Form submit ───────────────────────────────────────────────────────────
 
@@ -181,9 +188,8 @@ export default function ResetPasswordPage() {
                     {/* New password */}
                     <div className="space-y-1.5">
                       <Label htmlFor="password">New password</Label>
-                      <Input
+                      <PasswordInput
                         id="password"
-                        type="password"
                         autoComplete="new-password"
                         autoFocus
                         placeholder="Min. 8 characters"
@@ -198,9 +204,8 @@ export default function ResetPasswordPage() {
                     {/* Confirm password */}
                     <div className="space-y-1.5">
                       <Label htmlFor="confirmPassword">Confirm password</Label>
-                      <Input
+                      <PasswordInput
                         id="confirmPassword"
-                        type="password"
                         autoComplete="new-password"
                         placeholder="Re-enter password"
                         aria-invalid={!!errors.confirmPassword}

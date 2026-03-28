@@ -33,6 +33,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, next) => {
+      // PASSWORD_RECOVERY fires when the SDK exchanges a recovery/invite code.
+      // Redirect immediately — do NOT set loading=false so the app never renders
+      // the current route, preventing the bypass where users skip the reset form.
+      if (event === "PASSWORD_RECOVERY") {
+        window.location.replace("/reset-password?recovery=1");
+        return;
+      }
+
       setSession(next);
 
       if (next?.user) {

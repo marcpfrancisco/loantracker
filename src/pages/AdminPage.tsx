@@ -26,6 +26,7 @@ import { BorrowersList } from "@/components/admin/BorrowersList";
 import { InviteBorrowerDrawer } from "@/components/admin/InviteBorrowerDrawer";
 import { LoanCard } from "@/components/dashboard/LoanCard";
 import { UpcomingPayments } from "@/components/dashboard/UpcomingPayments";
+import { RefreshButton } from "@/components/ui/refresh-button";
 import { cardVariants } from "@/lib/animations";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -95,13 +96,26 @@ function RowSkeleton() {
 
 export default function AdminPage() {
   const navigate = useNavigate();
-  const { data: stats, isLoading: statsLoading, error: statsError } = useAdminStats();
-  const { data: borrowers = [], isLoading: borrowersLoading } = useAdminBorrowers();
-  const { data: allLoans = [], isLoading: loansLoading } = useLoans();
-  const { data: upcoming = [], isLoading: upcomingLoading } = useUpcomingInstallments();
-  const { data: overdue = [], isLoading: overdueLoading } = useOverdueInstallments();
-  const { data: pendingProofs = [], isLoading: proofsLoading } = useAdminPendingProofs();
+  const { data: stats, isLoading: statsLoading, isFetching: statsFetching, error: statsError, refetch: refetchStats } = useAdminStats();
+  const { data: borrowers = [], isLoading: borrowersLoading, isFetching: borrowersFetching, refetch: refetchBorrowers } = useAdminBorrowers();
+  const { data: allLoans = [], isLoading: loansLoading, isFetching: loansFetching, refetch: refetchLoans } = useLoans();
+  const { data: upcoming = [], isLoading: upcomingLoading, isFetching: upcomingFetching, refetch: refetchUpcoming } = useUpcomingInstallments();
+  const { data: overdue = [], isLoading: overdueLoading, isFetching: overdueFetching, refetch: refetchOverdue } = useOverdueInstallments();
+  const { data: pendingProofs = [], isLoading: proofsLoading, isFetching: proofsFetching, refetch: refetchProofs } = useAdminPendingProofs();
   const [inviteOpen, setInviteOpen] = useState(false);
+
+  const isRefetching =
+    statsFetching || borrowersFetching || loansFetching ||
+    upcomingFetching || overdueFetching || proofsFetching;
+
+  function handleRefresh() {
+    void refetchStats();
+    void refetchBorrowers();
+    void refetchLoans();
+    void refetchUpcoming();
+    void refetchOverdue();
+    void refetchProofs();
+  }
 
   const activeLoans = allLoans.filter((l) => l.status === "active").slice(0, 6);
 
@@ -114,13 +128,16 @@ export default function AdminPage() {
           <h1 className="text-foreground text-xl font-semibold tracking-tight">Admin Dashboard</h1>
           <p className="text-muted-foreground mt-1 text-sm">Overview of all loans and borrowers.</p>
         </div>
-        <button
-          onClick={() => setInviteOpen(true)}
-          className="bg-primary text-primary-foreground hover:bg-primary/90 flex cursor-pointer items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium shadow-sm transition-colors"
-        >
-          <UserPlus className="h-4 w-4" />
-          <span className="hidden sm:inline">Invite Borrower</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <RefreshButton onRefresh={handleRefresh} isRefetching={isRefetching} />
+          <button
+            onClick={() => setInviteOpen(true)}
+            className="bg-primary text-primary-foreground hover:bg-primary/90 flex cursor-pointer items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium shadow-sm transition-colors"
+          >
+            <UserPlus className="h-4 w-4" />
+            <span className="hidden sm:inline">Invite Borrower</span>
+          </button>
+        </div>
       </div>
 
       {/* Error state */}

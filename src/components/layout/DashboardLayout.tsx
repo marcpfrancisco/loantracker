@@ -2,6 +2,7 @@ import { Outlet } from "react-router";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { BottomNav } from "./BottomNav";
+import { GlobalLoadingBar } from "./GlobalLoadingBar";
 
 export default function DashboardLayout() {
   return (
@@ -13,6 +14,9 @@ export default function DashboardLayout() {
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Mobile top bar — hidden on desktop */}
         <TopBar />
+
+        {/* Thin loading indicator — synced with all React Query fetches */}
+        <GlobalLoadingBar />
 
         {/* Page content */}
         <main className="flex-1 overflow-y-auto pb-16 md:pb-0">

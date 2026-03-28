@@ -5,6 +5,7 @@ import { useMyLoans } from "@/hooks/useMyLoans";
 import { useUpcomingInstallments } from "@/hooks/useUpcomingInstallments";
 import { LoanCard } from "@/components/dashboard/LoanCard";
 import { UpcomingPayments } from "@/components/dashboard/UpcomingPayments";
+import { RefreshButton } from "@/components/ui/refresh-button";
 
 function getFirstName(fullName: string): string {
   return fullName.split(" ")[0];
@@ -31,22 +32,32 @@ function LoanCardSkeleton() {
 
 export default function DashboardPage() {
   const { profile } = useAuth();
-  const { data: loans = [], isLoading: loansLoading, error: loansError } = useMyLoans();
-  const { data: upcoming = [], isLoading: upcomingLoading } = useUpcomingInstallments();
+  const { data: loans = [], isLoading: loansLoading, isFetching: loansFetching, error: loansError, refetch: refetchLoans } = useMyLoans();
+  const { data: upcoming = [], isLoading: upcomingLoading, isFetching: upcomingFetching, refetch: refetchUpcoming } = useUpcomingInstallments();
+
+  const isRefetching = loansFetching || upcomingFetching;
 
   const activeLoans = loans.filter((l) => l.status === "active");
   const pastLoans = loans.filter((l) => l.status !== "active");
 
+  function handleRefresh() {
+    void refetchLoans();
+    void refetchUpcoming();
+  }
+
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">
       {/* Greeting */}
-      <div>
-        <h1 className="text-foreground text-xl font-semibold tracking-tight">
-          {profile ? `Hi, ${getFirstName(profile.full_name)} 👋` : "Dashboard"}
-        </h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Here's an overview of your loans.
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-foreground text-xl font-semibold tracking-tight">
+            {profile ? `Hi, ${getFirstName(profile.full_name)} 👋` : "Dashboard"}
+          </h1>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Here's an overview of your loans.
+          </p>
+        </div>
+        <RefreshButton onRefresh={handleRefresh} isRefetching={isRefetching} />
       </div>
 
       {/* Error */}

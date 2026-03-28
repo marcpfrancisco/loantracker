@@ -12,6 +12,7 @@ import { useAdminBorrowers } from "@/hooks/useAdminBorrowers";
 import { useCreditSources } from "@/hooks/useCreditSources";
 import { useCreateLoan } from "@/hooks/useCreateLoan";
 import { getLoanTypesForSource, getLoanTypeConfig } from "@/types/schema";
+import { LoanBreakdownSummary } from "@/components/loans/LoanBreakdownSummary";
 import type { LoanType, RegionType, CurrencyType } from "@/types/database";
 
 // ── Schema ────────────────────────────────────────────────────────────────────
@@ -144,6 +145,9 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
   const watchedLoanType = watch("loan_type");
   const watchedInstallments = watch("installments_total");
   const watchedDueDay = watch("due_day_of_month");
+  const watchedPrincipal = watch("principal");
+  const watchedInterestRate = watch("interest_rate");
+  const watchedServiceFee = watch("service_fee");
 
   const selectedBorrower = borrowers.find((b) => b.id === watchedBorrowerId) ?? null;
   const borrowerRegion = selectedBorrower?.region ?? null;
@@ -160,7 +164,7 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
     ? getLoanTypeConfig(selectedSource.name, watchedLoanType)
     : null;
   const availableDurations = activeConfig?.available_durations ?? [];
-  const hasStampTax = !!activeConfig?.stamp_tax_tiers;
+  const isMaribank = watchedLoanType === "maribank_credit";
 
   // Reset source when borrower changes
   useEffect(() => {
@@ -190,19 +194,6 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedLoanType, watchedSourceId, setValue]);
 
-  // Recompute stamp tax when installments_total changes (e.g. Maribank)
-  useEffect(() => {
-    if (!selectedSource) return;
-    const config = getLoanTypeConfig(selectedSource.name, watchedLoanType);
-    if (!config?.stamp_tax_tiers) return;
-
-    const months = Number(watchedInstallments);
-    const tier = config.stamp_tax_tiers.find((t) => t.months === months);
-    if (tier) {
-      setValue("service_fee", tier.amount, { shouldValidate: false });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [watchedInstallments, setValue]);
 
   const watchedStartedAt = watch("started_at");
 
@@ -431,9 +422,9 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
                     </FieldWrapper>
 
                     <FieldWrapper
-                      label="Service Fee"
+                      label={isMaribank ? "Stamp Tax" : "Service Fee"}
                       error={errors.service_fee?.message}
-                      hint={hasStampTax ? "Auto from stamp tax" : undefined}
+                      hint={isMaribank ? "Enter actual amount from Maribank app — varies by principal" : undefined}
                     >
                       <input
                         {...register("service_fee")}
@@ -451,7 +442,6 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
                     <FieldWrapper
                       label="Installments"
                       error={errors.installments_total?.message}
-                      hint={hasStampTax ? "Updates stamp tax" : undefined}
                     >
                       <select
                         {...register("installments_total")}
@@ -564,6 +554,18 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
                     />
                   </FieldWrapper>
                 </section>
+
+                {/* ── Breakdown Summary ──────────────────────────────── */}
+                {borrowerRegion && (
+                  <LoanBreakdownSummary
+                    loanType={watchedLoanType}
+                    principal={Number(watchedPrincipal) || 0}
+                    interestRate={watchedInterestRate}
+                    serviceFee={Number(watchedServiceFee) || 0}
+                    installmentsTotal={Number(watchedInstallments) || 0}
+                    currency={regionToCurrency(borrowerRegion)}
+                  />
+                )}
               </div>
 
               {/* Footer */}

@@ -67,16 +67,23 @@ export default function ResetPasswordPage() {
 
     if (isRecovery) {
       // Session was already established by the SDK (PASSWORD_RECOVERY event).
-      // Skip verification — go straight to the form.
+      // Skip verification — flag must already be set (requireAuth put us here).
+      localStorage.setItem("pending_password_setup", "1");
       setPageState("form");
     } else if (tokenHash && (flowType === "recovery" || flowType === "invite")) {
       void supabase.auth
         .verifyOtp({ token_hash: tokenHash, type: flowType })
-        .then(({ error }) => setPageState(error ? "invalid" : "form"));
+        .then(({ error }) => {
+          if (!error) localStorage.setItem("pending_password_setup", "1");
+          setPageState(error ? "invalid" : "form");
+        });
     } else if (code) {
       void supabase.auth
         .exchangeCodeForSession(code)
-        .then(({ error }) => setPageState(error ? "invalid" : "form"));
+        .then(({ error }) => {
+          if (!error) localStorage.setItem("pending_password_setup", "1");
+          setPageState(error ? "invalid" : "form");
+        });
     }
   }, [hasValidParams, isRecovery, tokenHash, flowType, code]);
 
@@ -92,6 +99,8 @@ export default function ResetPasswordPage() {
       return;
     }
 
+    // Password is now set — release the gate so requireAuth lets them through
+    localStorage.removeItem("pending_password_setup");
     setPageState("success");
     // Give user 2 s to read the success message, then land on dashboard
     setTimeout(() => void navigate("/dashboard", { replace: true }), 2000);

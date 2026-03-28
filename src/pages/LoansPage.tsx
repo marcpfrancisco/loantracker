@@ -6,6 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useLoans } from "@/hooks/useLoans";
 import { LoanCard } from "@/components/dashboard/LoanCard";
 import { AddLoanDrawer } from "@/components/loans/AddLoanDrawer";
+import { RefreshButton } from "@/components/ui/refresh-button";
 import type { LoanStatus, RegionType } from "@/types/database";
 
 type StatusFilter = LoanStatus | "all";
@@ -74,7 +75,7 @@ export default function LoansPage() {
   const { profile } = useAuth();
   const isAdmin = profile?.role === "admin";
 
-  const { data: loans = [], isLoading, error } = useLoans();
+  const { data: loans = [], isLoading, isFetching, error, refetch } = useLoans();
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [regionFilter, setRegionFilter] = useState<RegionFilter>("all");
@@ -100,15 +101,18 @@ export default function LoansPage() {
           )}
         </div>
 
-        {isAdmin && (
-          <button
-            onClick={() => setDrawerOpen(true)}
-            className="bg-primary text-primary-foreground flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-opacity hover:opacity-90"
-          >
-            <Plus className="h-4 w-4" />
-            Add Loan
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          <RefreshButton onRefresh={() => void refetch()} isRefetching={isFetching} />
+          {isAdmin && (
+            <button
+              onClick={() => setDrawerOpen(true)}
+              className="bg-primary text-primary-foreground flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-opacity hover:opacity-90"
+            >
+              <Plus className="h-4 w-4" />
+              Add Loan
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Error */}

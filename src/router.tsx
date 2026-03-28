@@ -9,6 +9,9 @@ import LoansPage from "@/pages/LoansPage";
 import LoanDetailPage from "@/pages/LoanDetailPage";
 import AdminPage from "@/pages/AdminPage";
 import ProfilePage from "@/pages/ProfilePage";
+import BorrowerDetailPage from "@/pages/BorrowerDetailPage";
+import ExpenseTabsPage from "@/pages/ExpenseTabsPage";
+import ExpenseTabDetailPage from "@/pages/ExpenseTabDetailPage";
 import { RouteErrorPage } from "@/components/ErrorBoundary";
 
 export const router = createBrowserRouter([
@@ -75,6 +78,19 @@ export const router = createBrowserRouter([
       {
         path: "profile",
         Component: ProfilePage,
+      },
+      {
+        path: "borrowers/:id",
+        loader: requireAdmin,
+        Component: BorrowerDetailPage,
+      },
+      {
+        path: "tabs",
+        Component: ExpenseTabsPage,
+      },
+      {
+        path: "tabs/:id",
+        Component: ExpenseTabDetailPage,
       },
     ],
   },

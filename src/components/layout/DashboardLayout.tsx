@@ -1,10 +1,18 @@
-import { Outlet } from "react-router";
+import { useEffect, useRef } from "react";
+import { Outlet, useLocation } from "react-router";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
 import { BottomNav } from "./BottomNav";
 import { GlobalLoadingBar } from "./GlobalLoadingBar";
 
 export default function DashboardLayout() {
+  const mainRef = useRef<HTMLElement>(null);
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0 });
+  }, [pathname]);
+
   return (
     <div className="bg-background flex h-screen w-full overflow-hidden">
       {/* Desktop sidebar — hidden on mobile */}
@@ -19,7 +27,7 @@ export default function DashboardLayout() {
         <GlobalLoadingBar />
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto pb-16 md:pb-0">
+        <main ref={mainRef} className="flex-1 overflow-y-auto pb-16 md:pb-0">
           <Outlet />
         </main>
       </div>

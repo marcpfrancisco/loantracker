@@ -99,17 +99,15 @@ export function BorrowersList({ borrowers, loading }: BorrowersListProps) {
             ) : (
               <div className="divide-border/40 divide-y">
                 {borrowers.map((b) => {
-                  const isClickable = b.isConfirmed && b.activeLoans > 0;
+                  const isClickable = b.isConfirmed;
                   const tooltipLabel = !b.isConfirmed
                     ? "Pending invitation"
-                    : b.activeLoans === 0
-                      ? "No active loans"
-                      : undefined;
+                    : undefined;
 
                   return (
                     <div key={b.id} className="group relative flex items-center">
                       <button
-                        onClick={() => isClickable && void navigate(`/loans?borrower=${b.id}`)}
+                        onClick={() => isClickable && void navigate(`/borrowers/${b.id}`)}
                         disabled={!isClickable}
                         className={cn(
                           "flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-left transition-colors",

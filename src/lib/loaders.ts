@@ -4,12 +4,19 @@ import { supabase } from "@/lib/supabase";
 /**
  * Use in protected route loaders.
  * Redirects to /login if no active session.
+ * Redirects to /reset-password if the user hasn't completed password setup yet
+ * (e.g. clicked an invite/recovery link but navigated away before saving).
  */
 export async function requireAuth() {
   const {
     data: { session },
   } = await supabase.auth.getSession();
   if (!session) throw redirect("/login");
+
+  if (localStorage.getItem("pending_password_setup") === "1") {
+    throw redirect("/reset-password?recovery=1");
+  }
+
   return session;
 }
 

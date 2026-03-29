@@ -10,7 +10,7 @@ interface UpdateLoanStatusPayload {
 }
 
 const statusToastMessages: Record<LoanStatus, string> = {
-  active:    "Loan reopened successfully.",
+  active: "Loan reopened successfully.",
   completed: "Loan marked as completed.",
   defaulted: "Loan marked as defaulted.",
   cancelled: "Loan cancelled.",

@@ -59,7 +59,8 @@ export function useAddExpenseItem(tabId: string) {
         .single();
 
       if (periodError) throw periodError;
-      if (periodData.is_locked) throw new Error("This month is locked. Unlock it first to add items.");
+      if (periodData.is_locked)
+        throw new Error("This month is locked. Unlock it first to add items.");
 
       const { error: itemError } = await supabase.from("expense_items").insert({
         period_id: periodData.id,
@@ -85,10 +86,7 @@ export function useDeleteExpenseItem(tabId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (itemId: string) => {
-      const { error } = await supabase
-        .from("expense_items")
-        .delete()
-        .eq("id", itemId);
+      const { error } = await supabase.from("expense_items").delete().eq("id", itemId);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -143,10 +141,55 @@ export function useDeletePayment(tabId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (paymentId: string) => {
+      const { error } = await supabase.from("expense_payments").delete().eq("id", paymentId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["expense-tab", tabId] });
+      void qc.invalidateQueries({ queryKey: ["expense-tabs"] });
+    },
+  });
+}
+
+// ── Delete period (only when empty — no items, no payments) ───────────────────
+
+export function useDeleteExpensePeriod(tabId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (periodId: string) => {
+      const { error } = await supabase.from("expense_periods").delete().eq("id", periodId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["expense-tab", tabId] });
+      void qc.invalidateQueries({ queryKey: ["expense-tabs"] });
+    },
+  });
+}
+
+// ── Update item ───────────────────────────────────────────────────────────────
+
+export function useUpdateExpenseItem(tabId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: {
+      id: string;
+      description: string;
+      amount: number;
+      is_already_split: boolean;
+    }) => {
+      const borrower_owes = params.is_already_split
+        ? params.amount
+        : Math.round((params.amount / 2) * 100) / 100;
       const { error } = await supabase
-        .from("expense_payments")
-        .delete()
-        .eq("id", paymentId);
+        .from("expense_items")
+        .update({
+          description: params.description.trim(),
+          amount: params.amount,
+          is_already_split: params.is_already_split,
+          borrower_owes,
+        })
+        .eq("id", params.id);
       if (error) throw error;
     },
     onSuccess: () => {

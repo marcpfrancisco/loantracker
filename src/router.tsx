@@ -22,9 +22,9 @@ export const router = createBrowserRouter([
     index: true,
     loader: ({ request }: LoaderFunctionArgs) => {
       const url = new URL(request.url);
-      const code      = url.searchParams.get("code");
+      const code = url.searchParams.get("code");
       const tokenHash = url.searchParams.get("token_hash");
-      const type      = url.searchParams.get("type");
+      const type = url.searchParams.get("type");
 
       if (code || (tokenHash && type)) {
         return redirect(`/reset-password?${url.searchParams.toString()}`);

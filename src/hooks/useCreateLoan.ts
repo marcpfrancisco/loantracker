@@ -23,8 +23,15 @@ function generateInstallments(
   loanId: string,
   payload: CreateLoanPayload
 ): TablesInsert<"installments">[] {
-  const { principal, interest_rate, service_fee, installments_total, started_at, due_day_of_month, loan_type } =
-    payload;
+  const {
+    principal,
+    interest_rate,
+    service_fee,
+    installments_total,
+    started_at,
+    due_day_of_month,
+    loan_type,
+  } = payload;
 
   const { baseAmount, lastAmount } = computeInstallmentAmounts(loan_type, {
     principal,

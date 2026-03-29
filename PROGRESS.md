@@ -123,16 +123,59 @@
 ### High Priority
 
 #### 1. Auto-generate Supabase TypeScript types
-Run `npx supabase gen types typescript --project-id <id> > src/types/database.ts` as a pre-build step or CI action. The manual approach drifts quickly as the schema evolves.
+~~Run `npx supabase gen types typescript --project-id <id> > src/types/database.ts` as a pre-build step or CI action. The manual approach drifts quickly as the schema evolves.~~
+**✅ Done** — `npm run gen:types` script added to `package.json`. Run after every schema migration.
 
-#### 2. Push / in-app notifications for due dates
-Notify borrowers (and admin) when a payment is due in N days. Options:
-- **Supabase Edge Functions** + **pg_cron** to scan due installments daily and trigger notifications
-- **Expo Push** if a React Native app is added later
-- Web Push API with a service worker (already have a PWA)
+#### 2. In-app notifications — Phase 1 ✅ Done
+~~Notify borrowers (and admin) when a payment is due in N days.~~
+**✅ Done** — In-app notification center implemented:
+- `notifications` table with RLS + Supabase Realtime (`003_notifications.sql`)
+- `create_notification()` SECURITY DEFINER function — single entry point, ready for Phase 2
+- DB triggers: `on_proof_submitted` (→ admin), `on_proof_reviewed` (→ borrower on approve/reject)
+- `useNotifications` hook — TanStack Query + Realtime subscription, `markRead`, `markAllRead`
+- `NotificationBell` component — bell icon with unread badge, animated dropdown panel, type-aware icons
+- Placed in TopBar (mobile) and Sidebar (desktop)
 
-#### 3. Overdue installment detection
-Automatically flag installments as overdue when `due_date < today` and `status != 'paid'`. This can be a Postgres view or a computed column. Surface it as a red badge on Dashboard and Loans pages.
+#### 2a. Web Push Notifications — Phase 2
+Upgrade in-app notifications to deliver system-level pushes even when the app is closed. The `create_notification()` function is the **only place that needs to change** — all other code stays the same.
+
+**Implementation order:**
+1. **Switch PWA to `injectManifest` mode** — change `vite.config.ts` from `generateSW` to `injectManifest` so a custom service worker file can be used. Add push event handler (`push`, `notificationclick`) to the service worker.
+2. **Generate VAPID keys** (one-time):
+   ```bash
+   npx web-push generate-vapid-keys
+   ```
+   Store as Edge Function secrets: `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`.
+3. **`push_subscriptions` table** — stores per-device browser subscription objects:
+   ```sql
+   CREATE TABLE push_subscriptions (
+     id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+     user_id    uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+     endpoint   text NOT NULL,
+     p256dh     text NOT NULL,  -- browser encryption key
+     auth       text NOT NULL,  -- browser auth secret
+     created_at timestamptz NOT NULL DEFAULT now(),
+     UNIQUE(user_id, endpoint)
+   );
+   ```
+4. **Permission prompt + subscription save** — on login, call `Notification.requestPermission()`. If granted, get the push subscription from the service worker and `upsert` it into `push_subscriptions`.
+5. **`send-push` Edge Function** — reads subscriptions for a `user_id`, encrypts and sends via Web Push Protocol using VAPID keys. Handles `410 Gone` (expired subscription → delete from DB).
+6. **Wire into `create_notification()`** — call `send-push` via `pg_net` or `supabase.functions.invoke()` inside the existing Postgres function. No trigger changes needed.
+7. **`send-due-date-reminders` Edge Function + `pg_cron`** — daily scan for installments due in 3 days, creates notifications + sends pushes. Requires `pg_cron` enabled (available on Supabase Pro).
+
+**Known limitations:**
+- iOS Safari only delivers Web Push to **installed PWAs** (Add to Home Screen), not in-browser tabs
+- Users must explicitly grant browser notification permission
+- Each device registers its own subscription — one user can have multiple active subscriptions
+- Stale/expired subscriptions return `410 Gone` and must be deleted from the DB
+
+#### 3. Overdue installment detection ✅ Done
+~~Automatically flag installments as overdue when `due_date < today` and `status != 'paid'`. This can be a Postgres view or a computed column. Surface it as a red badge on Dashboard and Loans pages.~~
+- `InstallmentRow` — overdue rows already had rose background + "Overdue" label
+- `LoanCard` — already showed "Xd overdue" for next due date
+- `AdminPage` — overdue panel already existed (admin sees all borrowers)
+- **New:** `useMyOverdueInstallments` hook — borrower-scoped (RLS filters automatically, no borrower_name needed)
+- **New:** Overdue alert panel on borrower `DashboardPage` — rose themed, days-late badge per installment, click → loan detail, only renders when data exists
 
 #### 4. FX conversion utility
 Add a `Money` utility class and a stored exchange rate (admin-configurable) so the Dashboard can optionally show a unified "total outstanding" across both currencies.

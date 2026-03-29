@@ -16,6 +16,8 @@ import {
   ChevronRight,
   Download,
   TableProperties,
+  Pencil,
+  Check,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -27,12 +29,10 @@ import {
   useTogglePeriodLock,
   useRecordPayment,
   useDeletePayment,
+  useDeleteExpensePeriod,
+  useUpdateExpenseItem,
 } from "@/hooks/useExpenseTabMutations";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { exportExpenseTabCSV, printExpenseTabPDF } from "@/lib/statementExport";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -73,9 +73,9 @@ function currentMonthStr() {
 }
 
 const PAID_STATUS_STYLES = {
-  paid:    "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+  paid: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
   partial: "bg-amber-500/15 text-amber-400 border-amber-500/30",
-  unpaid:  "bg-zinc-500/15 text-zinc-400 border-zinc-500/30",
+  unpaid: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30",
 };
 
 // ── Month pills ───────────────────────────────────────────────────────────────
@@ -119,13 +119,83 @@ function ItemRow({
   currency,
   isAdmin,
   onDelete,
+  onEdit,
 }: {
   item: ExpenseItem;
   currency: string;
   isAdmin: boolean;
   onDelete: (id: string) => void;
+  onEdit: (id: string, description: string, amount: number, is_already_split: boolean) => void;
 }) {
-  const [confirming, setConfirming] = useState(false);
+  const [mode, setMode] = useState<"view" | "edit" | "delete">("view");
+  const [editDesc, setEditDesc] = useState(item.description);
+  const [editAmount, setEditAmount] = useState(String(item.amount));
+  const [editSplit, setEditSplit] = useState(item.is_already_split);
+
+  function handleSave() {
+    const amt = Number(editAmount);
+    if (!editDesc.trim() || !amt || amt <= 0) return;
+    onEdit(item.id, editDesc, amt, editSplit);
+    setMode("view");
+  }
+
+  function handleCancelEdit() {
+    setEditDesc(item.description);
+    setEditAmount(String(item.amount));
+    setEditSplit(item.is_already_split);
+    setMode("view");
+  }
+
+  if (mode === "edit") {
+    return (
+      <div className="px-4 py-3 space-y-2">
+        <div className="flex items-center gap-2">
+          <input
+            autoFocus
+            value={editDesc}
+            onChange={(e) => setEditDesc(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") handleCancelEdit(); }}
+            className="border-border/60 bg-muted/50 focus:border-primary/60 min-w-0 flex-1 rounded-lg border px-3 py-1.5 text-sm outline-none"
+          />
+          <input
+            type="number"
+            step="0.01"
+            min="0.01"
+            value={editAmount}
+            onChange={(e) => setEditAmount(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") handleCancelEdit(); }}
+            className="border-border/60 bg-muted/50 focus:border-primary/60 w-24 shrink-0 rounded-lg border px-3 py-1.5 text-sm outline-none"
+          />
+          <button
+            type="button"
+            onClick={() => setEditSplit((v) => !v)}
+            className={cn(
+              "shrink-0 rounded-lg border px-2 py-1.5 text-xs font-semibold transition-colors",
+              editSplit
+                ? "border-primary/40 bg-primary/10 text-primary"
+                : "border-border/60 text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {editSplit ? "his" : "÷2"}
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            className="text-emerald-400 hover:text-emerald-300 shrink-0 transition-colors"
+          >
+            <Check className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={handleCancelEdit}
+            className="text-muted-foreground hover:text-foreground shrink-0 transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="group flex items-center gap-3 px-4 py-2.5">
@@ -138,8 +208,8 @@ function ItemRow({
       <span className="text-foreground shrink-0 text-sm font-semibold tabular-nums">
         {fmt(item.borrower_owes, currency)}
       </span>
-      {isAdmin && (
-        confirming ? (
+      {isAdmin &&
+        (mode === "delete" ? (
           <div className="flex shrink-0 items-center gap-1">
             <button
               type="button"
@@ -150,22 +220,30 @@ function ItemRow({
             </button>
             <button
               type="button"
-              onClick={() => setConfirming(false)}
+              onClick={() => setMode("view")}
               className="text-muted-foreground hover:text-foreground"
             >
               <X className="h-3 w-3" />
             </button>
           </div>
         ) : (
-          <button
-            type="button"
-            onClick={() => setConfirming(true)}
-            className="text-muted-foreground hover:text-rose-400 shrink-0 opacity-0 transition-all group-hover:opacity-100"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        )
-      )}
+          <div className="flex shrink-0 items-center gap-1 md:opacity-0 md:transition-all md:group-hover:opacity-100">
+            <button
+              type="button"
+              onClick={() => setMode("edit")}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("delete")}
+              className="text-muted-foreground hover:text-rose-400 transition-colors"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        ))}
     </div>
   );
 }
@@ -186,20 +264,20 @@ function PaymentRow({
   return (
     <div className="group flex items-center gap-3 px-4 py-2.5">
       <div className="min-w-0 flex-1">
-        <p className="text-emerald-400 text-sm font-medium">Payment received</p>
+        <p className="text-sm font-medium text-emerald-400">Payment received</p>
         <p className="text-muted-foreground text-[10px]">
           {fmtDate(payment.payment_date)}
           {payment.notes ? ` · ${payment.notes}` : ""}
         </p>
       </div>
-      <span className="text-emerald-400 shrink-0 text-sm font-semibold tabular-nums">
+      <span className="shrink-0 text-sm font-semibold text-emerald-400 tabular-nums">
         -{fmt(payment.amount, currency)}
       </span>
       {isAdmin && (
         <button
           type="button"
           onClick={() => onDelete(payment.id)}
-          className="text-muted-foreground hover:text-rose-400 shrink-0 opacity-0 transition-all group-hover:opacity-100"
+          className="text-muted-foreground shrink-0 hover:text-rose-400 md:opacity-0 md:transition-all md:group-hover:opacity-100"
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>
@@ -303,7 +381,7 @@ function RecordPaymentModal({
               type="button"
               disabled={isPending || !amount || Number(amount) <= 0}
               onClick={() => onSubmit(Number(amount), notes, date)}
-              className="bg-emerald-600 text-white hover:bg-emerald-500 flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium transition-colors disabled:opacity-60"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-500 disabled:opacity-60"
             >
               {isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               Confirm
@@ -317,7 +395,20 @@ function RecordPaymentModal({
 
 // ── Month picker popover ──────────────────────────────────────────────────────
 
-const MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const MONTH_LABELS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
 
 function MonthPickerPopover({
   existingPeriods,
@@ -396,7 +487,7 @@ function MonthPickerPopover({
                 )}
               >
                 {label}
-                {exists && <span className="ml-0.5 text-[8px] text-primary">•</span>}
+                {exists && <span className="text-primary ml-0.5 text-[8px]">•</span>}
               </button>
             );
           })}
@@ -451,7 +542,7 @@ function QuickAddBar({
         value={description}
         onChange={(e) => setDescription(e.target.value)}
         placeholder="Item name…"
-        className="border-border/60 bg-muted/50 focus:border-primary/60 min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm outline-none transition-colors"
+        className="border-border/60 bg-muted/50 focus:border-primary/60 min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm transition-colors outline-none"
         disabled={isPending}
       />
       <input
@@ -461,7 +552,7 @@ function QuickAddBar({
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
         placeholder="0.00"
-        className="border-border/60 bg-muted/50 focus:border-primary/60 w-24 shrink-0 rounded-lg border px-3 py-2 text-sm outline-none transition-colors"
+        className="border-border/60 bg-muted/50 focus:border-primary/60 w-24 shrink-0 rounded-lg border px-3 py-2 text-sm transition-colors outline-none"
         disabled={isPending}
       />
       {/* Split toggle */}
@@ -481,13 +572,9 @@ function QuickAddBar({
       <button
         type="submit"
         disabled={isPending || !description.trim() || !amount}
-        className="bg-primary text-primary-foreground flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-opacity disabled:opacity-50 hover:opacity-90"
+        className="bg-primary text-primary-foreground flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-opacity hover:opacity-90 disabled:opacity-50"
       >
-        {isPending ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Plus className="h-4 w-4" />
-        )}
+        {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
       </button>
     </form>
   );
@@ -505,9 +592,13 @@ export default function ExpenseTabDetailPage() {
 
   const addItem = useAddExpenseItem(id!);
   const deleteItem = useDeleteExpenseItem(id!);
+  const updateItem = useUpdateExpenseItem(id!);
   const toggleLock = useTogglePeriodLock(id!);
   const recordPayment = useRecordPayment(id!);
   const deletePayment = useDeletePayment(id!);
+  const deletePeriod = useDeleteExpensePeriod(id!);
+
+  const [confirmDeletePeriod, setConfirmDeletePeriod] = useState(false);
 
   const thisMonth = currentMonthStr();
 
@@ -536,6 +627,12 @@ export default function ExpenseTabDetailPage() {
       setExtraVirtualMonths((prev) => [...prev, period]);
     }
     setSelectedPeriod(period);
+    setConfirmDeletePeriod(false);
+  }
+
+  function handlePeriodSelect(period: string) {
+    setSelectedPeriod(period);
+    setConfirmDeletePeriod(false);
   }
 
   if (isLoading) {
@@ -563,10 +660,7 @@ export default function ExpenseTabDetailPage() {
   const allPeriods = [...tab.periods];
   const existingPeriodStrs = new Set(allPeriods.map((p) => p.period));
 
-  const virtualMonths = new Set([
-    ...extraVirtualMonths,
-    thisMonth,
-  ]);
+  const virtualMonths = new Set([...extraVirtualMonths, thisMonth]);
 
   const virtualPeriods: ExpensePeriod[] = [
     ...allPeriods,
@@ -586,9 +680,7 @@ export default function ExpenseTabDetailPage() {
   ];
 
   // Sorted newest-first for pills display
-  const sortedPeriods = [...virtualPeriods].sort((a, b) =>
-    b.period.localeCompare(a.period)
-  );
+  const sortedPeriods = [...virtualPeriods].sort((a, b) => b.period.localeCompare(a.period));
 
   const activePeriod = virtualPeriods.find((p) => p.period === selectedPeriod) ?? null;
   const isVirtual = activePeriod?.id === "__virtual__";
@@ -615,7 +707,7 @@ export default function ExpenseTabDetailPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col" style={{ height: "calc(100vh - 4rem)" }}>
+    <div className="mx-auto flex h-full max-w-2xl flex-col">
       {/* ── Header ──────────────────────────────────────────────── */}
       <div className="shrink-0 space-y-4 p-6 pb-0">
         {/* Back + export actions */}
@@ -655,7 +747,7 @@ export default function ExpenseTabDetailPage() {
         <div className="bg-card border-border/60 rounded-2xl border p-4">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-muted-foreground text-xs uppercase tracking-widest">
+              <p className="text-muted-foreground text-xs tracking-widest uppercase">
                 {tab.borrower.full_name}
               </p>
               <p className="text-foreground mt-1 text-2xl font-bold tabular-nums">
@@ -664,7 +756,7 @@ export default function ExpenseTabDetailPage() {
               <p className="text-muted-foreground text-xs">outstanding</p>
             </div>
             <div className="text-right">
-              <p className="text-emerald-400 text-sm font-semibold tabular-nums">
+              <p className="text-sm font-semibold text-emerald-400 tabular-nums">
                 {fmt(tab.total_paid, tab.currency)}
               </p>
               <p className="text-muted-foreground text-[10px]">paid</p>
@@ -685,7 +777,7 @@ export default function ExpenseTabDetailPage() {
               is_locked={p.is_locked}
               paid_status={p.paid_status}
               isSelected={p.period === selectedPeriod}
-              onClick={() => setSelectedPeriod(p.period)}
+              onClick={() => handlePeriodSelect(p.period)}
             />
           ))}
 
@@ -721,16 +813,54 @@ export default function ExpenseTabDetailPage() {
                     {activePeriod.paid_status === "paid"
                       ? "Fully paid"
                       : activePeriod.paid_status === "partial"
-                      ? `${fmt(activePeriod.outstanding, tab.currency)} remaining`
-                      : activePeriod.total_owed > 0
-                      ? "Unpaid"
-                      : "No items yet"}
+                        ? `${fmt(activePeriod.outstanding, tab.currency)} remaining`
+                        : activePeriod.total_owed > 0
+                          ? "Unpaid"
+                          : "No items yet"}
                   </p>
                 )}
               </div>
 
               {isAdmin && !isVirtual && activePeriod && (
                 <div className="flex items-center gap-2">
+                  {/* Delete month */}
+                  {confirmDeletePeriod ? (
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        disabled={deletePeriod.isPending}
+                        onClick={() => {
+                          deletePeriod.mutate(activePeriod.id, {
+                            onSuccess: () => setConfirmDeletePeriod(false),
+                          });
+                        }}
+                        className="rounded bg-rose-500/15 px-2 py-0.5 text-[10px] font-medium text-rose-400 hover:bg-rose-500/25 disabled:opacity-60"
+                      >
+                        {deletePeriod.isPending
+                          ? "Deleting…"
+                          : activePeriod.items.length > 0 || activePeriod.payments.length > 0
+                            ? `Delete (${activePeriod.items.length + activePeriod.payments.length})`
+                            : "Confirm"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeletePeriod(false)}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmDeletePeriod(true)}
+                      className="border-border/60 text-muted-foreground hover:border-rose-500/30 hover:text-rose-400 flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      Delete
+                    </button>
+                  )}
+
                   {/* Lock/Unlock */}
                   <button
                     type="button"
@@ -749,9 +879,13 @@ export default function ExpenseTabDetailPage() {
                     )}
                   >
                     {activePeriod.is_locked ? (
-                      <><Unlock className="h-3 w-3" /> Unlock</>
+                      <>
+                        <Unlock className="h-3 w-3" /> Unlock
+                      </>
                     ) : (
-                      <><Lock className="h-3 w-3" /> Lock</>
+                      <>
+                        <Lock className="h-3 w-3" /> Lock
+                      </>
                     )}
                   </button>
 
@@ -772,7 +906,8 @@ export default function ExpenseTabDetailPage() {
 
             {/* Items + payments list */}
             <div className="bg-card border-border/60 overflow-hidden rounded-xl border">
-              {isVirtual || (activePeriod?.items.length === 0 && activePeriod?.payments.length === 0) ? (
+              {isVirtual ||
+              (activePeriod?.items.length === 0 && activePeriod?.payments.length === 0) ? (
                 <div className="px-4 py-10 text-center">
                   <p className="text-muted-foreground text-sm">
                     {isAdmin ? "Add the first item below." : "No items this month yet."}
@@ -787,6 +922,9 @@ export default function ExpenseTabDetailPage() {
                       currency={tab.currency}
                       isAdmin={isAdmin}
                       onDelete={(iid) => deleteItem.mutate(iid)}
+                      onEdit={(iid, desc, amt, split) =>
+                        updateItem.mutate({ id: iid, description: desc, amount: amt, is_already_split: split })
+                      }
                     />
                   ))}
                   {activePeriod?.payments.map((payment) => (
@@ -813,7 +951,7 @@ export default function ExpenseTabDetailPage() {
                   {activePeriod.total_paid > 0 && (
                     <div className="flex justify-between text-xs">
                       <span className="text-muted-foreground">Paid</span>
-                      <span className="font-medium tabular-nums text-emerald-400">
+                      <span className="font-medium text-emerald-400 tabular-nums">
                         -{fmt(activePeriod.total_paid, tab.currency)}
                       </span>
                     </div>

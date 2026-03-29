@@ -96,17 +96,52 @@ function RowSkeleton() {
 
 export default function AdminPage() {
   const navigate = useNavigate();
-  const { data: stats, isLoading: statsLoading, isFetching: statsFetching, error: statsError, refetch: refetchStats } = useAdminStats();
-  const { data: borrowers = [], isLoading: borrowersLoading, isFetching: borrowersFetching, refetch: refetchBorrowers } = useAdminBorrowers();
-  const { data: allLoans = [], isLoading: loansLoading, isFetching: loansFetching, refetch: refetchLoans } = useLoans();
-  const { data: upcoming = [], isLoading: upcomingLoading, isFetching: upcomingFetching, refetch: refetchUpcoming } = useUpcomingInstallments();
-  const { data: overdue = [], isLoading: overdueLoading, isFetching: overdueFetching, refetch: refetchOverdue } = useOverdueInstallments();
-  const { data: pendingProofs = [], isLoading: proofsLoading, isFetching: proofsFetching, refetch: refetchProofs } = useAdminPendingProofs();
+  const {
+    data: stats,
+    isLoading: statsLoading,
+    isFetching: statsFetching,
+    error: statsError,
+    refetch: refetchStats,
+  } = useAdminStats();
+  const {
+    data: borrowers = [],
+    isLoading: borrowersLoading,
+    isFetching: borrowersFetching,
+    refetch: refetchBorrowers,
+  } = useAdminBorrowers();
+  const {
+    data: allLoans = [],
+    isLoading: loansLoading,
+    isFetching: loansFetching,
+    refetch: refetchLoans,
+  } = useLoans();
+  const {
+    data: upcoming = [],
+    isLoading: upcomingLoading,
+    isFetching: upcomingFetching,
+    refetch: refetchUpcoming,
+  } = useUpcomingInstallments();
+  const {
+    data: overdue = [],
+    isLoading: overdueLoading,
+    isFetching: overdueFetching,
+    refetch: refetchOverdue,
+  } = useOverdueInstallments();
+  const {
+    data: pendingProofs = [],
+    isLoading: proofsLoading,
+    isFetching: proofsFetching,
+    refetch: refetchProofs,
+  } = useAdminPendingProofs();
   const [inviteOpen, setInviteOpen] = useState(false);
 
   const isRefetching =
-    statsFetching || borrowersFetching || loansFetching ||
-    upcomingFetching || overdueFetching || proofsFetching;
+    statsFetching ||
+    borrowersFetching ||
+    loansFetching ||
+    upcomingFetching ||
+    overdueFetching ||
+    proofsFetching;
 
   function handleRefresh() {
     void refetchStats();
@@ -121,7 +156,6 @@ export default function AdminPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-6">
-
       {/* ── Page header ──────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-3">
         <div>
@@ -142,7 +176,7 @@ export default function AdminPage() {
 
       {/* Error state */}
       {statsError && (
-        <div className="border-rose-500/30 bg-rose-500/10 flex items-center gap-2 rounded-lg border px-4 py-3 text-sm text-rose-400">
+        <div className="flex items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-400">
           <AlertCircle className="h-4 w-4 shrink-0" />
           Failed to load stats. Please refresh.
         </div>
@@ -215,9 +249,7 @@ export default function AdminPage() {
             icon={Wallet}
             label="Outstanding · PHP"
             value={
-              statsLoading
-                ? "—"
-                : formatCurrency(stats?.portfolioOutstanding?.PHP ?? 0, "PHP")
+              statsLoading ? "—" : formatCurrency(stats?.portfolioOutstanding?.PHP ?? 0, "PHP")
             }
             loading={statsLoading}
             accent="blue"
@@ -228,9 +260,7 @@ export default function AdminPage() {
             icon={Wallet}
             label="Outstanding · AED"
             value={
-              statsLoading
-                ? "—"
-                : formatCurrency(stats?.portfolioOutstanding?.AED ?? 0, "AED")
+              statsLoading ? "—" : formatCurrency(stats?.portfolioOutstanding?.AED ?? 0, "AED")
             }
             loading={statsLoading}
             accent="amber"
@@ -250,12 +280,10 @@ export default function AdminPage() {
       {/* ── Overdue installments alert ────────────────────────── */}
       {(overdueLoading || overdue.length > 0) && (
         <motion.div variants={cardVariants} initial="hidden" animate="visible">
-          <div className="border-amber-500/30 bg-amber-500/5 overflow-hidden rounded-xl border">
-            <div className="border-amber-500/20 flex items-center gap-2.5 border-b px-4 py-3.5">
+          <div className="overflow-hidden rounded-xl border border-amber-500/30 bg-amber-500/5">
+            <div className="flex items-center gap-2.5 border-b border-amber-500/20 px-4 py-3.5">
               <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
-              <h2 className="text-amber-400 text-sm font-semibold">
-                Overdue Installments
-              </h2>
+              <h2 className="text-sm font-semibold text-amber-400">Overdue Installments</h2>
               {!overdueLoading && (
                 <span className="ml-auto rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-medium text-amber-400">
                   {overdue.length}
@@ -269,17 +297,17 @@ export default function AdminPage() {
                 <RowSkeleton />
               </div>
             ) : (
-              <div className="divide-amber-500/10 divide-y">
+              <div className="divide-y divide-amber-500/10">
                 {overdue.map((item) => (
                   <button
                     key={item.id}
                     type="button"
                     onClick={() => void navigate(`/loans/${item.loan_id}`)}
-                    className="hover:bg-amber-500/5 flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left transition-colors"
+                    className="flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-amber-500/5"
                   >
                     {/* Days overdue badge */}
                     <div className="flex h-9 w-9 shrink-0 flex-col items-center justify-center rounded-full bg-amber-500/15">
-                      <span className="text-[10px] font-bold leading-none text-amber-400">
+                      <span className="text-[10px] leading-none font-bold text-amber-400">
                         {item.days_overdue}d
                       </span>
                       <span className="text-[9px] leading-none text-amber-400/70">late</span>
@@ -366,7 +394,7 @@ export default function AdminPage() {
                       <span className="text-muted-foreground text-xs">
                         {formatRelative(proof.submitted_at)}
                       </span>
-                      <span className="rounded border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                      <span className="border-primary/40 bg-primary/10 text-primary rounded border px-1.5 py-0.5 text-[10px] font-medium">
                         Review
                       </span>
                     </div>
@@ -384,9 +412,7 @@ export default function AdminPage() {
           <h2 className="text-foreground text-sm font-semibold">
             Active Loans
             {!loansLoading && activeLoans.length > 0 && (
-              <span className="text-muted-foreground ml-2 font-normal">
-                ({activeLoans.length})
-              </span>
+              <span className="text-muted-foreground ml-2 font-normal">({activeLoans.length})</span>
             )}
           </h2>
           <Link

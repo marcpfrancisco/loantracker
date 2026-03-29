@@ -43,8 +43,7 @@ const LOAN_TYPE_LABEL: Record<string, string> = {
 // ── CSV Export ────────────────────────────────────────────────────────────────
 
 export function exportStatementCSV(statement: BorrowerStatement): void {
-  const escape = (v: string | number) =>
-    `"${String(v).replace(/"/g, '""')}"`;
+  const escape = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
 
   const rows: string[][] = [
     ["Loan Statement", statement.borrower.full_name],
@@ -94,9 +93,7 @@ export function exportStatementCSV(statement: BorrowerStatement): void {
     });
   });
 
-  const csv = rows
-    .map((row) => (row.length === 0 ? "" : row.map(escape).join(",")))
-    .join("\n");
+  const csv = rows.map((row) => (row.length === 0 ? "" : row.map(escape).join(","))).join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -182,7 +179,8 @@ export function printStatementPDF(statement: BorrowerStatement): void {
   const hasAED = statement.summary.AED.principal > 0;
 
   const summaryRows = [
-    hasPHP && `
+    hasPHP &&
+      `
       <tr>
         <td style="padding:10px 16px;color:#374151;border-bottom:1px solid #f3f4f6;">Total Principal (PHP)</td>
         <td style="padding:10px 16px;text-align:right;font-weight:600;color:#111827;border-bottom:1px solid #f3f4f6;">${fmt(statement.summary.PHP.principal, "PHP")}</td>
@@ -195,7 +193,8 @@ export function printStatementPDF(statement: BorrowerStatement): void {
         <td style="padding:10px 16px;color:#374151;border-bottom:1px solid #f3f4f6;">Outstanding (PHP)</td>
         <td style="padding:10px 16px;text-align:right;font-weight:700;color:${statement.summary.PHP.outstanding > 0 ? "#d97706" : "#16a34a"};border-bottom:1px solid #f3f4f6;">${fmt(statement.summary.PHP.outstanding, "PHP")}</td>
       </tr>`,
-    hasAED && `
+    hasAED &&
+      `
       <tr>
         <td style="padding:10px 16px;color:#374151;border-bottom:1px solid #f3f4f6;">Total Principal (AED)</td>
         <td style="padding:10px 16px;text-align:right;font-weight:600;color:#111827;border-bottom:1px solid #f3f4f6;">${fmt(statement.summary.AED.principal, "AED")}</td>
@@ -279,7 +278,11 @@ export function printStatementPDF(statement: BorrowerStatement): void {
 export function exportExpenseTabCSV(tab: ExpenseTabDetail): void {
   const escape = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
   const generatedAt = new Date().toLocaleString("en-US", {
-    month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
   });
 
   const rows: string[][] = [
@@ -295,7 +298,8 @@ export function exportExpenseTabCSV(tab: ExpenseTabDetail): void {
 
   for (const period of tab.periods) {
     const monthLabel = new Date(period.period + "T12:00:00").toLocaleDateString("en-US", {
-      month: "long", year: "numeric",
+      month: "long",
+      year: "numeric",
     });
     for (const item of period.items) {
       rows.push([
@@ -313,15 +317,11 @@ export function exportExpenseTabCSV(tab: ExpenseTabDetail): void {
 
   for (const period of tab.periods) {
     const monthLabel = new Date(period.period + "T12:00:00").toLocaleDateString("en-US", {
-      month: "long", year: "numeric",
+      month: "long",
+      year: "numeric",
     });
     for (const payment of period.payments) {
-      rows.push([
-        monthLabel,
-        payment.payment_date,
-        String(payment.amount),
-        payment.notes ?? "",
-      ]);
+      rows.push([monthLabel, payment.payment_date, String(payment.amount), payment.notes ?? ""]);
     }
   }
 
@@ -330,12 +330,10 @@ export function exportExpenseTabCSV(tab: ExpenseTabDetail): void {
     ["— SUMMARY —"],
     ["Total Charged", String(tab.total_owed)],
     ["Total Paid", String(tab.total_paid)],
-    ["Outstanding", String(tab.outstanding)],
+    ["Outstanding", String(tab.outstanding)]
   );
 
-  const csv = rows
-    .map((row) => (row.length === 0 ? "" : row.map(escape).join(",")))
-    .join("\n");
+  const csv = rows.map((row) => (row.length === 0 ? "" : row.map(escape).join(","))).join("\n");
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -349,7 +347,11 @@ export function exportExpenseTabCSV(tab: ExpenseTabDetail): void {
 
 export function printExpenseTabPDF(tab: ExpenseTabDetail): void {
   const generatedAt = new Date().toLocaleString("en-US", {
-    month: "long", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
   });
 
   const paidStatusColor: Record<string, string> = {
@@ -363,31 +365,41 @@ export function printExpenseTabPDF(tab: ExpenseTabDetail): void {
     unpaid: "Unpaid",
   };
 
-  const periodSections = tab.periods.map((period) => {
-    const monthLabel = new Date(period.period + "T12:00:00").toLocaleDateString("en-US", {
-      month: "long", year: "numeric",
-    });
-    const color = paidStatusColor[period.paid_status] ?? "#9ca3af";
-    const label = paidStatusLabel[period.paid_status] ?? period.paid_status;
+  const periodSections = tab.periods
+    .map((period) => {
+      const monthLabel = new Date(period.period + "T12:00:00").toLocaleDateString("en-US", {
+        month: "long",
+        year: "numeric",
+      });
+      const color = paidStatusColor[period.paid_status] ?? "#9ca3af";
+      const label = paidStatusLabel[period.paid_status] ?? period.paid_status;
 
-    const itemRows = period.items.map((item) => `
+      const itemRows = period.items
+        .map(
+          (item) => `
       <tr>
         <td style="padding:8px 12px;color:#374151;border-bottom:1px solid #f3f4f6;">${item.description}</td>
         <td style="padding:8px 12px;color:#6b7280;border-bottom:1px solid #f3f4f6;font-size:12px;">${item.entry_date}</td>
         <td style="padding:8px 12px;text-align:right;color:#374151;border-bottom:1px solid #f3f4f6;">${fmt(item.amount, tab.currency)}</td>
         <td style="padding:8px 12px;text-align:center;color:#6b7280;border-bottom:1px solid #f3f4f6;font-size:12px;">${item.is_already_split ? "His share" : "÷ 2"}</td>
         <td style="padding:8px 12px;text-align:right;font-weight:600;color:#111827;border-bottom:1px solid #f3f4f6;">${fmt(item.borrower_owes, tab.currency)}</td>
-      </tr>`).join("");
+      </tr>`
+        )
+        .join("");
 
-    const paymentRows = period.payments.map((pay) => `
+      const paymentRows = period.payments
+        .map(
+          (pay) => `
       <tr style="background:#f0fdf4;">
         <td colspan="4" style="padding:8px 12px;color:#16a34a;border-bottom:1px solid #f3f4f6;">
           Payment received · ${fmtDate(pay.payment_date)}${pay.notes ? ` · ${pay.notes}` : ""}
         </td>
         <td style="padding:8px 12px;text-align:right;font-weight:600;color:#16a34a;border-bottom:1px solid #f3f4f6;">-${fmt(pay.amount, tab.currency)}</td>
-      </tr>`).join("");
+      </tr>`
+        )
+        .join("");
 
-    return `
+      return `
     <div style="margin-bottom:24px;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;break-inside:avoid;">
       <div style="background:#f9fafb;padding:12px 18px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;">
         <span style="font-weight:700;color:#111827;font-size:14px;">${monthLabel}</span>
@@ -410,15 +422,20 @@ export function printExpenseTabPDF(tab: ExpenseTabDetail): void {
         <tbody>
           ${itemRows || `<tr><td colspan="5" style="padding:16px 12px;text-align:center;color:#9ca3af;font-size:12px;">No items</td></tr>`}
           ${paymentRows}
-          ${period.total_owed > 0 ? `
+          ${
+            period.total_owed > 0
+              ? `
           <tr style="background:#f9fafb;">
             <td colspan="4" style="padding:8px 12px;text-align:right;font-size:12px;color:#6b7280;font-weight:600;">Outstanding</td>
             <td style="padding:8px 12px;text-align:right;font-weight:700;color:${period.outstanding <= 0 ? "#16a34a" : "#111827"};">${fmt(period.outstanding, tab.currency)}</td>
-          </tr>` : ""}
+          </tr>`
+              : ""
+          }
         </tbody>
       </table>
     </div>`;
-  }).join("");
+    })
+    .join("");
 
   const html = `<!DOCTYPE html>
 <html lang="en">

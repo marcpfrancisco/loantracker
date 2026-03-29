@@ -36,16 +36,12 @@ function PeriodPill({
   paid_status: "unpaid" | "partial" | "paid";
 }) {
   const styles = {
-    paid:    "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+    paid: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
     partial: "bg-amber-500/15 text-amber-400 border-amber-500/30",
-    unpaid:  "bg-zinc-500/15 text-zinc-400 border-zinc-500/30",
+    unpaid: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30",
   };
 
-  const Icon = paid_status === "paid"
-    ? CheckCircle2
-    : is_locked
-    ? Lock
-    : Unlock;
+  const Icon = paid_status === "paid" ? CheckCircle2 : is_locked ? Lock : Unlock;
 
   return (
     <span
@@ -144,10 +140,10 @@ export default function ExpenseTabsPage() {
 
   // For borrower: data is a single tab or null
   const tabs: ExpenseTabSummary[] = isAdmin
-    ? (data as ExpenseTabSummary[] | undefined) ?? []
+    ? ((data as ExpenseTabSummary[] | undefined) ?? [])
     : data
-    ? [data as ExpenseTabSummary]
-    : [];
+      ? [data as ExpenseTabSummary]
+      : [];
 
   // Borrower with a tab → redirect straight to their tab
   if (!isAdmin && !isLoading && tabs.length > 0) {

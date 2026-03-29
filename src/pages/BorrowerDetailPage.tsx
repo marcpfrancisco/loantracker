@@ -53,7 +53,12 @@ const LOAN_TYPE_LABEL: Record<string, string> = {
 };
 
 function getInitials(name: string) {
-  return name.split(" ").map((w) => w[0]).join("").toUpperCase().slice(0, 2);
+  return name
+    .split(" ")
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
 }
 
 // ── Create Tab Modal ──────────────────────────────────────────────────────────
@@ -66,7 +71,13 @@ interface CreateTabModalProps {
   onCreated: (tabId: string) => void;
 }
 
-function CreateTabModal({ borrowerId, defaultCurrency, borrowerName, onClose, onCreated }: CreateTabModalProps) {
+function CreateTabModal({
+  borrowerId,
+  defaultCurrency,
+  borrowerName,
+  onClose,
+  onCreated,
+}: CreateTabModalProps) {
   const [title, setTitle] = useState("Shared Expenses");
   const [currency, setCurrency] = useState<CurrencyType>(defaultCurrency);
   const createTab = useCreateExpenseTab();
@@ -103,7 +114,7 @@ function CreateTabModal({ borrowerId, defaultCurrency, borrowerName, onClose, on
             <input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="border-border/60 bg-background focus:border-primary/60 w-full rounded-lg border px-3 py-2 text-sm outline-none transition-colors"
+              className="border-border/60 bg-background focus:border-primary/60 w-full rounded-lg border px-3 py-2 text-sm transition-colors outline-none"
               required
             />
           </div>
@@ -252,7 +263,7 @@ export default function BorrowerDetailPage() {
               <button
                 type="button"
                 onClick={() => void navigate(`/tabs/${borrower.expenseTab!.id}`)}
-                className="text-primary hover:bg-primary/10 flex w-full items-center justify-between rounded-xl border border-primary/20 px-4 py-3 transition-colors"
+                className="text-primary hover:bg-primary/10 border-primary/20 flex w-full items-center justify-between rounded-xl border px-4 py-3 transition-colors"
               >
                 <div className="flex items-center gap-2.5">
                   <Receipt className="h-4 w-4" />
@@ -322,8 +333,7 @@ export default function BorrowerDetailPage() {
                 <div className="min-w-0 flex-1">
                   <p className="text-foreground text-sm font-medium">{loan.source_name}</p>
                   <p className="text-muted-foreground text-xs">
-                    {LOAN_TYPE_LABEL[loan.loan_type] ?? loan.loan_type} ·{" "}
-                    {fmtDate(loan.started_at)}
+                    {LOAN_TYPE_LABEL[loan.loan_type] ?? loan.loan_type} · {fmtDate(loan.started_at)}
                   </p>
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1">

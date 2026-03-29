@@ -58,9 +58,7 @@ function splitEvenly(
 function computeMaribank(params: InstallmentParams): InstallmentBreakdown {
   const { principal, interest_rate, installments_total } = params;
   const totalInterest =
-    interest_rate !== null
-      ? principal * (interest_rate / 100) * installments_total
-      : 0;
+    interest_rate !== null ? principal * (interest_rate / 100) * installments_total : 0;
   const total = principal + totalInterest;
   return { total, ...splitEvenly(total, installments_total) };
 }
@@ -74,8 +72,7 @@ function computeMaribank(params: InstallmentParams): InstallmentBreakdown {
  */
 function computeDefault(params: InstallmentParams): InstallmentBreakdown {
   const { principal, interest_rate, service_fee, installments_total } = params;
-  const interest =
-    interest_rate !== null ? principal * (interest_rate / 100) : 0;
+  const interest = interest_rate !== null ? principal * (interest_rate / 100) : 0;
   const total = principal + interest + service_fee;
   return { total, ...splitEvenly(total, installments_total) };
 }

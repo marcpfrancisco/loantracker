@@ -35,17 +35,15 @@ export default function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
 
   // Read URL params once — these are set by the Supabase email link
-  const tokenHash    = searchParams.get("token_hash");
-  const flowType     = searchParams.get("type"); // 'recovery' | 'invite'
-  const code         = searchParams.get("code");
+  const tokenHash = searchParams.get("token_hash");
+  const flowType = searchParams.get("type"); // 'recovery' | 'invite'
+  const code = searchParams.get("code");
   // Set by AuthContext when the SDK fires PASSWORD_RECOVERY (session already established)
-  const isRecovery   = searchParams.get("recovery") === "1";
-  const isInvite     = flowType === "invite";
+  const isRecovery = searchParams.get("recovery") === "1";
+  const isInvite = flowType === "invite";
 
   const hasValidParams =
-    !!(tokenHash && (flowType === "recovery" || flowType === "invite")) ||
-    !!code ||
-    isRecovery;
+    !!(tokenHash && (flowType === "recovery" || flowType === "invite")) || !!code || isRecovery;
 
   const [pageState, setPageState] = useState<PageState>(hasValidParams ? "loading" : "invalid");
   const [serverError, setServerError] = useState<string | null>(null);
@@ -71,19 +69,15 @@ export default function ResetPasswordPage() {
       localStorage.setItem("pending_password_setup", "1");
       setPageState("form");
     } else if (tokenHash && (flowType === "recovery" || flowType === "invite")) {
-      void supabase.auth
-        .verifyOtp({ token_hash: tokenHash, type: flowType })
-        .then(({ error }) => {
-          if (!error) localStorage.setItem("pending_password_setup", "1");
-          setPageState(error ? "invalid" : "form");
-        });
+      void supabase.auth.verifyOtp({ token_hash: tokenHash, type: flowType }).then(({ error }) => {
+        if (!error) localStorage.setItem("pending_password_setup", "1");
+        setPageState(error ? "invalid" : "form");
+      });
     } else if (code) {
-      void supabase.auth
-        .exchangeCodeForSession(code)
-        .then(({ error }) => {
-          if (!error) localStorage.setItem("pending_password_setup", "1");
-          setPageState(error ? "invalid" : "form");
-        });
+      void supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
+        if (!error) localStorage.setItem("pending_password_setup", "1");
+        setPageState(error ? "invalid" : "form");
+      });
     }
   }, [hasValidParams, isRecovery, tokenHash, flowType, code]);
 

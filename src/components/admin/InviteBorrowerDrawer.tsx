@@ -89,7 +89,7 @@ export function InviteBorrowerDrawer({ open, onClose }: InviteBorrowerDrawerProp
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 300 }}
-            className="bg-background border-border/60 fixed right-0 top-0 z-50 flex h-full w-full flex-col border-l shadow-2xl sm:w-[400px]"
+            className="bg-background border-border/60 fixed top-0 right-0 z-50 flex h-full w-full flex-col border-l shadow-2xl sm:w-[400px]"
           >
             {/* Header */}
             <div className="border-border/60 flex items-center gap-3 border-b px-5 py-4">
@@ -114,21 +114,20 @@ export function InviteBorrowerDrawer({ open, onClose }: InviteBorrowerDrawerProp
               className="flex flex-1 flex-col overflow-y-auto"
             >
               <div className="flex-1 space-y-5 px-5 py-6">
-
                 {/* Email */}
                 <div>
                   <label className="text-foreground mb-1.5 block text-xs font-medium">
                     Email address <span className="text-rose-400">*</span>
                   </label>
                   <div className="relative">
-                    <Mail className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
+                    <Mail className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
                     <input
                       {...register("email")}
                       type="email"
                       placeholder="borrower@example.com"
                       autoComplete="off"
                       className={cn(
-                        "bg-muted/50 border-border/60 focus:border-primary/60 w-full rounded-lg border py-2 pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground/50",
+                        "bg-muted/50 border-border/60 focus:border-primary/60 placeholder:text-muted-foreground/50 w-full rounded-lg border py-2 pr-3 pl-9 text-sm transition-colors outline-none",
                         errors.email && "border-rose-500/60"
                       )}
                     />
@@ -142,14 +141,14 @@ export function InviteBorrowerDrawer({ open, onClose }: InviteBorrowerDrawerProp
                     Full name <span className="text-rose-400">*</span>
                   </label>
                   <div className="relative">
-                    <User className="text-muted-foreground pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" />
+                    <User className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
                     <input
                       {...register("full_name")}
                       type="text"
                       placeholder="Juan dela Cruz"
                       autoComplete="off"
                       className={cn(
-                        "bg-muted/50 border-border/60 focus:border-primary/60 w-full rounded-lg border py-2 pl-9 pr-3 text-sm outline-none transition-colors placeholder:text-muted-foreground/50",
+                        "bg-muted/50 border-border/60 focus:border-primary/60 placeholder:text-muted-foreground/50 w-full rounded-lg border py-2 pr-3 pl-9 text-sm transition-colors outline-none",
                         errors.full_name && "border-rose-500/60"
                       )}
                     />
@@ -187,9 +186,10 @@ export function InviteBorrowerDrawer({ open, onClose }: InviteBorrowerDrawerProp
                 </div>
 
                 {/* Info banner */}
-                <div className="bg-muted/40 border-border/60 rounded-lg border px-4 py-3 text-xs text-muted-foreground">
-                  The borrower will receive an email with a link to set their password and access the app.
-                  Their account will be created with the <span className="text-foreground font-medium">borrower</span> role.
+                <div className="bg-muted/40 border-border/60 text-muted-foreground rounded-lg border px-4 py-3 text-xs">
+                  The borrower will receive an email with a link to set their password and access
+                  the app. Their account will be created with the{" "}
+                  <span className="text-foreground font-medium">borrower</span> role.
                 </div>
               </div>
 

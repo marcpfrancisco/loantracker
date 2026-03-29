@@ -20,7 +20,10 @@ Deno.serve(async (req: Request) => {
     // ── 1. Verify JWT ──────────────────────────────────────────────────────────
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return Response.json({ error: "Missing authorization header" }, { status: 401, headers: corsHeaders });
+      return Response.json(
+        { error: "Missing authorization header" },
+        { status: 401, headers: corsHeaders }
+      );
     }
 
     const token = authHeader.replace("Bearer ", "");
@@ -31,9 +34,15 @@ Deno.serve(async (req: Request) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
-    const { data: { user }, error: userError } = await supabaseUser.auth.getUser(token);
+    const {
+      data: { user },
+      error: userError,
+    } = await supabaseUser.auth.getUser(token);
     if (userError || !user) {
-      return Response.json({ error: `Unauthorized: ${userError?.message ?? "no user"}` }, { status: 401, headers: corsHeaders });
+      return Response.json(
+        { error: `Unauthorized: ${userError?.message ?? "no user"}` },
+        { status: 401, headers: corsHeaders }
+      );
     }
 
     // ── 2. Verify caller is admin ──────────────────────────────────────────────
@@ -50,15 +59,21 @@ Deno.serve(async (req: Request) => {
       .single();
 
     if (profileError || callerProfile?.role !== "admin") {
-      return Response.json({ error: "Forbidden: admin access required" }, { status: 403, headers: corsHeaders });
+      return Response.json(
+        { error: "Forbidden: admin access required" },
+        { status: 403, headers: corsHeaders }
+      );
     }
 
     // ── 3. Parse payload ───────────────────────────────────────────────────────
-    const body = await req.json() as Partial<NotifyPayload>;
+    const body = (await req.json()) as Partial<NotifyPayload>;
     const { installmentId, adminNote, fileUrl } = body;
 
     if (!installmentId || !adminNote) {
-      return Response.json({ error: "Missing required fields: installmentId, adminNote" }, { status: 400, headers: corsHeaders });
+      return Response.json(
+        { error: "Missing required fields: installmentId, adminNote" },
+        { status: 400, headers: corsHeaders }
+      );
     }
 
     // ── 4. Delete file from Storage (service role — guaranteed permission) ─────
@@ -75,19 +90,24 @@ Deno.serve(async (req: Request) => {
     // ── 5. Fetch installment + loan + borrower details ─────────────────────────
     const { data: inst, error: instError } = await supabaseAdmin
       .from("installments")
-      .select(`
+      .select(
+        `
         installment_no,
         loans!installments_loan_id_fkey (
           credit_sources!loans_source_id_fkey ( name ),
           borrower:profiles!loans_borrower_id_fkey ( id, full_name )
         )
-      `)
+      `
+      )
       .eq("id", installmentId)
       .single();
 
     if (instError || !inst) {
       console.error("[notify-rejection] Installment fetch error:", instError?.message);
-      return Response.json({ error: "Installment not found" }, { status: 404, headers: corsHeaders });
+      return Response.json(
+        { error: "Installment not found" },
+        { status: 404, headers: corsHeaders }
+      );
     }
 
     const loan = inst.loans as {
@@ -100,10 +120,16 @@ Deno.serve(async (req: Request) => {
     const installmentNo = inst.installment_no;
 
     // ── 6. Get borrower email from auth.users ──────────────────────────────────
-    const { data: { user: borrowerUser }, error: borrowerError } = await supabaseAdmin.auth.admin.getUserById(borrowerId);
+    const {
+      data: { user: borrowerUser },
+      error: borrowerError,
+    } = await supabaseAdmin.auth.admin.getUserById(borrowerId);
     if (borrowerError || !borrowerUser?.email) {
       console.error("[notify-rejection] Borrower email fetch error:", borrowerError?.message);
-      return Response.json({ error: "Borrower email not found" }, { status: 404, headers: corsHeaders });
+      return Response.json(
+        { error: "Borrower email not found" },
+        { status: 404, headers: corsHeaders }
+      );
     }
 
     // ── 7. Send rejection email via Brevo ──────────────────────────────────────
@@ -115,7 +141,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const fromEmail = Deno.env.get("BREVO_FROM_EMAIL") ?? "noreply@loantracker.app";
-    const fromName  = Deno.env.get("BREVO_FROM_NAME")  ?? "Loan Tracker";
+    const fromName = Deno.env.get("BREVO_FROM_NAME") ?? "Loan Tracker";
 
     const emailRes = await fetch("https://api.brevo.com/v3/smtp/email", {
       method: "POST",
@@ -124,9 +150,9 @@ Deno.serve(async (req: Request) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        sender:      { name: fromName, email: fromEmail },
-        to:          [{ email: borrowerUser.email, name: borrowerName }],
-        subject:     `Payment proof rejected — ${sourceName} Installment #${installmentNo}`,
+        sender: { name: fromName, email: fromEmail },
+        to: [{ email: borrowerUser.email, name: borrowerName }],
+        subject: `Payment proof rejected — ${sourceName} Installment #${installmentNo}`,
         htmlContent: buildRejectionEmail(borrowerName, sourceName, installmentNo, adminNote),
       }),
     });
@@ -135,11 +161,13 @@ Deno.serve(async (req: Request) => {
       const errText = await emailRes.text();
       console.error("[notify-rejection] Resend error:", errText);
       // Don't fail the response — file deletion already succeeded
-      return Response.json({ ok: true, email_sent: false, email_error: errText }, { headers: corsHeaders });
+      return Response.json(
+        { ok: true, email_sent: false, email_error: errText },
+        { headers: corsHeaders }
+      );
     }
 
     return Response.json({ ok: true, email_sent: true }, { headers: corsHeaders });
-
   } catch (err) {
     console.error("[notify-rejection] Unexpected error:", err);
     return Response.json(

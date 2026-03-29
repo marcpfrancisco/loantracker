@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/context/ThemeContext";
 import { navItems } from "./navItems";
 import { RegionBadge } from "@/components/ui/region-badge";
+import { NotificationBell } from "@/components/layout/NotificationBell";
 
 function getInitials(name: string): string {
   return name
@@ -45,9 +46,7 @@ export function Sidebar() {
         <div className="bg-primary/10 border-border flex h-8 w-8 items-center justify-center rounded-xl border">
           <LockKeyhole className="text-primary h-4 w-4" />
         </div>
-        <span className="text-foreground text-sm font-semibold tracking-tight">
-          Loan Tracker
-        </span>
+        <span className="text-foreground text-sm font-semibold tracking-tight">Loan Tracker</span>
       </div>
 
       {/* Nav items */}
@@ -65,7 +64,7 @@ export function Sidebar() {
                     />
                     <motion.div
                       layoutId="sidebar-accent"
-                      className="bg-primary absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full"
+                      className="bg-primary absolute top-1/2 left-0 h-5 w-[3px] -translate-y-1/2 rounded-r-full"
                       transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
                     />
                   </>
@@ -95,7 +94,7 @@ export function Sidebar() {
         <div className="border-border/60 border-t px-3 py-4">
           <button
             onClick={() => void navigate("/profile")}
-            className="mb-2 flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-muted/50"
+            className="hover:bg-muted/50 mb-2 flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2 transition-colors"
           >
             {/* Avatar */}
             {(() => {
@@ -113,9 +112,7 @@ export function Sidebar() {
               );
             })()}
             <div className="min-w-0 text-left">
-              <p className="text-foreground truncate text-sm font-medium">
-                {profile.full_name}
-              </p>
+              <p className="text-foreground truncate text-sm font-medium">{profile.full_name}</p>
               <div className="flex items-center gap-1.5">
                 <span className="text-muted-foreground text-xs capitalize">{profile.role}</span>
                 <span className="text-border">·</span>
@@ -123,6 +120,12 @@ export function Sidebar() {
               </div>
             </div>
           </button>
+          {/* Notifications */}
+          <div className="flex items-center gap-3 rounded-lg px-3 py-2">
+            <NotificationBell panelOrigin="bottom-right" />
+            <span className="text-muted-foreground text-sm">Notifications</span>
+          </div>
+
           <button
             onClick={toggleTheme}
             className="text-muted-foreground hover:text-foreground hover:bg-muted/50 flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors"
@@ -142,4 +145,3 @@ export function Sidebar() {
     </aside>
   );
 }
-

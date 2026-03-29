@@ -1,16 +1,13 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, AlertCircle } from "lucide-react";
+import { Plus, AlertCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
-import { useLoans } from "@/hooks/useLoans";
+import { useLoansInfinite, LOANS_PAGE_SIZE } from "@/hooks/useLoansInfinite";
+import type { StatusFilter, RegionFilter } from "@/hooks/useLoansInfinite";
 import { LoanCard } from "@/components/dashboard/LoanCard";
 import { AddLoanDrawer } from "@/components/loans/AddLoanDrawer";
 import { RefreshButton } from "@/components/ui/refresh-button";
-import type { LoanStatus, RegionType } from "@/types/database";
-
-type StatusFilter = LoanStatus | "all";
-type RegionFilter = RegionType | "all";
 
 const statusOptions: { value: StatusFilter; label: string }[] = [
   { value: "all", label: "All" },
@@ -75,17 +72,28 @@ export default function LoansPage() {
   const { profile } = useAuth();
   const isAdmin = profile?.role === "admin";
 
-  const { data: loans = [], isLoading, isFetching, error, refetch } = useLoans();
-
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [regionFilter, setRegionFilter] = useState<RegionFilter>("all");
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  const filtered = loans.filter((loan) => {
-    if (statusFilter !== "all" && loan.status !== statusFilter) return false;
-    if (regionFilter !== "all" && loan.region !== regionFilter) return false;
-    return true;
-  });
+  const {
+    data,
+    isLoading,
+    isFetching,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+    error,
+    refetch,
+  } = useLoansInfinite(statusFilter, regionFilter);
+
+  const loans = data?.pages.flat() ?? [];
+  const totalLoaded = loans.length;
+  const hasFilters = statusFilter !== "all" || regionFilter !== "all";
+
+  function handleFilterChange<T>(setter: (v: T) => void) {
+    return (v: T) => setter(v);
+  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-5 p-6">
@@ -95,14 +103,17 @@ export default function LoansPage() {
           <h1 className="text-foreground text-xl font-semibold tracking-tight">Loans</h1>
           {!isLoading && (
             <p className="text-muted-foreground mt-1 text-sm">
-              {filtered.length} loan{filtered.length !== 1 ? "s" : ""}
-              {statusFilter !== "all" || regionFilter !== "all" ? " matching filters" : " total"}
+              {totalLoaded > 0
+                ? `${totalLoaded}${hasNextPage ? "+" : ""} loan${totalLoaded !== 1 ? "s" : ""}${hasFilters ? " matching filters" : ""}`
+                : hasFilters
+                  ? "No loans match the selected filters"
+                  : "No loans yet"}
             </p>
           )}
         </div>
 
         <div className="flex items-center gap-2">
-          <RefreshButton onRefresh={() => void refetch()} isRefetching={isFetching} />
+          <RefreshButton onRefresh={() => void refetch()} isRefetching={isFetching && !isFetchingNextPage} />
           {isAdmin && (
             <button
               onClick={() => setDrawerOpen(true)}
@@ -117,7 +128,7 @@ export default function LoansPage() {
 
       {/* Error */}
       {error && (
-        <div className="border-rose-500/30 bg-rose-500/10 flex items-center gap-2 rounded-lg border px-4 py-3 text-sm text-rose-400">
+        <div className="flex items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-400">
           <AlertCircle className="h-4 w-4 shrink-0" />
           Failed to load loans. Please refresh.
         </div>
@@ -125,7 +136,6 @@ export default function LoansPage() {
 
       {/* Filters */}
       <div className="space-y-2">
-        {/* Status pills */}
         <div className="flex flex-wrap gap-2">
           {statusOptions.map((opt) => (
             <FilterPill
@@ -133,12 +143,10 @@ export default function LoansPage() {
               value={opt.value}
               label={opt.label}
               active={statusFilter === opt.value}
-              onClick={setStatusFilter}
+              onClick={handleFilterChange(setStatusFilter)}
             />
           ))}
         </div>
-
-        {/* Region pills */}
         <div className="flex flex-wrap gap-2">
           {regionOptions.map((opt) => (
             <FilterPill
@@ -146,7 +154,7 @@ export default function LoansPage() {
               value={opt.value}
               label={opt.label}
               active={regionFilter === opt.value}
-              onClick={setRegionFilter}
+              onClick={handleFilterChange(setRegionFilter)}
             />
           ))}
         </div>
@@ -155,15 +163,15 @@ export default function LoansPage() {
       {/* Loan list */}
       {isLoading ? (
         <div className="grid gap-3 sm:grid-cols-2">
-          {Array.from({ length: 4 }).map((_, i) => (
+          {Array.from({ length: LOANS_PAGE_SIZE > 4 ? 4 : LOANS_PAGE_SIZE }).map((_, i) => (
             <LoanCardSkeleton key={i} />
           ))}
         </div>
-      ) : filtered.length === 0 ? (
+      ) : loans.length === 0 ? (
         <div className="border-border/60 bg-card rounded-xl border px-4 py-16 text-center">
           <p className="text-foreground text-sm font-medium">No loans found</p>
           <p className="text-muted-foreground mt-1 text-xs">
-            {statusFilter !== "all" || regionFilter !== "all"
+            {hasFilters
               ? "Try adjusting your filters."
               : isAdmin
                 ? "Add the first loan using the button above."
@@ -171,25 +179,55 @@ export default function LoansPage() {
           </p>
         </div>
       ) : (
-        <motion.div
-          className="grid gap-3 sm:grid-cols-2"
-          variants={{ visible: { transition: { staggerChildren: 0.05 } } }}
-          initial="hidden"
-          animate="visible"
-        >
-          {filtered.map((loan) => (
-            <LoanCard
-              key={loan.id}
-              loan={loan}
-              borrowerName={isAdmin ? (loan.borrower?.full_name ?? "Unknown") : undefined}
-            />
-          ))}
-        </motion.div>
+        <>
+          <motion.div
+            className="grid gap-3 sm:grid-cols-2"
+            variants={{ visible: { transition: { staggerChildren: 0.05 } } }}
+            initial="hidden"
+            animate="visible"
+          >
+            {loans.map((loan) => (
+              <LoanCard
+                key={loan.id}
+                loan={loan}
+                borrowerName={isAdmin ? (loan.borrower?.full_name ?? "Unknown") : undefined}
+              />
+            ))}
+          </motion.div>
+
+          {/* Load more */}
+          {hasNextPage && (
+            <div className="flex justify-center pt-2">
+              <button
+                type="button"
+                onClick={() => void fetchNextPage()}
+                disabled={isFetchingNextPage}
+                className="border-border/60 text-muted-foreground hover:text-foreground flex cursor-pointer items-center gap-2 rounded-lg border px-5 py-2.5 text-sm transition-colors disabled:opacity-60"
+              >
+                {isFetchingNextPage ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading…
+                  </>
+                ) : (
+                  "Load more"
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* Next-page skeleton while fetching */}
+          {isFetchingNextPage && (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <LoanCardSkeleton key={i} />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
-      {isAdmin && (
-        <AddLoanDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
-      )}
+      {isAdmin && <AddLoanDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />}
     </div>
   );
 }

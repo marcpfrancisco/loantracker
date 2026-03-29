@@ -84,7 +84,7 @@ function ErrorUI({
     <div className="bg-background flex min-h-screen flex-col items-center justify-center p-6">
       <div className="w-full max-w-sm space-y-6 text-center">
         {/* Icon */}
-        <div className="bg-rose-500/10 border-rose-500/20 mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border border-rose-500/20 bg-rose-500/10">
           <AlertTriangle className="h-8 w-8 text-rose-400" />
         </div>
 

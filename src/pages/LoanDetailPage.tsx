@@ -1,11 +1,12 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router";
 import { motion } from "framer-motion";
-import { ArrowLeft, AlertCircle, User, MapPin, Calendar, FileText } from "lucide-react";
+import { ArrowLeft, AlertCircle, User, MapPin, Calendar, FileText, CheckSquare, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { cardVariants } from "@/lib/animations";
 import { useAuth } from "@/hooks/useAuth";
 import { useLoanDetail } from "@/hooks/useLoanDetail";
-import { useUpdateInstallment } from "@/hooks/useUpdateInstallment";
+import { useUpdateInstallment, useBulkMarkPaid } from "@/hooks/useUpdateInstallment";
 import { useUpdateLoanStatus } from "@/hooks/useUpdateLoanStatus";
 import { InstallmentRow } from "@/components/loans/InstallmentRow";
 import { RegionLabel } from "@/components/ui/region-badge";
@@ -14,25 +15,25 @@ import type { LoanStatus, LoanType, CreditSourceType, PaymentStatus } from "@/ty
 // ── Lookup maps ───────────────────────────────────────────────────────────────
 
 const loanTypeLabels: Record<LoanType, string> = {
-  tabby:            "Tabby",
-  sloan:            "SLoan",
-  gloan:            "GLoan",
-  spaylater:        "SPayLater",
-  credit_card:      "Credit Card",
-  custom:           "Custom",
-  lazcredit:        "LazCredit",
-  maribank_credit:  "Maribank Credit",
+  tabby: "Tabby",
+  sloan: "SLoan",
+  gloan: "GLoan",
+  spaylater: "SPayLater",
+  credit_card: "Credit Card",
+  custom: "Custom",
+  lazcredit: "LazCredit",
+  maribank_credit: "Maribank Credit",
 };
 
 const sourceTypeLabels: Record<CreditSourceType, string> = {
-  e_wallet:      "E-Wallet",
-  credit_card:   "Credit Card",
-  bnpl:          "BNPL",
+  e_wallet: "E-Wallet",
+  credit_card: "Credit Card",
+  bnpl: "BNPL",
   bank_transfer: "Bank Transfer",
 };
 
 const loanStatusStyles: Record<LoanStatus, string> = {
-  active:    "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+  active: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
   completed: "bg-blue-500/15 text-blue-400 border-blue-500/30",
   defaulted: "bg-rose-500/15 text-rose-400 border-rose-500/30",
   cancelled: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30",
@@ -92,16 +93,37 @@ export default function LoanDetailPage() {
   const isAdmin = profile?.role === "admin";
 
   const { data: loan, isLoading, error } = useLoanDetail(id);
-  const { mutate: updateInstallment, isPending: updatingInstallment, variables: updatingVars } =
-    useUpdateInstallment(id ?? "");
+  const {
+    mutate: updateInstallment,
+    isPending: updatingInstallment,
+    variables: updatingVars,
+  } = useUpdateInstallment(id ?? "");
   const { mutate: updateLoanStatus, isPending: updatingStatus } = useUpdateLoanStatus(id ?? "");
+  const { mutate: bulkMarkPaid, isPending: bulkPending } = useBulkMarkPaid(id ?? "");
+
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  function exitBulkMode() {
+    setBulkMode(false);
+    setSelectedIds(new Set());
+  }
+
+  function toggleId(installmentId: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(installmentId)) next.delete(installmentId);
+      else next.add(installmentId);
+      return next;
+    });
+  }
 
   if (isLoading) return <PageSkeleton />;
 
   if (error || !loan) {
     return (
       <div className="mx-auto max-w-2xl p-6">
-        <div className="border-rose-500/30 bg-rose-500/10 flex items-center gap-2 rounded-lg border px-4 py-3 text-sm text-rose-400">
+        <div className="flex items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-400">
           <AlertCircle className="h-4 w-4 shrink-0" />
           {error ? "Failed to load loan. Please try again." : "Loan not found."}
         </div>
@@ -114,7 +136,8 @@ export default function LoanDetailPage() {
   const totalPayable = loan.principal + interest + loan.service_fee;
   const paidInstallments = loan.installments.filter((i) => i.status === "paid");
   const paidAmount = paidInstallments.reduce((sum, i) => sum + i.amount, 0);
-  const progress = loan.installments_total > 0 ? paidInstallments.length / loan.installments_total : 0;
+  const progress =
+    loan.installments_total > 0 ? paidInstallments.length / loan.installments_total : 0;
 
   const allPaid = paidInstallments.length === loan.installments_total;
 
@@ -260,7 +283,7 @@ export default function LoanDetailPage() {
           animate="visible"
           className="bg-card border-border/60 rounded-xl border p-4"
         >
-          <p className="text-muted-foreground mb-3 text-xs font-semibold uppercase tracking-wider">
+          <p className="text-muted-foreground mb-3 text-xs font-semibold tracking-wider uppercase">
             Loan Actions
           </p>
           <div className="flex flex-wrap gap-2">
@@ -299,7 +322,7 @@ export default function LoanDetailPage() {
           animate="visible"
           className="bg-card border-border/60 rounded-xl border p-4"
         >
-          <p className="text-muted-foreground mb-3 text-xs font-semibold uppercase tracking-wider">
+          <p className="text-muted-foreground mb-3 text-xs font-semibold tracking-wider uppercase">
             Loan Actions
           </p>
           <button
@@ -319,11 +342,89 @@ export default function LoanDetailPage() {
         animate="visible"
         className="bg-card border-border/60 overflow-hidden rounded-xl border"
       >
-        <div className="border-border/60 flex items-center justify-between border-b px-4 py-3.5">
-          <h2 className="text-foreground text-sm font-semibold">Installments</h2>
-          <span className="text-muted-foreground text-xs">
-            {paidInstallments.length} of {loan.installments_total} paid
-          </span>
+        {/* Header */}
+        <div className="border-border/60 flex items-center justify-between gap-3 border-b px-4 py-3.5">
+          {bulkMode ? (
+            <>
+              {/* Select-all checkbox + count */}
+              {(() => {
+                const eligible = loan.installments.filter((i) => i.status !== "paid");
+                const allSelected = eligible.length > 0 && eligible.every((i) => selectedIds.has(i.id));
+                return (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSelectedIds(
+                        allSelected ? new Set() : new Set(eligible.map((i) => i.id))
+                      )
+                    }
+                    className="flex cursor-pointer items-center gap-2"
+                  >
+                    <div
+                      className={cn(
+                        "flex h-4 w-4 items-center justify-center rounded border transition-colors",
+                        allSelected ? "bg-primary border-primary" : "border-border/60"
+                      )}
+                    >
+                      {allSelected && (
+                        <svg viewBox="0 0 10 8" className="h-2.5 w-2.5 text-white" fill="currentColor">
+                          <path d="M1 4l2.5 2.5L9 1" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                    </div>
+                    <span className="text-foreground text-sm font-semibold">
+                      {selectedIds.size > 0 ? `${selectedIds.size} selected` : "Select all"}
+                    </span>
+                  </button>
+                );
+              })()}
+              <div className="flex items-center gap-2">
+                {selectedIds.size > 0 && (
+                  <button
+                    type="button"
+                    disabled={bulkPending}
+                    onClick={() =>
+                      bulkMarkPaid([...selectedIds], { onSuccess: exitBulkMode })
+                    }
+                    className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-500 disabled:opacity-60"
+                  >
+                    {bulkPending ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <CheckSquare className="h-3 w-3" />
+                    )}
+                    Mark {selectedIds.size} Paid
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={exitBulkMode}
+                  className="border-border/60 text-muted-foreground hover:text-foreground cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <h2 className="text-foreground text-sm font-semibold">Installments</h2>
+              <div className="flex items-center gap-3">
+                <span className="text-muted-foreground text-xs">
+                  {paidInstallments.length} of {loan.installments_total} paid
+                </span>
+                {isAdmin && loan.installments.some((i) => i.status !== "paid") && (
+                  <button
+                    type="button"
+                    onClick={() => setBulkMode(true)}
+                    className="border-border/60 text-muted-foreground hover:text-foreground flex cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors"
+                  >
+                    <CheckSquare className="h-3 w-3" />
+                    Bulk
+                  </button>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         {loan.installments.length === 0 ? (
@@ -340,6 +441,10 @@ export default function LoanDetailPage() {
               isAdmin={isAdmin}
               onUpdate={handleInstallmentUpdate}
               isUpdating={updatingInstallment && updatingVars?.id === inst.id}
+              bulkMode={bulkMode}
+              isSelected={selectedIds.has(inst.id)}
+              isEligible={inst.status !== "paid"}
+              onToggle={() => toggleId(inst.id)}
             />
           ))
         )}

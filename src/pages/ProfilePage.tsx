@@ -30,10 +30,10 @@ import type { LoanStatus, CreditSourceType, LoanType } from "@/types/database";
 const DICEBEAR_OPTIONS = [
   { style: "adventurer-neutral", variant: "1", label: "Adventurer A" },
   { style: "adventurer-neutral", variant: "2", label: "Adventurer B" },
-  { style: "bottts-neutral",     variant: "1", label: "Bottts A"     },
-  { style: "bottts-neutral",     variant: "2", label: "Bottts B"     },
-  { style: "big-ears-neutral",   variant: "1", label: "Big Ears A"   },
-  { style: "big-ears-neutral",   variant: "2", label: "Big Ears B"   },
+  { style: "bottts-neutral", variant: "1", label: "Bottts A" },
+  { style: "bottts-neutral", variant: "2", label: "Bottts B" },
+  { style: "big-ears-neutral", variant: "1", label: "Big Ears A" },
+  { style: "big-ears-neutral", variant: "2", label: "Big Ears B" },
 ] as const;
 
 type DiceBearOptionId =
@@ -326,9 +326,13 @@ export default function ProfilePage() {
         <div className="mb-6 flex flex-col items-center gap-4">
           {/* Big avatar circle */}
           <div className="relative">
-            <div className="h-20 w-20 overflow-hidden rounded-full ring-2 ring-border">
+            <div className="ring-border h-20 w-20 overflow-hidden rounded-full ring-2">
               {displaySrc ? (
-                <img src={displaySrc} alt={profile.full_name} className="h-full w-full object-cover" />
+                <img
+                  src={displaySrc}
+                  alt={profile.full_name}
+                  className="h-full w-full object-cover"
+                />
               ) : (
                 <div className="bg-primary/15 text-primary flex h-full w-full items-center justify-center text-xl font-semibold">
                   {getInitials(profile.full_name)}
@@ -337,7 +341,7 @@ export default function ProfilePage() {
             </div>
             {/* Pending indicator */}
             {hasPendingChange && (
-              <span className="bg-primary border-background absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full border-2">
+              <span className="bg-primary border-background absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full border-2">
                 <span className="h-1.5 w-1.5 rounded-full bg-white" />
               </span>
             )}
@@ -347,7 +351,9 @@ export default function ProfilePage() {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => { setShowStylePicker((v) => !v); }}
+              onClick={() => {
+                setShowStylePicker((v) => !v);
+              }}
               className={cn(
                 "flex cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
                 showStylePicker
@@ -411,7 +417,7 @@ export default function ProfilePage() {
                           : "border-border/60 hover:border-border hover:bg-muted/30"
                       )}
                     >
-                      <div className="h-12 w-12 overflow-hidden rounded-full bg-muted">
+                      <div className="bg-muted h-12 w-12 overflow-hidden rounded-full">
                         <img
                           src={dicebearUrl(opt.style, opt.variant, profile.id)}
                           alt={opt.label}
@@ -421,7 +427,7 @@ export default function ProfilePage() {
                       </div>
                       <span className="text-muted-foreground text-[10px]">{opt.label}</span>
                       {isActive && (
-                        <span className="bg-primary absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full">
+                        <span className="bg-primary absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full">
                           <Check className="h-2.5 w-2.5 text-white" />
                         </span>
                       )}
@@ -448,12 +454,7 @@ export default function ProfilePage() {
 
           <div className="flex flex-col gap-1.5">
             <label className="text-foreground text-xs font-medium">Email</label>
-            <input
-              type="email"
-              value={session?.user.email ?? ""}
-              disabled
-              className={inputClass}
-            />
+            <input type="email" value={session?.user.email ?? ""} disabled className={inputClass} />
             <p className="text-muted-foreground flex items-center gap-1 text-xs">
               <Mail className="h-3 w-3 shrink-0" />
               To change your email, contact your administrator.
@@ -488,7 +489,7 @@ export default function ProfilePage() {
       {/* ── Account Settings ─────────────────────────────────────────── */}
       <Section title="Account Settings">
         <form onSubmit={handleChangePassword} className="space-y-4">
-          <p className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">
+          <p className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
             Change Password
           </p>
 
@@ -526,7 +527,7 @@ export default function ProfilePage() {
           <button
             type="submit"
             disabled={changingPassword || !newPassword || !confirmPassword}
-            className="flex cursor-pointer items-center gap-2 rounded-lg border border-primary/40 bg-primary/10 px-4 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/15 disabled:opacity-50"
+            className="border-primary/40 bg-primary/10 text-primary hover:bg-primary/15 flex cursor-pointer items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50"
           >
             {changingPassword && <Loader2 className="h-4 w-4 animate-spin" />}
             <KeyRound className="h-4 w-4" />
@@ -550,10 +551,10 @@ export default function ProfilePage() {
             <div className="space-y-4">
               {activeLoans.length > 0 && (
                 <div>
-                  <p className="text-muted-foreground mb-2 text-xs font-semibold uppercase tracking-wider">
+                  <p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wider uppercase">
                     Active
                   </p>
-                  <div className="divide-border/40 divide-y overflow-hidden rounded-lg border border-border/60">
+                  <div className="divide-border/40 border-border/60 divide-y overflow-hidden rounded-lg border">
                     {activeLoans.map((loan) => (
                       <LoanHistoryRow
                         key={loan.id}
@@ -566,10 +567,10 @@ export default function ProfilePage() {
               )}
               {pastLoans.length > 0 && (
                 <div>
-                  <p className="text-muted-foreground mb-2 text-xs font-semibold uppercase tracking-wider">
+                  <p className="text-muted-foreground mb-2 text-xs font-semibold tracking-wider uppercase">
                     Past
                   </p>
-                  <div className="divide-border/40 divide-y overflow-hidden rounded-lg border border-border/60">
+                  <div className="divide-border/40 border-border/60 divide-y overflow-hidden rounded-lg border">
                     {pastLoans.map((loan) => (
                       <LoanHistoryRow
                         key={loan.id}

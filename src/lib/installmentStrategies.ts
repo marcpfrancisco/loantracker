@@ -114,6 +114,31 @@ function computeMaribank(params: InstallmentParams): InstallmentBreakdown {
 }
 
 /**
+ * GCash GLoan
+ *
+ * Formula:  total = principal + (principal × monthly_rate × term)
+ * Reason:   GLoan uses a monthly add-on rate (default 2.59%, but varies per
+ *           principal — admin must enter the actual rate shown in the GCash app).
+ *           No service fee.
+ *
+ * Due date: same calendar day as the loan start date, always next month.
+ *           Handled by due_day_of_month = null in the config, which causes
+ *           generateInstallments to fall back to startDay automatically.
+ *
+ * Example (PHP 25,000 / 12 months / 2.59%):
+ *   totalInterest = 25,000 × 0.0259 × 12 = 7,770.00
+ *   total         = 32,770.00
+ *   monthly       → 2,730.83 × 11 + 2,730.87 (last)
+ */
+function computeGLoan(params: InstallmentParams): InstallmentBreakdown {
+  const { principal, interest_rate, installments_total } = params;
+  const totalInterest =
+    interest_rate !== null ? principal * (interest_rate / 100) * installments_total : 0;
+  const total = Math.round((principal + totalInterest) * 100) / 100;
+  return { total, feeExcludedFromTotal: false, ...splitEvenly(total, installments_total) };
+}
+
+/**
  * Default / flat-rate strategy
  *
  * Formula:  total = principal + (principal × rate) + service_fee
@@ -136,6 +161,7 @@ function computeDefault(params: InstallmentParams): InstallmentBreakdown {
 const INSTALLMENT_STRATEGIES: Partial<Record<LoanType, InstallmentStrategy>> = {
   maribank_credit: computeMaribank,
   sloan: computeSLoan,
+  gloan: computeGLoan,
 };
 
 // ── Dispatcher ────────────────────────────────────────────────────────────────

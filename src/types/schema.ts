@@ -26,7 +26,8 @@ export type FirstDueStrategy =
   | "same_month_if_possible"
   | "always_next_month"
   | "fixed_days_after_disbursement" // e.g. +30 days
-  | "billing_cycle_based";
+  | "billing_cycle_based"
+  | "immediate_first_then_monthly"; // first payment due same day as purchase (e.g. Tabby)
 
 export interface LoanTypeConfig {
   /** Must match the loan_type enum value in the database */
@@ -180,6 +181,13 @@ export const CREDIT_SOURCE_CONFIGS: CreditSourceConfig[] = [
     region: "UAE",
     loan_types: [
       {
+        /**
+         * Tabby Pay Later — 4 equal splits, 0% interest, no fees.
+         * First payment is due immediately on the purchase date.
+         * Subsequent payments fall on the same calendar day each month.
+         * Amounts are editable in the form because Tabby's app may show
+         * a non-equal first split depending on merchant rounding.
+         */
         loan_type: "tabby",
         label: "Tabby",
         installments_total: 4,
@@ -187,7 +195,7 @@ export const CREDIT_SOURCE_CONFIGS: CreditSourceConfig[] = [
         interest_rate: 0,
         service_fee: 0,
         due_day_of_month: null,
-        first_due_strategy: "always_next_month",
+        first_due_strategy: "immediate_first_then_monthly",
       },
     ],
   },

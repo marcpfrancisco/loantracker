@@ -20,6 +20,12 @@ export interface CreateLoanPayload {
   due_day_of_month: number | null;
   notes: string | null;
   first_due_strategy: FirstDueStrategy;
+  /**
+   * When provided, overrides the computed per-installment amounts.
+   * Length must equal installments_total.
+   * Used for Tabby where the app may show non-equal splits.
+   */
+  installment_overrides?: number[];
 }
 
 function generateInstallments(
@@ -35,6 +41,7 @@ function generateInstallments(
     due_day_of_month,
     loan_type,
     first_due_strategy,
+    installment_overrides,
   } = payload;
 
   const { baseAmount, lastAmount } = computeInstallmentAmounts(loan_type, {
@@ -49,13 +56,17 @@ function generateInstallments(
   const startYear = startDate.getFullYear();
   const startMonth = startDate.getMonth(); // 0-indexed
 
-  // Determine if first installment is same month or next
+  // Determine month offset for the first installment
   const firstOffset =
     first_due_strategy === "same_month_if_possible"
       ? due_day_of_month !== null && startDay <= due_day_of_month
         ? 0
         : 1
-      : 1;
+      : first_due_strategy === "immediate_first_then_monthly"
+        ? 0 // first payment same day as purchase
+        : 1;
+
+  const isImmediateFirst = first_due_strategy === "immediate_first_then_monthly";
 
   return Array.from({ length: installments_total }, (_, i) => {
     const rawMonth = startMonth + firstOffset + i;
@@ -71,12 +82,21 @@ function generateInstallments(
     const mo = String(targetMonth + 1).padStart(2, "0");
     const d = String(targetDay).padStart(2, "0");
 
+    const amount =
+      installment_overrides?.[i] ??
+      (i === installments_total - 1 ? lastAmount : baseAmount);
+
+    // For immediate-first strategies (e.g. Tabby), the first payment is collected
+    // at checkout — mark it paid so it appears correctly in the installment list.
+    const isPaidAtCheckout = isImmediateFirst && i === 0;
+
     return {
       loan_id: loanId,
       installment_no: i + 1,
       due_date: `${targetYear}-${mo}-${d}`,
-      amount: i === installments_total - 1 ? lastAmount : baseAmount,
-      status: "unpaid" as const,
+      amount,
+      status: isPaidAtCheckout ? ("paid" as const) : ("unpaid" as const),
+      paid_at: isPaidAtCheckout ? new Date(started_at + "T00:00:00").toISOString() : null,
     };
   });
 }

@@ -16,6 +16,15 @@ export interface InstallmentBreakdown {
   baseAmount: number;
   /** Amount for the last installment — absorbs any rounding remainder. */
   lastAmount: number;
+  /**
+   * True when service_fee was intentionally excluded from `total`
+   * (i.e. it is deducted before disbursement, not amortized into installments).
+   */
+  feeExcludedFromTotal: boolean;
+}
+
+export interface DetailedInstallmentBreakdown extends InstallmentBreakdown {
+  totalInterest: number;
 }
 
 /**
@@ -44,6 +53,47 @@ function splitEvenly(
 // ── Strategies ────────────────────────────────────────────────────────────────
 
 /**
+ * Shopee SLoan
+ *
+ * Formula:
+ *   totalInterest = principal × monthly_rate × term
+ *   total = principal + totalInterest
+ *
+ * Important:
+ * - Admin fee / service_fee is NOT amortized into installments.
+ * - It is treated as an upfront fee (typically deducted from disbursement).
+ * - Therefore `service_fee` is intentionally excluded from `total`.
+ *
+ * Example:
+ *   principal = 7000
+ *   rate = 4.95
+ *   term = 12
+ *   totalInterest = 4157.91 (per app)
+ *   total = 11157.91
+ *   monthly ≈ 929.83
+ */
+export function computeSLoan(params: InstallmentParams): DetailedInstallmentBreakdown {
+  const { principal, interest_rate, installments_total } = params;
+
+  if (interest_rate === null) {
+    throw new Error("SLoan requires a fixed interest_rate");
+  }
+
+  const rawInterest = principal * (interest_rate / 100) * installments_total;
+  const totalInterest = Math.round(rawInterest * 100) / 100;
+
+  // Admin fee is NOT amortized for SLoan.
+  const total = Math.round((principal + totalInterest) * 100) / 100;
+
+  return {
+    total,
+    totalInterest,
+    feeExcludedFromTotal: true,
+    ...splitEvenly(total, installments_total),
+  };
+}
+
+/**
  * Maribank Credit
  *
  * Formula:  total = principal + (principal × monthly_rate × term)
@@ -60,7 +110,7 @@ function computeMaribank(params: InstallmentParams): InstallmentBreakdown {
   const totalInterest =
     interest_rate !== null ? principal * (interest_rate / 100) * installments_total : 0;
   const total = principal + totalInterest;
-  return { total, ...splitEvenly(total, installments_total) };
+  return { total, feeExcludedFromTotal: true, ...splitEvenly(total, installments_total) };
 }
 
 /**
@@ -74,7 +124,7 @@ function computeDefault(params: InstallmentParams): InstallmentBreakdown {
   const { principal, interest_rate, service_fee, installments_total } = params;
   const interest = interest_rate !== null ? principal * (interest_rate / 100) : 0;
   const total = principal + interest + service_fee;
-  return { total, ...splitEvenly(total, installments_total) };
+  return { total, feeExcludedFromTotal: false, ...splitEvenly(total, installments_total) };
 }
 
 // ── Registry ──────────────────────────────────────────────────────────────────
@@ -85,6 +135,7 @@ function computeDefault(params: InstallmentParams): InstallmentBreakdown {
 
 const INSTALLMENT_STRATEGIES: Partial<Record<LoanType, InstallmentStrategy>> = {
   maribank_credit: computeMaribank,
+  sloan: computeSLoan,
 };
 
 // ── Dispatcher ────────────────────────────────────────────────────────────────

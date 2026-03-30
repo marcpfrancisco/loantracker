@@ -7,7 +7,7 @@ import type {
   CreditSourceType,
   RegionType,
   PaymentStatus,
-} from "@/types/database";
+} from "@/types/enums";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

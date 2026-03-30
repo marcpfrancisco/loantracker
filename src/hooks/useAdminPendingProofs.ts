@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import type { CurrencyType } from "@/types/database";
+import type { CurrencyType } from "@/types/enums";
 
 export interface PendingProofItem {
   id: string;

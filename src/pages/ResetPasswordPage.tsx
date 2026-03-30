@@ -63,22 +63,48 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     if (!hasValidParams) return;
 
-    if (isRecovery) {
-      // Session was already established by the SDK (PASSWORD_RECOVERY event).
-      // Skip verification — flag must already be set (requireAuth put us here).
-      localStorage.setItem("pending_password_setup", "1");
-      setPageState("form");
-    } else if (tokenHash && (flowType === "recovery" || flowType === "invite")) {
-      void supabase.auth.verifyOtp({ token_hash: tokenHash, type: flowType }).then(({ error }) => {
-        if (!error) localStorage.setItem("pending_password_setup", "1");
-        setPageState(error ? "invalid" : "form");
-      });
-    } else if (code) {
-      void supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
-        if (!error) localStorage.setItem("pending_password_setup", "1");
-        setPageState(error ? "invalid" : "form");
-      });
-    }
+    const run = async () => {
+      try {
+        // Recovery flow (no async call needed)
+        if (isRecovery) {
+          localStorage.setItem("pending_password_setup", "1");
+          setPageState("form");
+          return;
+        }
+
+        // OTP verification flow
+        if (tokenHash && (flowType === "recovery" || flowType === "invite")) {
+          const { error } = await supabase.auth.verifyOtp({
+            token_hash: tokenHash,
+            type: flowType,
+          });
+
+          if (!error) {
+            localStorage.setItem("pending_password_setup", "1");
+            setPageState("form");
+          } else {
+            setPageState("invalid");
+          }
+          return;
+        }
+
+        // Code exchange flow
+        if (code) {
+          const { error } = await supabase.auth.exchangeCodeForSession(code);
+
+          if (!error) {
+            localStorage.setItem("pending_password_setup", "1");
+            setPageState("form");
+          } else {
+            setPageState("invalid");
+          }
+        }
+      } catch {
+        setPageState("invalid");
+      }
+    };
+
+    void run();
   }, [hasValidParams, isRecovery, tokenHash, flowType, code]);
 
   // ── Form submit ───────────────────────────────────────────────────────────

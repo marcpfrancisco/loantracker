@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import type { CurrencyType, LoanStatus, LoanType, RegionType } from "@/types/database";
+import type { CurrencyType, LoanStatus, LoanType, RegionType } from "@/types/enums";
 
 export interface BorrowerLoanSummary {
   id: string;

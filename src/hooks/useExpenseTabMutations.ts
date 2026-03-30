@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import type { CurrencyType, RegionType } from "@/types/database";
+import type { CurrencyType, RegionType } from "@/types/enums";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

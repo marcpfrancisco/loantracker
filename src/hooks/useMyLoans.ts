@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
-import type { CurrencyType, LoanStatus, LoanType, CreditSourceType } from "@/types/database";
+import type { CurrencyType, LoanStatus, LoanType, CreditSourceType } from "@/types/enums";
 import type { LoanCardData } from "@/components/dashboard/LoanCard";
 
 export interface MyLoan extends LoanCardData {

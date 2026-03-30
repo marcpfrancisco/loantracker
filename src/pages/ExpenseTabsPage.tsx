@@ -47,7 +47,13 @@ function PeriodPill({
     archived: "bg-violet-500/15 text-violet-400 border-violet-500/30",
   };
 
-  const Icon = is_archived ? Archive : paid_status === "paid" ? CheckCircle2 : is_locked ? Lock : Unlock;
+  const Icon = is_archived
+    ? Archive
+    : paid_status === "paid"
+      ? CheckCircle2
+      : is_locked
+        ? Lock
+        : Unlock;
   const styleKey = is_archived ? "archived" : paid_status;
 
   return (
@@ -120,8 +126,11 @@ function TabCard({ tab, isAdmin }: { tab: ExpenseTabSummary; isAdmin: boolean })
       {isAdmin && (
         <button
           type="button"
-          onClick={(e) => { e.stopPropagation(); setShowConfirm(true); }}
-          className="text-muted-foreground hover:text-rose-400 absolute right-3 top-3.5 rounded p-1 transition-colors"
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowConfirm(true);
+          }}
+          className="text-muted-foreground absolute top-3.5 right-3 rounded p-1 transition-colors hover:text-rose-400"
           title="Delete this expense tab"
         >
           <Trash2 className="h-3.5 w-3.5" />

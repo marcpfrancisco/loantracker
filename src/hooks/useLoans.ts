@@ -6,7 +6,7 @@ import type {
   LoanType,
   CreditSourceType,
   RegionType,
-} from "@/types/database";
+} from "@/types/enums";
 
 export interface LoanListItem {
   id: string;

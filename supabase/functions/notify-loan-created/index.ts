@@ -120,7 +120,10 @@ Deno.serve(async (req: Request) => {
 
     if (borrowerError || !borrowerUser?.email) {
       console.error("[notify-loan-created] Borrower email fetch error:", borrowerError?.message);
-      return Response.json({ error: "Borrower email not found" }, { status: 404, headers: corsHeaders });
+      return Response.json(
+        { error: "Borrower email not found" },
+        { status: 404, headers: corsHeaders }
+      );
     }
 
     // ── 6. Send email via Brevo ────────────────────────────────────────────────
@@ -203,7 +206,16 @@ function buildLoanCreatedEmail(params: {
   installments: { installment_no: number; amount: number; due_date: string }[];
   notes: string | null;
 }): string {
-  const { borrowerName, sourceName, loanUrl, principal, currency, installmentsTotal, installments, notes } = params;
+  const {
+    borrowerName,
+    sourceName,
+    loanUrl,
+    principal,
+    currency,
+    installmentsTotal,
+    installments,
+    notes,
+  } = params;
 
   const firstInstallment = installments[0];
   const lastInstallment = installments[installments.length - 1];

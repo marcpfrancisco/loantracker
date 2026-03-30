@@ -1,8 +1,9 @@
+import type { TablesInsert } from "@/types/database";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { computeInstallmentAmounts } from "@/lib/installmentStrategies";
-import type { LoanType, CurrencyType, RegionType, TablesInsert } from "@/types/database";
+import type { LoanType, CurrencyType, RegionType } from "@/types/enums";
 
 export interface CreateLoanPayload {
   borrower_id: string;

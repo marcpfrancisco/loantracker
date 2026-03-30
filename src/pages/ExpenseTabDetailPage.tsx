@@ -99,7 +99,13 @@ function MonthPill({
   isSelected: boolean;
   onClick: () => void;
 }) {
-  const Icon = is_archived ? Archive : paid_status === "paid" ? CheckCircle2 : is_locked ? Lock : Unlock;
+  const Icon = is_archived
+    ? Archive
+    : paid_status === "paid"
+      ? CheckCircle2
+      : is_locked
+        ? Lock
+        : Unlock;
 
   return (
     <button
@@ -141,14 +147,15 @@ function ItemRow({
   const [editAmount, setEditAmount] = useState(String(item.amount));
   const [editSplit, setEditSplit] = useState(item.is_already_split);
 
-  // If period becomes locked while in edit mode, exit gracefully
-  useEffect(() => {
-    if (isLocked) { setMode("view"); setShowDeleteDialog(false); }
-  }, [isLocked]);
+  const effectiveMode = isLocked ? "view" : mode;
+  const effectiveShowDeleteDialog = isLocked ? false : showDeleteDialog;
 
   function handleSave() {
+    if (isLocked) return;
+
     const amt = Number(editAmount);
     if (!editDesc.trim() || !amt || amt <= 0) return;
+
     onEdit(item.id, editDesc, amt, editSplit);
     setMode("view");
   }
@@ -160,26 +167,49 @@ function ItemRow({
     setMode("view");
   }
 
-  if (mode === "edit") {
+  function handleStartEdit() {
+    if (isLocked) return;
+
+    setEditDesc(item.description);
+    setEditAmount(String(item.amount));
+    setEditSplit(item.is_already_split);
+
+    setMode("edit");
+  }
+
+  function handleOpenDelete() {
+    if (isLocked) return;
+    setShowDeleteDialog(true);
+  }
+
+  if (effectiveMode === "edit") {
     return (
-      <div className="px-4 py-3 space-y-2">
+      <div className="space-y-2 px-4 py-3">
         <div className="flex items-center gap-2">
           <input
             autoFocus
             value={editDesc}
             onChange={(e) => setEditDesc(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") handleCancelEdit(); }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleSave();
+              if (e.key === "Escape") handleCancelEdit();
+            }}
             className="border-border/60 bg-muted/50 focus:border-primary/60 min-w-0 flex-1 rounded-lg border px-3 py-1.5 text-sm outline-none"
           />
+
           <input
             type="number"
             step="0.01"
             min="0.01"
             value={editAmount}
             onChange={(e) => setEditAmount(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") handleCancelEdit(); }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleSave();
+              if (e.key === "Escape") handleCancelEdit();
+            }}
             className="border-border/60 bg-muted/50 focus:border-primary/60 w-24 shrink-0 rounded-lg border px-3 py-1.5 text-sm outline-none"
           />
+
           <button
             type="button"
             onClick={() => setEditSplit((v) => !v)}
@@ -192,13 +222,15 @@ function ItemRow({
           >
             {editSplit ? "his" : "÷2"}
           </button>
+
           <button
             type="button"
             onClick={handleSave}
-            className="text-emerald-400 hover:text-emerald-300 shrink-0 transition-colors"
+            className="shrink-0 text-emerald-400 transition-colors hover:text-emerald-300"
           >
             <Check className="h-4 w-4" />
           </button>
+
           <button
             type="button"
             onClick={handleCancelEdit}
@@ -219,33 +251,43 @@ function ItemRow({
           {item.is_already_split ? "his share" : `${fmt(item.amount, currency)} ÷ 2`}
         </p>
       </div>
+
       <span className="text-foreground shrink-0 text-sm font-semibold tabular-nums">
         {fmt(item.borrower_owes, currency)}
       </span>
+
       {isAdmin && !isLocked && (
         <div className="flex shrink-0 items-center gap-1">
           <button
             type="button"
-            onClick={() => setMode("edit")}
+            onClick={handleStartEdit}
             className="text-muted-foreground hover:text-foreground transition-colors"
           >
             <Pencil className="h-3.5 w-3.5" />
           </button>
+
           <button
             type="button"
-            onClick={() => setShowDeleteDialog(true)}
-            className="text-muted-foreground hover:text-rose-400 transition-colors"
+            onClick={handleOpenDelete}
+            className="text-muted-foreground transition-colors hover:text-rose-400"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
         </div>
       )}
+
       <ConfirmDialog
-        open={showDeleteDialog}
+        open={effectiveShowDeleteDialog}
         title="Delete this item?"
-        description={`"${item.description}" (${fmt(item.borrower_owes, currency)}) will be permanently removed.`}
+        description={`"${item.description}" (${fmt(
+          item.borrower_owes,
+          currency
+        )}) will be permanently removed.`}
         confirmLabel="Delete item"
-        onConfirm={() => { onDelete(item.id); setShowDeleteDialog(false); }}
+        onConfirm={() => {
+          onDelete(item.id);
+          setShowDeleteDialog(false);
+        }}
         onCancel={() => setShowDeleteDialog(false)}
       />
     </div>
@@ -285,7 +327,7 @@ function PaymentRow({
         <button
           type="button"
           onClick={() => setShowDeleteDialog(true)}
-          className="text-muted-foreground shrink-0 hover:text-rose-400 transition-colors"
+          className="text-muted-foreground shrink-0 transition-colors hover:text-rose-400"
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>
@@ -295,7 +337,10 @@ function PaymentRow({
         title="Delete this payment?"
         description={`${fmt(payment.amount, currency)} recorded on ${fmtDate(payment.payment_date)} will be permanently removed.`}
         confirmLabel="Delete payment"
-        onConfirm={() => { onDelete(payment.id); setShowDeleteDialog(false); }}
+        onConfirm={() => {
+          onDelete(payment.id);
+          setShowDeleteDialog(false);
+        }}
         onCancel={() => setShowDeleteDialog(false)}
       />
     </div>
@@ -626,7 +671,11 @@ export default function ExpenseTabDetailPage() {
   function toggleYear(year: string) {
     setExpandedYears((prev) => {
       const next = new Set(prev);
-      next.has(year) ? next.delete(year) : next.add(year);
+      if (next.has(year)) {
+        next.delete(year);
+      } else {
+        next.add(year);
+      }
       return next;
     });
   }
@@ -821,9 +870,11 @@ export default function ExpenseTabDetailPage() {
 
             // Real (non-virtual) periods only for archive logic
             const realPeriods = yearPeriods.filter((p) => p.id !== "__virtual__");
-            const allPaid = realPeriods.length > 0 && realPeriods.every((p) => p.paid_status === "paid");
+            const allPaid =
+              realPeriods.length > 0 && realPeriods.every((p) => p.paid_status === "paid");
             const allArchived = realPeriods.length > 0 && realPeriods.every((p) => p.is_archived);
-            const canArchiveYear = isAdmin && !isCurrentYear && allPaid && !allArchived && realPeriods.length > 0;
+            const canArchiveYear =
+              isAdmin && !isCurrentYear && allPaid && !allArchived && realPeriods.length > 0;
 
             const yearTotalOwed = realPeriods.reduce((s, p) => s + p.total_owed, 0);
 
@@ -862,7 +913,7 @@ export default function ExpenseTabDetailPage() {
                     <button
                       type="button"
                       onClick={() => setShowArchiveYear(year)}
-                      className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground hover:text-violet-400 transition-colors"
+                      className="text-muted-foreground flex items-center gap-1 text-[10px] font-medium transition-colors hover:text-violet-400"
                     >
                       <Archive className="h-3 w-3" />
                       Archive {year}
@@ -909,10 +960,7 @@ export default function ExpenseTabDetailPage() {
           {/* If no periods exist yet, show add past month button standalone */}
           {years.length === 0 && isAdmin && (
             <div className="flex items-center gap-2 pb-2">
-              <MonthPickerPopover
-                existingPeriods={[]}
-                onSelect={handleAddPastMonth}
-              />
+              <MonthPickerPopover existingPeriods={[]} onSelect={handleAddPastMonth} />
             </div>
           )}
         </div>
@@ -956,7 +1004,7 @@ export default function ExpenseTabDetailPage() {
                       type="button"
                       disabled={activePeriod.items.length > 0 || activePeriod.payments.length > 0}
                       onClick={() => setShowDeletePeriod(true)}
-                      className="border-border/60 text-muted-foreground hover:border-rose-500/30 hover:text-rose-400 flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 sm:px-3"
+                      className="border-border/60 text-muted-foreground flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors hover:border-rose-500/30 hover:text-rose-400 disabled:cursor-not-allowed disabled:opacity-40 sm:px-3"
                       title={
                         activePeriod.items.length > 0 || activePeriod.payments.length > 0
                           ? "Remove all items and payments before deleting this month"
@@ -969,16 +1017,18 @@ export default function ExpenseTabDetailPage() {
                   )}
 
                   {/* Archive month — fully-paid, non-archived, has content */}
-                  {!activePeriod.is_archived && activePeriod.paid_status === "paid" && activePeriod.items.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setShowArchivePeriod(true)}
-                      className="flex items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 px-2 py-1.5 text-xs font-medium text-violet-400 transition-colors hover:bg-violet-500/20 sm:px-3"
-                    >
-                      <Archive className="h-3 w-3 shrink-0" />
-                      <span className="hidden sm:inline">Archive</span>
-                    </button>
-                  )}
+                  {!activePeriod.is_archived &&
+                    activePeriod.paid_status === "paid" &&
+                    activePeriod.items.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowArchivePeriod(true)}
+                        className="flex items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 px-2 py-1.5 text-xs font-medium text-violet-400 transition-colors hover:bg-violet-500/20 sm:px-3"
+                      >
+                        <Archive className="h-3 w-3 shrink-0" />
+                        <span className="hidden sm:inline">Archive</span>
+                      </button>
+                    )}
 
                   {/* Archived badge — static, no button */}
                   {activePeriod.is_archived && (
@@ -1055,7 +1105,12 @@ export default function ExpenseTabDetailPage() {
                       isLocked={activePeriod.is_locked}
                       onDelete={(iid) => deleteItem.mutate(iid)}
                       onEdit={(iid, desc, amt, split) =>
-                        updateItem.mutate({ id: iid, description: desc, amount: amt, is_already_split: split })
+                        updateItem.mutate({
+                          id: iid,
+                          description: desc,
+                          amount: amt,
+                          is_already_split: split,
+                        })
                       }
                     />
                   ))}

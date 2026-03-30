@@ -18,7 +18,9 @@ import { useLoanDetail } from "@/hooks/useLoanDetail";
 import { useUpdateInstallment, useBulkMarkPaid } from "@/hooks/useUpdateInstallment";
 import { useUpdateLoanStatus } from "@/hooks/useUpdateLoanStatus";
 import { InstallmentRow } from "@/components/loans/InstallmentRow";
+import { LoanBreakdownSummary } from "@/components/loans/LoanBreakdownSummary";
 import { RegionLabel } from "@/components/ui/region-badge";
+import { getLoanTypeConfig, FALLBACK_LOAN_TYPE } from "@/types/schema";
 import type { LoanStatus, LoanType, CreditSourceType, PaymentStatus } from "@/types/enums";
 
 // ── Lookup maps ───────────────────────────────────────────────────────────────
@@ -139,6 +141,10 @@ export default function LoanDetailPage() {
       </div>
     );
   }
+
+  // Loan type config — drives breakdown summary display behaviour
+  const loanTypeConfig =
+    getLoanTypeConfig(loan.credit_source.name, loan.loan_type) ?? FALLBACK_LOAN_TYPE;
 
   // Derived stats
   const interest = loan.interest_rate !== null ? loan.principal * (loan.interest_rate / 100) : 0;
@@ -282,6 +288,18 @@ export default function LoanDetailPage() {
             <p className="text-muted-foreground text-xs">{loan.notes}</p>
           </div>
         )}
+      </motion.div>
+
+      {/* ── Loan breakdown summary (visible to all roles) ─────── */}
+      <motion.div variants={cardVariants} initial="hidden" animate="visible">
+        <LoanBreakdownSummary
+          loanTypeConfig={loanTypeConfig}
+          principal={loan.principal}
+          interestRate={loan.interest_rate}
+          serviceFee={loan.service_fee}
+          installmentsTotal={loan.installments_total}
+          currency={loan.currency}
+        />
       </motion.div>
 
       {/* ── Admin: loan status actions ────────────────────────── */}

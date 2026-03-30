@@ -109,10 +109,12 @@ export function LoanBreakdownSummary({
           <Row label={`${installmentsTotal} × monthly payment`} value={fmt(baseAmount, currency)} />
         )}
 
-        {/* ── Upfront deduction block (Stamp Tax, Admin Fee, etc.) ── */}
-        {showUpfrontDeduction && (
-          <>
-            <Divider />
+        {/* ── Disbursement block ── */}
+        <>
+          <Divider />
+
+          {/* Upfront deduction line — only when a fee is subtracted before disbursement */}
+          {showUpfrontDeduction && (
             <div className="flex items-start justify-between gap-4 pt-0.5">
               <span className="text-xs leading-snug text-amber-400/80">
                 {(feeMode as { kind: "upfront_deduction"; label: string }).label}
@@ -124,17 +126,18 @@ export function LoanBreakdownSummary({
                 − {fmt(serviceFee, currency)}
               </span>
             </div>
+          )}
 
-            <div className="flex items-center justify-between gap-4 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2">
-              <span className="text-xs font-semibold text-emerald-400">
-                Borrower Actually Receives
-              </span>
-              <span className="text-sm font-bold text-emerald-400 tabular-nums">
-                {fmt(principal - serviceFee, currency)}
-              </span>
-            </div>
-          </>
-        )}
+          {/* Always show what the borrower actually receives */}
+          <div className="flex items-center justify-between gap-4 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2">
+            <span className="text-xs font-semibold text-emerald-400">
+              Borrower Actually Receives
+            </span>
+            <span className="text-sm font-bold text-emerald-400 tabular-nums">
+              {fmt(showUpfrontDeduction ? principal - serviceFee : principal, currency)}
+            </span>
+          </div>
+        </>
       </div>
     </section>
   );

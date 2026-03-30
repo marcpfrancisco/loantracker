@@ -110,11 +110,16 @@ export const CREDIT_SOURCE_CONFIGS: CreditSourceConfig[] = [
     region: "PH",
     loan_types: [
       {
+        /**
+         * GCash GLoan — monthly add-on rate (varies per principal, default 2.59%).
+         * Due date = same calendar day as disbursement, always next month.
+         * due_day_of_month is null so the system inherits the start-date day.
+         */
         loan_type: "gloan",
         label: "GLoan",
         installments_total: 3,
-        available_durations: [3],
-        interest_rate: null,
+        available_durations: [3, 6, 9, 12],
+        interest_rate: 2.59,
         service_fee: 0,
         due_day_of_month: null,
         first_due_strategy: "always_next_month",
@@ -131,8 +136,8 @@ export const CREDIT_SOURCE_CONFIGS: CreditSourceConfig[] = [
         loan_type: "lazcredit",
         label: "LazCredit",
         installments_total: 3,
-        available_durations: [3],
-        interest_rate: null,
+        available_durations: [3, 6, 9, 12],
+        interest_rate: 4.08,
         service_fee: 0,
         due_day_of_month: null,
         first_due_strategy: "always_next_month",

@@ -114,6 +114,66 @@ function computeMaribank(params: InstallmentParams): InstallmentBreakdown {
 }
 
 /**
+ * GCash GLoan
+ *
+ * Formula:  total = principal + (principal × monthly_rate × term)
+ * Reason:   GLoan uses a monthly add-on rate (default 2.59%, but varies per
+ *           principal — admin must enter the actual rate shown in the GCash app).
+ *           No service fee.
+ *
+ * Due date: same calendar day as the loan start date, always next month.
+ *           Handled by due_day_of_month = null in the config, which causes
+ *           generateInstallments to fall back to startDay automatically.
+ *
+ * Example (PHP 25,000 / 12 months / 2.59%):
+ *   totalInterest = 25,000 × 0.0259 × 12 = 7,770.00
+ *   total         = 32,770.00
+ *   monthly       → 2,730.83 × 11 + 2,730.87 (last)
+ */
+function computeGLoan(params: InstallmentParams): InstallmentBreakdown {
+  const { principal, interest_rate, installments_total } = params;
+  const totalInterest =
+    interest_rate !== null ? principal * (interest_rate / 100) * installments_total : 0;
+  const total = Math.round((principal + totalInterest) * 100) / 100;
+  return { total, feeExcludedFromTotal: false, ...splitEvenly(total, installments_total) };
+}
+
+/**
+ * Lazada LazCredit
+ *
+ * Formula:  total = principal + (principal × monthly_rate × term)
+ * Reason:   LazCredit uses a monthly add-on rate (default 4.08%, varies per
+ *           principal — admin must enter the actual rate shown in the Lazada app).
+ *           No service fee.
+ *
+ * Rounding: Lazada rounds each installment UP to the nearest whole peso (ceiling),
+ *           so all installments are equal whole-number amounts.
+ *           This means the stored total is baseAmount × term, not the raw computed total.
+ *
+ * Due date: same calendar day as the loan start date, always next month.
+ *           due_day_of_month = null in the config — falls back to startDay.
+ *
+ * Example (PHP 12,000 / 12 months / 4.08%):
+ *   totalInterest   = 12,000 × 0.0408 × 12 = 5,875.20
+ *   rawTotal        = 17,875.20
+ *   rawMonthly      = 17,875.20 / 12 = 1,489.60
+ *   baseAmount      = ceil(1,489.60) = 1,490   ← matches Lazada app
+ *   total           = 1,490 × 12 = 17,880
+ */
+function computeLazCredit(params: InstallmentParams): InstallmentBreakdown {
+  const { principal, interest_rate, installments_total } = params;
+  const totalInterest =
+    interest_rate !== null ? principal * (interest_rate / 100) * installments_total : 0;
+  const rawTotal = principal + totalInterest;
+
+  // Ceiling to nearest whole peso — matches Lazada app behaviour.
+  const baseAmount = Math.ceil(rawTotal / installments_total);
+  const total = baseAmount * installments_total;
+
+  return { total, feeExcludedFromTotal: false, baseAmount, lastAmount: baseAmount };
+}
+
+/**
  * Default / flat-rate strategy
  *
  * Formula:  total = principal + (principal × rate) + service_fee
@@ -136,6 +196,8 @@ function computeDefault(params: InstallmentParams): InstallmentBreakdown {
 const INSTALLMENT_STRATEGIES: Partial<Record<LoanType, InstallmentStrategy>> = {
   maribank_credit: computeMaribank,
   sloan: computeSLoan,
+  gloan: computeGLoan,
+  lazcredit: computeLazCredit,
 };
 
 // ── Dispatcher ────────────────────────────────────────────────────────────────

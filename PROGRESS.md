@@ -1,6 +1,6 @@
 # Global Loan Tracker — Progress & Roadmap
 
-> Last updated: 2026-03-30
+> Last updated: 2026-03-30 (session 2)
 
 ---
 
@@ -53,7 +53,16 @@
 - [x] Loan status management: active → completed / defaulted / cancelled
 - [x] Multi-currency support: PHP (Philippines) and AED (UAE), never mixed in totals
 - [x] Supported loan types: Maribank Credit, S-Loan, G-Loan, SPayLater, LazCredit, Tabby, Credit Card, Custom
-- [x] Loan breakdown summary component (shows principal, fees, total repayable)
+- [x] Loan breakdown summary component — always shows "Borrower Actually Receives" green block (not only when fee exists); visible to both admin and borrower on Loan Detail page
+- [x] Installment strategies with full config per loan type:
+  - `computeMaribank` — monthly reducing balance, `same_month_if_possible` first due
+  - `computeSLoan` — add-on rate, admin fee deducted upfront, `always_next_month`
+  - `computeGLoan` — monthly add-on rate, `always_next_month`, inherits start day
+  - `computeLazCredit` — monthly add-on rate, `Math.ceil` rounding to whole peso (matches Lazada app), `always_next_month`
+  - `computeTabby` — 0% interest, equal split, `immediate_first_then_monthly` (first payment due same day as purchase, auto-marked paid)
+- [x] Tabby editable payment splits in Add Loan drawer — pre-filled with equal split, admin adjusts to match Tabby app's exact amounts; live sum-vs-principal validator
+- [x] `src/types/enums.ts` — hand-maintained named type alias file (`LoanStatus`, `LoanType`, `CurrencyType`, etc.) that survives `npm run gen:types` overwrites; all 30+ import sites updated
+- [x] Cache invalidation strategy for `useUpdateInstallment` — full set of `invalidateQueries` on success (`loan`, `loans`, `loans-infinite`, `my-loans`, `upcoming-installments`, `overdue-installments`, `my-overdue-installments`, `admin/stats`); `staleTime: 30s` on `useLoanDetail` to prevent redundant window-focus refetches
 
 ### Admin Module
 - [x] Admin dashboard with stat cards: total borrowers, active loans, total outstanding (PHP + AED split)
@@ -62,6 +71,7 @@
 - [x] Borrower Detail page (`/borrowers/:id`): profile card, expense tab shortcut, loans list
 - [x] Loan Statement drawer — slides in from the right, per-loan installment breakdown, PHP/AED summary totals
 - [x] Export loan statement as **PDF** (browser print window, styled HTML) or **CSV** (flat download)
+- [x] Credit Sources CRUD drawer — create, rename, toggle active/inactive, delete with confirmation; PH/UAE region tabs; accessible from Admin page via "Credit Sources" button
 
 ### Expense Tabs Module
 - [x] Database schema: `expense_tabs` → `expense_periods` → `expense_items` + `expense_payments`
@@ -72,7 +82,7 @@
 - [x] Expense Tabs list page (`/tabs`): admin sees all tabs; borrower is redirected straight to their own tab
 - [x] Expense Tab Detail page (`/tabs/:id`):
   - Totals card (outstanding / paid / total charged)
-  - Month pills — horizontal scroll, newest-first, color-coded (paid / partial / unpaid)
+  - Month pills — horizontal scroll (`overflow-x-auto`, `scrollbar-none`), auto-centers active pill via `scrollIntoView` on select; color-coded: **emerald** (paid) / **amber** (partial) / **orange** (locked + unpaid) / **zinc** (unlocked unpaid) / **violet** (archived)
   - **Past month picker** — shadcn Popover with year navigation + 3×4 month grid; picks any past month as a virtual period without a DB write until first item is added
   - Per-month item list with description, amount, split hint (`÷2` or `his share`), borrower owes
   - Per-month payment rows (emerald, shows date + notes)
@@ -109,12 +119,17 @@
 
 ## Known Limitations / Current State
 
-- The `Database` type in `src/types/database.ts` is **manually maintained**. It must be updated whenever a new migration is applied. The correct long-term fix is to run `npx supabase gen types typescript` after each migration and commit the output.
-- No push notifications for upcoming due dates.
+- `src/types/database.ts` is **auto-generated** via `npm run gen:types`. Run after every schema migration. Named type aliases (`LoanStatus`, `LoanType`, etc.) now live in `src/types/enums.ts` so they survive overwrites.
+- No push notifications for upcoming due dates (Web Push Phase 2 not yet implemented).
 - No FX conversion utility — PHP and AED totals are always kept separate.
 - Payment proof storage is in Supabase Storage but there is no CDN or expiry policy configured.
 - The expense tab module has no "delete period" action — removing all items from a month leaves an empty period row in the DB.
 - Borrower confirmation status is detected via an RPC (`get_user_confirmation_statuses`) that queries `auth.users` — this requires a Supabase service-role function and may need a periodic refresh.
+- Tabby installment amounts are editable at loan creation time but cannot be edited after the loan is saved. If the admin enters wrong splits they must delete and re-create the loan.
+
+### Pending Ops Tasks
+- Run `supabase db push` for `004_expense_period_archive.sql` then `npm run gen:types`
+- Deploy `supabase functions deploy notify-loan-created`
 
 ---
 
@@ -209,8 +224,11 @@ When generating a PDF or CSV statement for a borrower, optionally append their e
 #### 11. Loan notes & attachments
 Allow admin to attach documents (contract PDF, screenshots) to individual loans, stored in Supabase Storage alongside payment proofs.
 
-#### 12. Custom credit sources via UI
-The `credit_sources` table exists but new sources are seeded via SQL. Add a UI in the Admin page for creating custom credit sources per region without a database migration.
+#### 12. Custom credit sources via UI ✅ Done
+~~The `credit_sources` table exists but new sources are seeded via SQL. Add a UI in the Admin page for creating custom credit sources per region without a database migration.~~
+- `CreditSourcesDrawer.tsx` — PH/UAE tabs, inline create/rename forms, active toggle (pill switch), ConfirmDialog for delete
+- `useCreditSourceMutations.ts` — `useCreateCreditSource`, `useUpdateCreditSource`, `useToggleCreditSourceActive`, `useDeleteCreditSource`; all invalidate `["credit-sources"]` on success
+- `useAllCreditSources()` in `useCreditSources.ts` — admin-scoped hook that includes inactive sources
 
 ### Low Priority / Nice to Have
 
@@ -245,6 +263,7 @@ src/
 ├── components/
 │   ├── admin/
 │   │   ├── BorrowersList.tsx        # Borrower list with statement button
+│   │   ├── CreditSourcesDrawer.tsx  # Credit sources CRUD (create/rename/toggle/delete)
 │   │   ├── InviteBorrowerDrawer.tsx # Invite flow
 │   │   ├── LoanStatementDrawer.tsx  # PDF/CSV export drawer
 │   │   └── StatCard.tsx             # Dashboard stat card
@@ -277,14 +296,17 @@ src/
 │   ├── useExpenseTab.ts             # Single tab detail + computed totals
 │   ├── useExpenseTabs.ts            # Tab list (admin) / own tab (borrower)
 │   ├── useExpenseTabMutations.ts    # Add/delete items, payments, lock
-│   ├── useLoanDetail.ts
+│   ├── useCreditSources.ts          # useCreditSources (active only) + useAllCreditSources (admin)
+│   ├── useCreditSourceMutations.ts  # create/update/toggleActive/delete credit sources
+│   ├── useLoanDetail.ts             # staleTime: 30s to prevent window-focus refetches
 │   ├── useLoans.ts / useMyLoans.ts
 │   ├── useLoansInfinite.ts          # Infinite scroll (LOANS_PAGE_SIZE=20, cursor-based)
 │   ├── useNotifications.ts          # In-app notification bell (TanStack Query + Realtime)
 │   ├── useReviewProof.ts            # Admin proof approve/reject → notify-rejection
-│   ├── useUpdateInstallment.ts      # Mark paid → notify-payment-confirmed
+│   ├── useUpdateInstallment.ts      # Mark paid → full cache invalidation + notify-payment-confirmed
 │   └── ...
 ├── lib/
+│   ├── installmentStrategies.ts     # computeMaribank / computeSLoan / computeGLoan / computeLazCredit / computeTabby
 │   ├── statementExport.ts           # PDF + CSV for loans AND expense tabs
 │   └── supabase.ts
 ├── pages/
@@ -300,7 +322,8 @@ src/
 │   └── ResetPasswordPage.tsx
 ├── types/
 │   ├── database.ts                  # Auto-generated — run `npm run gen:types` after migrations
-│   └── schema.ts                    # Loan type / credit source configs
+│   ├── enums.ts                     # Hand-maintained named type aliases (survives gen:types)
+│   └── schema.ts                    # Loan type / credit source configs + FirstDueStrategy
 └── router.tsx
 supabase/
 ├── functions/
@@ -317,4 +340,4 @@ supabase/
 
 ---
 
-*This document covers the state of the project as of 2026-03-28. Update it after each significant feature or migration.*
+*This document covers the state of the project as of 2026-03-30. Update it after each significant feature or migration.*

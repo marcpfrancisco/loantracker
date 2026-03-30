@@ -11,7 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useAdminBorrowers } from "@/hooks/useAdminBorrowers";
 import { useCreditSources } from "@/hooks/useCreditSources";
 import { useCreateLoan } from "@/hooks/useCreateLoan";
-import { getLoanTypesForSource, getLoanTypeConfig } from "@/types/schema";
+import { getLoanTypesForSource, getLoanTypeConfig, type FirstDueStrategy } from "@/types/schema";
 import { LoanBreakdownSummary } from "@/components/loans/LoanBreakdownSummary";
 import type { LoanType, RegionType, CurrencyType } from "@/types/enums";
 
@@ -60,6 +60,7 @@ type FormData = {
   started_at: string;
   due_day_of_month: number | null;
   notes?: string;
+  first_due_strategy?: FirstDueStrategy | null;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -164,7 +165,15 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
     ? getLoanTypeConfig(selectedSource.name, watchedLoanType)
     : null;
   const availableDurations = activeConfig?.available_durations ?? [];
-  const isMaribank = watchedLoanType === "maribank_credit";
+  // Derive service fee field label from config — no hardcoded loan-type names.
+  const feeFieldLabel =
+    activeConfig?.feeDisplayMode?.kind === "upfront_deduction"
+      ? activeConfig.feeDisplayMode.label
+      : "Service Fee";
+  const feeFieldHint =
+    activeConfig?.feeDisplayMode?.kind === "upfront_deduction"
+      ? `Enter actual ${activeConfig.feeDisplayMode.label.toLowerCase()} amount shown in the app`
+      : undefined;
 
   // Reset source when borrower changes
   useEffect(() => {
@@ -257,6 +266,7 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
       started_at: data.started_at,
       due_day_of_month: data.due_day_of_month ?? null,
       notes: data.notes ?? null,
+      first_due_strategy: data.first_due_strategy ?? "always_next_month",
     });
 
     handleClose();
@@ -421,13 +431,9 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
                     </FieldWrapper>
 
                     <FieldWrapper
-                      label={isMaribank ? "Stamp Tax" : "Service Fee"}
+                      label={feeFieldLabel}
                       error={errors.service_fee?.message}
-                      hint={
-                        isMaribank
-                          ? "Enter actual amount from Maribank app — varies by principal"
-                          : undefined
-                      }
+                      hint={feeFieldHint}
                     >
                       <input
                         {...register("service_fee")}
@@ -556,9 +562,9 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
                 </section>
 
                 {/* ── Breakdown Summary ──────────────────────────────── */}
-                {borrowerRegion && (
+                {borrowerRegion && activeConfig && (
                   <LoanBreakdownSummary
-                    loanType={watchedLoanType}
+                    loanTypeConfig={activeConfig}
                     principal={Number(watchedPrincipal) || 0}
                     interestRate={watchedInterestRate}
                     serviceFee={Number(watchedServiceFee) || 0}

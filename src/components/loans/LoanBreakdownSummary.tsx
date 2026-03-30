@@ -1,10 +1,10 @@
 import { computeInstallmentAmounts } from "@/lib/installmentStrategies";
-import type { LoanType } from "@/types/enums";
+import type { LoanTypeConfig } from "@/types/schema";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface LoanBreakdownSummaryProps {
-  loanType: LoanType;
+  loanTypeConfig: LoanTypeConfig;
   principal: number;
   interestRate: number | null;
   serviceFee: number;
@@ -21,12 +21,18 @@ function fmt(amount: number, currency: string): string {
   })}`;
 }
 
+/**
+ * Derives the interest label from the fee display mode.
+ * Loan types with `upfront_deduction` fees tend to use an add-on monthly rate;
+ * everything else is shown as a flat rate.
+ */
 function interestLabel(
-  loanType: LoanType,
+  loanTypeConfig: LoanTypeConfig,
   interestRate: number,
   installmentsTotal: number
 ): string {
-  if (loanType === "maribank_credit") {
+  const mode = loanTypeConfig.feeDisplayMode;
+  if (mode?.kind === "upfront_deduction") {
     return `${interestRate}% × ${installmentsTotal} mo. (add-on)`;
   }
   return `${interestRate}% flat`;
@@ -35,7 +41,7 @@ function interestLabel(
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function LoanBreakdownSummary({
-  loanType,
+  loanTypeConfig,
   principal,
   interestRate,
   serviceFee,
@@ -44,18 +50,24 @@ export function LoanBreakdownSummary({
 }: LoanBreakdownSummaryProps) {
   if (!principal || principal <= 0 || !installmentsTotal || installmentsTotal <= 0) return null;
 
-  const { total, baseAmount, lastAmount } = computeInstallmentAmounts(loanType, {
+  const breakdown = computeInstallmentAmounts(loanTypeConfig.loan_type, {
     principal,
     interest_rate: interestRate,
     service_fee: serviceFee,
     installments_total: installmentsTotal,
   });
 
-  // For Maribank, service_fee (stamp tax) is NOT rolled into installments — shown separately.
-  const isMaribank = loanType === "maribank_credit";
+  const { total, baseAmount, lastAmount, feeExcludedFromTotal } = breakdown;
+
   const totalInterest = total - principal;
   const lastIsDifferent = Math.abs(baseAmount - lastAmount) >= 0.01;
   const baseCount = lastIsDifferent ? installmentsTotal - 1 : installmentsTotal;
+
+  // Determine fee display behaviour from the config (never from loan_type name).
+  const feeMode = loanTypeConfig.feeDisplayMode ?? { kind: "amortized" };
+  const showUpfrontDeduction =
+    feeMode.kind === "upfront_deduction" && feeExcludedFromTotal && serviceFee > 0;
+  const showAmortizedFee = feeMode.kind === "amortized" && !feeExcludedFromTotal && serviceFee > 0;
 
   return (
     <section className="space-y-3">
@@ -69,14 +81,14 @@ export function LoanBreakdownSummary({
 
         {totalInterest > 0 && interestRate !== null && (
           <Row
-            label={`Interest (${interestLabel(loanType, interestRate, installmentsTotal)})`}
+            label={`Interest (${interestLabel(loanTypeConfig, interestRate, installmentsTotal)})`}
             value={fmt(totalInterest, currency)}
             subtle
           />
         )}
 
-        {/* Service fee — only shown when it's amortized into installments (non-Maribank) */}
-        {!isMaribank && serviceFee > 0 && (
+        {/* Service fee — only when amortized into installments */}
+        {showAmortizedFee && (
           <Row label="Service Fee" value={fmt(serviceFee, currency)} subtle />
         )}
 
@@ -97,13 +109,13 @@ export function LoanBreakdownSummary({
           <Row label={`${installmentsTotal} × monthly payment`} value={fmt(baseAmount, currency)} />
         )}
 
-        {/* ── Maribank stamp tax + actual disbursement ── */}
-        {isMaribank && serviceFee > 0 && (
+        {/* ── Upfront deduction block (Stamp Tax, Admin Fee, etc.) ── */}
+        {showUpfrontDeduction && (
           <>
             <Divider />
             <div className="flex items-start justify-between gap-4 pt-0.5">
               <span className="text-xs leading-snug text-amber-400/80">
-                Stamp Tax
+                {(feeMode as { kind: "upfront_deduction"; label: string }).label}
                 <span className="text-muted-foreground ml-1 font-normal">
                   (deducted before disbursement)
                 </span>

@@ -11,6 +11,23 @@ export interface StampTaxTier {
   amount: number; // in the loan's currency
 }
 
+/**
+ * Describes how the service_fee is displayed in the loan breakdown UI.
+ *
+ * - `amortized`         → fee is rolled into installments (shown as "Service Fee" row above total).
+ * - `upfront_deduction` → fee is deducted from the disbursed amount before the borrower receives it
+ *                         (shown below the installment schedule with a custom label + green receipt row).
+ *
+ * When absent, the component falls back to `amortized` if service_fee > 0.
+ */
+export type FeeDisplayMode = { kind: "amortized" } | { kind: "upfront_deduction"; label: string };
+
+export type FirstDueStrategy =
+  | "same_month_if_possible"
+  | "always_next_month"
+  | "fixed_days_after_disbursement" // e.g. +30 days
+  | "billing_cycle_based";
+
 export interface LoanTypeConfig {
   /** Must match the loan_type enum value in the database */
   loan_type: LoanType;
@@ -34,6 +51,14 @@ export interface LoanTypeConfig {
    * based on the selected installments_total.
    */
   stamp_tax_tiers?: StampTaxTier[];
+  /**
+   * Determines how the service_fee is rendered in LoanBreakdownSummary.
+   * Defaults to `amortized` when omitted.
+   */
+  feeDisplayMode?: FeeDisplayMode;
+
+  /** NEW: controls how first installment date is computed */
+  first_due_strategy: FirstDueStrategy;
 }
 
 export interface CreditSourceConfig {
@@ -62,15 +87,19 @@ export const CREDIT_SOURCE_CONFIGS: CreditSourceConfig[] = [
         interest_rate: null,
         service_fee: 0,
         due_day_of_month: null,
+        first_due_strategy: "always_next_month",
       },
       {
         loan_type: "sloan",
         label: "SLoan",
-        installments_total: 3,
-        available_durations: [3],
-        interest_rate: null,
+        installments_total: 4,
+        available_durations: [3, 6, 9, 12],
+        interest_rate: 4.95,
         service_fee: 0,
-        due_day_of_month: null,
+        due_day_of_month: 29,
+        // SLoan admin fee is deducted from disbursement, never rolled in.
+        feeDisplayMode: { kind: "upfront_deduction", label: "Admin Fee" },
+        first_due_strategy: "always_next_month",
       },
     ],
   },
@@ -88,6 +117,7 @@ export const CREDIT_SOURCE_CONFIGS: CreditSourceConfig[] = [
         interest_rate: null,
         service_fee: 0,
         due_day_of_month: null,
+        first_due_strategy: "always_next_month",
       },
     ],
   },
@@ -105,6 +135,7 @@ export const CREDIT_SOURCE_CONFIGS: CreditSourceConfig[] = [
         interest_rate: null,
         service_fee: 0,
         due_day_of_month: null,
+        first_due_strategy: "always_next_month",
       },
     ],
   },
@@ -129,6 +160,9 @@ export const CREDIT_SOURCE_CONFIGS: CreditSourceConfig[] = [
         interest_rate: 2.95,
         service_fee: 0,
         due_day_of_month: 30,
+        // Stamp tax is deducted from disbursement, never rolled in.
+        feeDisplayMode: { kind: "upfront_deduction", label: "Stamp Tax" },
+        first_due_strategy: "same_month_if_possible",
       },
     ],
   },
@@ -148,6 +182,7 @@ export const CREDIT_SOURCE_CONFIGS: CreditSourceConfig[] = [
         interest_rate: 0,
         service_fee: 0,
         due_day_of_month: null,
+        first_due_strategy: "always_next_month",
       },
     ],
   },
@@ -166,6 +201,7 @@ export const CREDIT_SOURCE_CONFIGS: CreditSourceConfig[] = [
         interest_rate: null,
         service_fee: 0,
         due_day_of_month: null,
+        first_due_strategy: "always_next_month",
       },
     ],
   },
@@ -184,6 +220,7 @@ export const CREDIT_SOURCE_CONFIGS: CreditSourceConfig[] = [
         interest_rate: null,
         service_fee: 0,
         due_day_of_month: null,
+        first_due_strategy: "always_next_month",
       },
     ],
   },
@@ -202,6 +239,7 @@ export const CREDIT_SOURCE_CONFIGS: CreditSourceConfig[] = [
         interest_rate: null,
         service_fee: 0,
         due_day_of_month: null,
+        first_due_strategy: "always_next_month",
       },
     ],
   },
@@ -218,6 +256,7 @@ export const FALLBACK_LOAN_TYPE: LoanTypeConfig = {
   interest_rate: null,
   service_fee: 0,
   due_day_of_month: null,
+  first_due_strategy: "always_next_month",
 };
 
 export function getSourceConfig(sourceName: string): CreditSourceConfig | null {

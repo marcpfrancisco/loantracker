@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { SubmitPaymentModal } from "@/components/loans/SubmitPaymentModal";
 import { ReviewProofModal } from "@/components/loans/ReviewProofModal";
 import type { InstallmentDetail } from "@/hooks/useLoanDetail";
-import type { PaymentStatus, CurrencyType } from "@/types/database";
+import type { PaymentStatus, CurrencyType } from "@/types/enums";
 
 interface InstallmentRowProps {
   installment: InstallmentDetail;

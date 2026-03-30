@@ -1,5 +1,5 @@
 import { computeInstallmentAmounts } from "@/lib/installmentStrategies";
-import type { LoanType } from "@/types/database";
+import type { LoanType } from "@/types/enums";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

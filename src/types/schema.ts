@@ -1,4 +1,4 @@
-import type { CreditSourceType, LoanType, RegionType } from "@/types/database";
+import type { CreditSourceType, LoanType, RegionType } from "@/types/enums";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

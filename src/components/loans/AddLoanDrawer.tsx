@@ -13,7 +13,7 @@ import { useCreditSources } from "@/hooks/useCreditSources";
 import { useCreateLoan } from "@/hooks/useCreateLoan";
 import { getLoanTypesForSource, getLoanTypeConfig } from "@/types/schema";
 import { LoanBreakdownSummary } from "@/components/loans/LoanBreakdownSummary";
-import type { LoanType, RegionType, CurrencyType } from "@/types/database";
+import type { LoanType, RegionType, CurrencyType } from "@/types/enums";
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 

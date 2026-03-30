@@ -11,7 +11,7 @@ import {
   useDeleteCreditSource,
 } from "@/hooks/useCreditSourceMutations";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import type { CreditSourceType, RegionType } from "@/types/database";
+import type { CreditSourceType, RegionType } from "@/types/enums";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 

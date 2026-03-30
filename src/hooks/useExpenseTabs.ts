@@ -16,6 +16,7 @@ export interface ExpenseTabSummary {
   periodSummaries: Array<{
     period: string;
     is_locked: boolean;
+    is_archived: boolean;
     paid_status: "unpaid" | "partial" | "paid";
   }>;
 }
@@ -27,7 +28,7 @@ async function fetchExpenseTabs(): Promise<ExpenseTabSummary[]> {
       `id, title, currency, region, status,
        profiles!expense_tabs_borrower_id_fkey(id, full_name, region),
        expense_periods(
-         id, period, is_locked,
+         id, period, is_locked, is_archived,
          expense_items(borrower_owes),
          expense_payments(amount)
        )`
@@ -56,7 +57,7 @@ async function fetchExpenseTabs(): Promise<ExpenseTabSummary[]> {
         const outstanding = Math.max(0, owed - paid);
         const paid_status: "unpaid" | "partial" | "paid" =
           paid === 0 ? "unpaid" : outstanding <= 0 ? "paid" : "partial";
-        return { period: p.period, is_locked: p.is_locked, paid_status };
+        return { period: p.period, is_locked: p.is_locked, is_archived: p.is_archived ?? false, paid_status };
       })
       .sort((a, b) => a.period.localeCompare(b.period));
 
@@ -86,7 +87,7 @@ async function fetchMyExpenseTab(): Promise<ExpenseTabSummary | null> {
       `id, title, currency, region, status,
        profiles!expense_tabs_borrower_id_fkey(id, full_name, region),
        expense_periods(
-         id, period, is_locked,
+         id, period, is_locked, is_archived,
          expense_items(borrower_owes),
          expense_payments(amount)
        )`
@@ -115,7 +116,7 @@ async function fetchMyExpenseTab(): Promise<ExpenseTabSummary | null> {
       const outstanding = Math.max(0, owed - paid);
       const paid_status: "unpaid" | "partial" | "paid" =
         paid === 0 ? "unpaid" : outstanding <= 0 ? "paid" : "partial";
-      return { period: p.period, is_locked: p.is_locked, paid_status };
+      return { period: p.period, is_locked: p.is_locked, is_archived: p.is_archived ?? false, paid_status };
     })
     .sort((a, b) => a.period.localeCompare(b.period));
 

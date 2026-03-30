@@ -124,6 +124,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          is_archived: boolean
           is_locked: boolean
           period: string
           tab_id: string
@@ -131,6 +132,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          is_archived?: boolean
           is_locked?: boolean
           period: string
           tab_id: string
@@ -138,6 +140,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          is_archived?: boolean
           is_locked?: boolean
           period?: string
           tab_id?: string
@@ -606,6 +609,16 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
+
+// ── Named type aliases (convenience re-exports of Enums) ──────────────────────
+export type LoanStatus = Enums<"loan_status">
+export type LoanType = Enums<"loan_type">
+export type CreditSourceType = Enums<"credit_source_type">
+export type PaymentStatus = Enums<"payment_status">
+export type CurrencyType = Enums<"currency_type">
+export type RegionType = Enums<"region_type">
+export type ProofStatus = Enums<"proof_status">
+export type UserRole = Enums<"user_role">
 
 export const Constants = {
   public: {

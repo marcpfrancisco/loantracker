@@ -9,6 +9,22 @@ function toFirstOfMonth(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`;
 }
 
+// ── Delete tab ────────────────────────────────────────────────────────────────
+
+export function useDeleteExpenseTab() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (tabId: string) => {
+      const { error } = await supabase.from("expense_tabs").delete().eq("id", tabId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["expense-tabs"] });
+      void qc.invalidateQueries({ queryKey: ["admin", "borrowers"] });
+    },
+  });
+}
+
 // ── Create tab ────────────────────────────────────────────────────────────────
 
 export function useCreateExpenseTab() {
@@ -158,6 +174,44 @@ export function useDeleteExpensePeriod(tabId: string) {
   return useMutation({
     mutationFn: async (periodId: string) => {
       const { error } = await supabase.from("expense_periods").delete().eq("id", periodId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["expense-tab", tabId] });
+      void qc.invalidateQueries({ queryKey: ["expense-tabs"] });
+    },
+  });
+}
+
+// ── Archive period (fully paid months only) ───────────────────────────────────
+
+export function useArchivePeriod(tabId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (periodId: string) => {
+      const { error } = await supabase
+        .from("expense_periods")
+        .update({ is_archived: true, is_locked: true })
+        .eq("id", periodId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["expense-tab", tabId] });
+      void qc.invalidateQueries({ queryKey: ["expense-tabs"] });
+    },
+  });
+}
+
+// ── Archive all periods in a year ─────────────────────────────────────────────
+
+export function useArchiveYear(tabId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (periodIds: string[]) => {
+      const { error } = await supabase
+        .from("expense_periods")
+        .update({ is_archived: true, is_locked: true })
+        .in("id", periodIds);
       if (error) throw error;
     },
     onSuccess: () => {

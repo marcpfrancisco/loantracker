@@ -1,11 +1,14 @@
+import { useState } from "react";
 import { useNavigate } from "react-router";
 import { motion } from "framer-motion";
-import { Receipt, AlertCircle, Lock, Unlock, CheckCircle2 } from "lucide-react";
+import { Receipt, AlertCircle, Lock, Unlock, CheckCircle2, Archive, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { cardVariants } from "@/lib/animations";
 import { useAuth } from "@/hooks/useAuth";
 import { useExpenseTabsAdmin, useMyExpenseTab } from "@/hooks/useExpenseTabs";
 import type { ExpenseTabSummary } from "@/hooks/useExpenseTabs";
+import { useDeleteExpenseTab } from "@/hooks/useExpenseTabMutations";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -29,25 +32,29 @@ function formatPeriod(period: string) {
 function PeriodPill({
   period,
   is_locked,
+  is_archived,
   paid_status,
 }: {
   period: string;
   is_locked: boolean;
+  is_archived: boolean;
   paid_status: "unpaid" | "partial" | "paid";
 }) {
   const styles = {
     paid: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
     partial: "bg-amber-500/15 text-amber-400 border-amber-500/30",
     unpaid: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30",
+    archived: "bg-violet-500/15 text-violet-400 border-violet-500/30",
   };
 
-  const Icon = paid_status === "paid" ? CheckCircle2 : is_locked ? Lock : Unlock;
+  const Icon = is_archived ? Archive : paid_status === "paid" ? CheckCircle2 : is_locked ? Lock : Unlock;
+  const styleKey = is_archived ? "archived" : paid_status;
 
   return (
     <span
       className={cn(
         "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium",
-        styles[paid_status]
+        styles[styleKey]
       )}
     >
       <Icon className="h-2.5 w-2.5" />
@@ -58,50 +65,79 @@ function PeriodPill({
 
 // ── Tab card ──────────────────────────────────────────────────────────────────
 
-function TabCard({ tab }: { tab: ExpenseTabSummary }) {
+function TabCard({ tab, isAdmin }: { tab: ExpenseTabSummary; isAdmin: boolean }) {
   const navigate = useNavigate();
-  const recentPeriods = tab.periodSummaries.slice(-3);
+  const deleteTab = useDeleteExpenseTab();
+  const [showConfirm, setShowConfirm] = useState(false);
 
   return (
-    <motion.button
+    <motion.div
       variants={cardVariants}
-      type="button"
-      onClick={() => void navigate(`/tabs/${tab.id}`)}
-      className="bg-card border-border/60 hover:bg-muted/20 w-full rounded-2xl border p-4 text-left transition-colors"
+      className="bg-card border-border/60 group relative rounded-2xl border transition-colors"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-foreground text-sm font-semibold">{tab.borrower.full_name}</p>
-          <p className="text-muted-foreground mt-0.5 text-xs">{tab.title}</p>
+      {/* Clickable card body — pr-10 leaves room for the trash icon */}
+      <button
+        type="button"
+        onClick={() => void navigate(`/tabs/${tab.id}`)}
+        className="hover:bg-muted/20 w-full rounded-2xl p-4 pr-10 text-left transition-colors"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-foreground text-sm font-semibold">{tab.borrower.full_name}</p>
+            <p className="text-muted-foreground mt-0.5 text-xs">{tab.title}</p>
+          </div>
+          <div className="shrink-0 text-right">
+            <p className="text-foreground text-sm font-bold tabular-nums">
+              {fmt(tab.outstanding, tab.currency)}
+            </p>
+            <p className="text-muted-foreground text-[10px]">outstanding</p>
+          </div>
         </div>
-        <div className="shrink-0 text-right">
-          <p className="text-foreground text-sm font-bold tabular-nums">
-            {fmt(tab.outstanding, tab.currency)}
-          </p>
-          <p className="text-muted-foreground text-[10px]">outstanding</p>
-        </div>
-      </div>
 
-      {recentPeriods.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {tab.periodSummaries.map((p) => (
-            <PeriodPill
-              key={p.period}
-              period={p.period}
-              is_locked={p.is_locked}
-              paid_status={p.paid_status}
-            />
-          ))}
-        </div>
+        {tab.periodSummaries.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {tab.periodSummaries.map((p) => (
+              <PeriodPill
+                key={p.period}
+                period={p.period}
+                is_locked={p.is_locked}
+                is_archived={p.is_archived}
+                paid_status={p.paid_status}
+              />
+            ))}
+          </div>
+        )}
+
+        {tab.outstanding <= 0 && tab.totalOwed > 0 && (
+          <div className="mt-3 flex items-center gap-1.5">
+            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+            <span className="text-xs text-emerald-400">All settled</span>
+          </div>
+        )}
+      </button>
+
+      {/* Trash icon — positioned in the top-right corner, outside card button */}
+      {isAdmin && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setShowConfirm(true); }}
+          className="text-muted-foreground hover:text-rose-400 absolute right-3 top-3.5 rounded p-1 transition-colors"
+          title="Delete this expense tab"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </button>
       )}
 
-      {tab.outstanding <= 0 && tab.totalOwed > 0 && (
-        <div className="mt-3 flex items-center gap-1.5">
-          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
-          <span className="text-xs text-emerald-400">All settled</span>
-        </div>
-      )}
-    </motion.button>
+      <ConfirmDialog
+        open={showConfirm}
+        title="Delete expense tab?"
+        description={`This will permanently delete "${tab.title}" for ${tab.borrower.full_name}, including all months, items, and payments. This cannot be undone.`}
+        confirmLabel="Delete tab"
+        isPending={deleteTab.isPending}
+        onConfirm={() => deleteTab.mutate(tab.id, { onSuccess: () => setShowConfirm(false) })}
+        onCancel={() => setShowConfirm(false)}
+      />
+    </motion.div>
   );
 }
 
@@ -199,7 +235,7 @@ export default function ExpenseTabsPage() {
           animate="visible"
         >
           {tabs.map((tab) => (
-            <TabCard key={tab.id} tab={tab} />
+            <TabCard key={tab.id} tab={tab} isAdmin={isAdmin} />
           ))}
         </motion.div>
       )}

@@ -11,9 +11,9 @@ interface UpdateInstallmentPayload {
 }
 
 const statusToastMessages: Record<PaymentStatus, string> = {
-  unpaid:  "Payment reverted to unpaid.",
+  unpaid: "Payment reverted to unpaid.",
   pending: "Payment submitted for review.",
-  paid:    "Payment marked as paid.",
+  paid: "Payment marked as paid.",
 };
 
 async function updateInstallment({ id, status }: UpdateInstallmentPayload): Promise<void> {
@@ -26,6 +26,60 @@ async function updateInstallment({ id, status }: UpdateInstallmentPayload): Prom
     .eq("id", id);
 
   if (error) throw error;
+}
+
+export function useBulkMarkPaid(loanId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase
+        .from("installments")
+        .update({ status: "paid" })
+        .in("id", ids);
+      if (error) throw error;
+    },
+
+    onMutate: async (ids) => {
+      await queryClient.cancelQueries({ queryKey: ["loan", loanId] });
+      const previousLoan = queryClient.getQueryData<LoanDetail>(["loan", loanId]);
+
+      queryClient.setQueryData<LoanDetail>(["loan", loanId], (old) => {
+        if (!old) return old;
+        const idSet = new Set(ids);
+        return {
+          ...old,
+          installments: old.installments.map((i) =>
+            idSet.has(i.id) ? { ...i, status: "paid" as const, paid_at: new Date().toISOString() } : i
+          ),
+        };
+      });
+
+      return { previousLoan };
+    },
+
+    onError: (_err, _ids, context) => {
+      if (context?.previousLoan) {
+        queryClient.setQueryData(["loan", loanId], context.previousLoan);
+      }
+      toast.error("Bulk update failed. Please try again.");
+    },
+
+    onSuccess: (_data, ids) => {
+      toast.success(`${ids.length} installment${ids.length !== 1 ? "s" : ""} marked as paid.`);
+      void queryClient.invalidateQueries({ queryKey: ["loans"] });
+      void queryClient.invalidateQueries({ queryKey: ["loans-infinite"] });
+      void queryClient.invalidateQueries({ queryKey: ["my-loans"] });
+      void queryClient.invalidateQueries({ queryKey: ["upcoming-installments"] });
+      void queryClient.invalidateQueries({ queryKey: ["my-overdue-installments"] });
+      void queryClient.invalidateQueries({ queryKey: ["overdue-installments"] });
+      void queryClient.invalidateQueries({ queryKey: ["admin", "stats"] });
+      // Notify borrower via email for all confirmed installments (fire-and-forget)
+      void supabase.functions.invoke("notify-payment-confirmed", {
+        body: { installmentIds: ids },
+      });
+    },
+  });
 }
 
 export function useUpdateInstallment(loanId: string) {
@@ -60,12 +114,18 @@ export function useUpdateInstallment(loanId: string) {
       toast.error("Failed to update payment status. Please try again.");
     },
 
-    onSuccess: (_data, { status }) => {
+    onSuccess: (_data, { id, status }) => {
       toast.success(statusToastMessages[status]);
       void queryClient.invalidateQueries({ queryKey: ["loans"] });
       void queryClient.invalidateQueries({ queryKey: ["my-loans"] });
       void queryClient.invalidateQueries({ queryKey: ["upcoming-installments"] });
       void queryClient.invalidateQueries({ queryKey: ["admin", "stats"] });
+      // Notify borrower via email (fire-and-forget — never blocks the UI)
+      if (status === "paid") {
+        void supabase.functions.invoke("notify-payment-confirmed", {
+          body: { installmentIds: [id] },
+        });
+      }
     },
   });
 }

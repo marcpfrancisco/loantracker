@@ -71,7 +71,11 @@ export function useReviewProof(loanId: string) {
           ...old,
           installments: old.installments.map((i) =>
             i.id === installmentId
-              ? { ...i, status: newStatus, paid_at: action === "approve" ? new Date().toISOString() : null }
+              ? {
+                  ...i,
+                  status: newStatus,
+                  paid_at: action === "approve" ? new Date().toISOString() : null,
+                }
               : i
           ),
         };
@@ -88,7 +92,9 @@ export function useReviewProof(loanId: string) {
     },
 
     onSuccess: (_data, { action, installmentId }) => {
-      toast.success(action === "approve" ? "Payment approved." : "Payment rejected — borrower notified.");
+      toast.success(
+        action === "approve" ? "Payment approved." : "Payment rejected — borrower notified."
+      );
       void queryClient.invalidateQueries({ queryKey: ["proof", installmentId] });
       void queryClient.invalidateQueries({ queryKey: ["loans"] });
       void queryClient.invalidateQueries({ queryKey: ["my-loans"] });

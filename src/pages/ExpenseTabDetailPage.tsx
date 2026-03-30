@@ -16,6 +16,9 @@ import {
   ChevronRight,
   Download,
   TableProperties,
+  Pencil,
+  Check,
+  Archive,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -27,12 +30,13 @@ import {
   useTogglePeriodLock,
   useRecordPayment,
   useDeletePayment,
+  useDeleteExpensePeriod,
+  useUpdateExpenseItem,
+  useArchivePeriod,
+  useArchiveYear,
 } from "@/hooks/useExpenseTabMutations";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { exportExpenseTabCSV, printExpenseTabPDF } from "@/lib/statementExport";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -73,9 +77,9 @@ function currentMonthStr() {
 }
 
 const PAID_STATUS_STYLES = {
-  paid:    "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
+  paid: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
   partial: "bg-amber-500/15 text-amber-400 border-amber-500/30",
-  unpaid:  "bg-zinc-500/15 text-zinc-400 border-zinc-500/30",
+  unpaid: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30",
 };
 
 // ── Month pills ───────────────────────────────────────────────────────────────
@@ -83,17 +87,19 @@ const PAID_STATUS_STYLES = {
 function MonthPill({
   period,
   is_locked,
+  is_archived,
   paid_status,
   isSelected,
   onClick,
 }: {
   period: string;
   is_locked: boolean;
+  is_archived: boolean;
   paid_status: "unpaid" | "partial" | "paid";
   isSelected: boolean;
   onClick: () => void;
 }) {
-  const Icon = paid_status === "paid" ? CheckCircle2 : is_locked ? Lock : Unlock;
+  const Icon = is_archived ? Archive : paid_status === "paid" ? CheckCircle2 : is_locked ? Lock : Unlock;
 
   return (
     <button
@@ -118,14 +124,92 @@ function ItemRow({
   item,
   currency,
   isAdmin,
+  isLocked,
   onDelete,
+  onEdit,
 }: {
   item: ExpenseItem;
   currency: string;
   isAdmin: boolean;
+  isLocked: boolean;
   onDelete: (id: string) => void;
+  onEdit: (id: string, description: string, amount: number, is_already_split: boolean) => void;
 }) {
-  const [confirming, setConfirming] = useState(false);
+  const [mode, setMode] = useState<"view" | "edit">("view");
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [editDesc, setEditDesc] = useState(item.description);
+  const [editAmount, setEditAmount] = useState(String(item.amount));
+  const [editSplit, setEditSplit] = useState(item.is_already_split);
+
+  // If period becomes locked while in edit mode, exit gracefully
+  useEffect(() => {
+    if (isLocked) { setMode("view"); setShowDeleteDialog(false); }
+  }, [isLocked]);
+
+  function handleSave() {
+    const amt = Number(editAmount);
+    if (!editDesc.trim() || !amt || amt <= 0) return;
+    onEdit(item.id, editDesc, amt, editSplit);
+    setMode("view");
+  }
+
+  function handleCancelEdit() {
+    setEditDesc(item.description);
+    setEditAmount(String(item.amount));
+    setEditSplit(item.is_already_split);
+    setMode("view");
+  }
+
+  if (mode === "edit") {
+    return (
+      <div className="px-4 py-3 space-y-2">
+        <div className="flex items-center gap-2">
+          <input
+            autoFocus
+            value={editDesc}
+            onChange={(e) => setEditDesc(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") handleCancelEdit(); }}
+            className="border-border/60 bg-muted/50 focus:border-primary/60 min-w-0 flex-1 rounded-lg border px-3 py-1.5 text-sm outline-none"
+          />
+          <input
+            type="number"
+            step="0.01"
+            min="0.01"
+            value={editAmount}
+            onChange={(e) => setEditAmount(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") handleCancelEdit(); }}
+            className="border-border/60 bg-muted/50 focus:border-primary/60 w-24 shrink-0 rounded-lg border px-3 py-1.5 text-sm outline-none"
+          />
+          <button
+            type="button"
+            onClick={() => setEditSplit((v) => !v)}
+            className={cn(
+              "shrink-0 rounded-lg border px-2 py-1.5 text-xs font-semibold transition-colors",
+              editSplit
+                ? "border-primary/40 bg-primary/10 text-primary"
+                : "border-border/60 text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {editSplit ? "his" : "÷2"}
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            className="text-emerald-400 hover:text-emerald-300 shrink-0 transition-colors"
+          >
+            <Check className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={handleCancelEdit}
+            className="text-muted-foreground hover:text-foreground shrink-0 transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="group flex items-center gap-3 px-4 py-2.5">
@@ -138,34 +222,32 @@ function ItemRow({
       <span className="text-foreground shrink-0 text-sm font-semibold tabular-nums">
         {fmt(item.borrower_owes, currency)}
       </span>
-      {isAdmin && (
-        confirming ? (
-          <div className="flex shrink-0 items-center gap-1">
-            <button
-              type="button"
-              onClick={() => onDelete(item.id)}
-              className="rounded bg-rose-500/15 px-2 py-0.5 text-[10px] font-medium text-rose-400 hover:bg-rose-500/25"
-            >
-              Delete
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirming(false)}
-              className="text-muted-foreground hover:text-foreground"
-            >
-              <X className="h-3 w-3" />
-            </button>
-          </div>
-        ) : (
+      {isAdmin && !isLocked && (
+        <div className="flex shrink-0 items-center gap-1">
           <button
             type="button"
-            onClick={() => setConfirming(true)}
-            className="text-muted-foreground hover:text-rose-400 shrink-0 opacity-0 transition-all group-hover:opacity-100"
+            onClick={() => setMode("edit")}
+            className="text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowDeleteDialog(true)}
+            className="text-muted-foreground hover:text-rose-400 transition-colors"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
-        )
+        </div>
       )}
+      <ConfirmDialog
+        open={showDeleteDialog}
+        title="Delete this item?"
+        description={`"${item.description}" (${fmt(item.borrower_owes, currency)}) will be permanently removed.`}
+        confirmLabel="Delete item"
+        onConfirm={() => { onDelete(item.id); setShowDeleteDialog(false); }}
+        onCancel={() => setShowDeleteDialog(false)}
+      />
     </div>
   );
 }
@@ -176,34 +258,46 @@ function PaymentRow({
   payment,
   currency,
   isAdmin,
+  isLocked,
   onDelete,
 }: {
   payment: ExpensePayment;
   currency: string;
   isAdmin: boolean;
+  isLocked: boolean;
   onDelete: (id: string) => void;
 }) {
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
   return (
-    <div className="group flex items-center gap-3 px-4 py-2.5">
+    <div className="flex items-center gap-3 px-4 py-2.5">
       <div className="min-w-0 flex-1">
-        <p className="text-emerald-400 text-sm font-medium">Payment received</p>
+        <p className="text-sm font-medium text-emerald-400">Payment received</p>
         <p className="text-muted-foreground text-[10px]">
           {fmtDate(payment.payment_date)}
           {payment.notes ? ` · ${payment.notes}` : ""}
         </p>
       </div>
-      <span className="text-emerald-400 shrink-0 text-sm font-semibold tabular-nums">
+      <span className="shrink-0 text-sm font-semibold text-emerald-400 tabular-nums">
         -{fmt(payment.amount, currency)}
       </span>
-      {isAdmin && (
+      {isAdmin && !isLocked && (
         <button
           type="button"
-          onClick={() => onDelete(payment.id)}
-          className="text-muted-foreground hover:text-rose-400 shrink-0 opacity-0 transition-all group-hover:opacity-100"
+          onClick={() => setShowDeleteDialog(true)}
+          className="text-muted-foreground shrink-0 hover:text-rose-400 transition-colors"
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>
       )}
+      <ConfirmDialog
+        open={showDeleteDialog}
+        title="Delete this payment?"
+        description={`${fmt(payment.amount, currency)} recorded on ${fmtDate(payment.payment_date)} will be permanently removed.`}
+        confirmLabel="Delete payment"
+        onConfirm={() => { onDelete(payment.id); setShowDeleteDialog(false); }}
+        onCancel={() => setShowDeleteDialog(false)}
+      />
     </div>
   );
 }
@@ -303,7 +397,7 @@ function RecordPaymentModal({
               type="button"
               disabled={isPending || !amount || Number(amount) <= 0}
               onClick={() => onSubmit(Number(amount), notes, date)}
-              className="bg-emerald-600 text-white hover:bg-emerald-500 flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium transition-colors disabled:opacity-60"
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-500 disabled:opacity-60"
             >
               {isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               Confirm
@@ -317,7 +411,20 @@ function RecordPaymentModal({
 
 // ── Month picker popover ──────────────────────────────────────────────────────
 
-const MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const MONTH_LABELS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
 
 function MonthPickerPopover({
   existingPeriods,
@@ -396,7 +503,7 @@ function MonthPickerPopover({
                 )}
               >
                 {label}
-                {exists && <span className="ml-0.5 text-[8px] text-primary">•</span>}
+                {exists && <span className="text-primary ml-0.5 text-[8px]">•</span>}
               </button>
             );
           })}
@@ -451,7 +558,7 @@ function QuickAddBar({
         value={description}
         onChange={(e) => setDescription(e.target.value)}
         placeholder="Item name…"
-        className="border-border/60 bg-muted/50 focus:border-primary/60 min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm outline-none transition-colors"
+        className="border-border/60 bg-muted/50 focus:border-primary/60 min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm transition-colors outline-none"
         disabled={isPending}
       />
       <input
@@ -461,7 +568,7 @@ function QuickAddBar({
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
         placeholder="0.00"
-        className="border-border/60 bg-muted/50 focus:border-primary/60 w-24 shrink-0 rounded-lg border px-3 py-2 text-sm outline-none transition-colors"
+        className="border-border/60 bg-muted/50 focus:border-primary/60 w-24 shrink-0 rounded-lg border px-3 py-2 text-sm transition-colors outline-none"
         disabled={isPending}
       />
       {/* Split toggle */}
@@ -481,13 +588,9 @@ function QuickAddBar({
       <button
         type="submit"
         disabled={isPending || !description.trim() || !amount}
-        className="bg-primary text-primary-foreground flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-opacity disabled:opacity-50 hover:opacity-90"
+        className="bg-primary text-primary-foreground flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-opacity hover:opacity-90 disabled:opacity-50"
       >
-        {isPending ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <Plus className="h-4 w-4" />
-        )}
+        {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
       </button>
     </form>
   );
@@ -505,9 +608,28 @@ export default function ExpenseTabDetailPage() {
 
   const addItem = useAddExpenseItem(id!);
   const deleteItem = useDeleteExpenseItem(id!);
+  const updateItem = useUpdateExpenseItem(id!);
   const toggleLock = useTogglePeriodLock(id!);
   const recordPayment = useRecordPayment(id!);
   const deletePayment = useDeletePayment(id!);
+  const deletePeriod = useDeleteExpensePeriod(id!);
+  const archivePeriod = useArchivePeriod(id!);
+  const archiveYear = useArchiveYear(id!);
+
+  const [showDeletePeriod, setShowDeletePeriod] = useState(false);
+  const [showArchivePeriod, setShowArchivePeriod] = useState(false);
+  const [showArchiveYear, setShowArchiveYear] = useState<string | null>(null);
+
+  const currentYear = String(new Date().getFullYear());
+  const [expandedYears, setExpandedYears] = useState<Set<string>>(() => new Set([currentYear]));
+
+  function toggleYear(year: string) {
+    setExpandedYears((prev) => {
+      const next = new Set(prev);
+      next.has(year) ? next.delete(year) : next.add(year);
+      return next;
+    });
+  }
 
   const thisMonth = currentMonthStr();
 
@@ -536,6 +658,16 @@ export default function ExpenseTabDetailPage() {
       setExtraVirtualMonths((prev) => [...prev, period]);
     }
     setSelectedPeriod(period);
+    setShowDeletePeriod(false);
+  }
+
+  function handlePeriodSelect(period: string) {
+    setSelectedPeriod(period);
+    setShowDeletePeriod(false);
+    setShowArchivePeriod(false);
+    // Ensure the year of the selected period is expanded
+    const year = period.slice(0, 4);
+    setExpandedYears((prev) => (prev.has(year) ? prev : new Set([...prev, year])));
   }
 
   if (isLoading) {
@@ -563,10 +695,7 @@ export default function ExpenseTabDetailPage() {
   const allPeriods = [...tab.periods];
   const existingPeriodStrs = new Set(allPeriods.map((p) => p.period));
 
-  const virtualMonths = new Set([
-    ...extraVirtualMonths,
-    thisMonth,
-  ]);
+  const virtualMonths = new Set([...extraVirtualMonths, thisMonth]);
 
   const virtualPeriods: ExpensePeriod[] = [
     ...allPeriods,
@@ -576,6 +705,7 @@ export default function ExpenseTabDetailPage() {
         id: "__virtual__",
         period: m,
         is_locked: false,
+        is_archived: false,
         items: [],
         payments: [],
         total_owed: 0,
@@ -586,9 +716,15 @@ export default function ExpenseTabDetailPage() {
   ];
 
   // Sorted newest-first for pills display
-  const sortedPeriods = [...virtualPeriods].sort((a, b) =>
-    b.period.localeCompare(a.period)
-  );
+  const sortedPeriods = [...virtualPeriods].sort((a, b) => b.period.localeCompare(a.period));
+
+  // Group by year (newest year first)
+  const periodsByYear = sortedPeriods.reduce<Record<string, typeof sortedPeriods>>((acc, p) => {
+    const year = p.period.slice(0, 4);
+    (acc[year] ??= []).push(p);
+    return acc;
+  }, {});
+  const years = Object.keys(periodsByYear).sort((a, b) => b.localeCompare(a));
 
   const activePeriod = virtualPeriods.find((p) => p.period === selectedPeriod) ?? null;
   const isVirtual = activePeriod?.id === "__virtual__";
@@ -615,7 +751,7 @@ export default function ExpenseTabDetailPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col" style={{ height: "calc(100vh - 4rem)" }}>
+    <div className="mx-auto flex h-full max-w-2xl flex-col">
       {/* ── Header ──────────────────────────────────────────────── */}
       <div className="shrink-0 space-y-4 p-6 pb-0">
         {/* Back + export actions */}
@@ -655,7 +791,7 @@ export default function ExpenseTabDetailPage() {
         <div className="bg-card border-border/60 rounded-2xl border p-4">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-muted-foreground text-xs uppercase tracking-widest">
+              <p className="text-muted-foreground text-xs tracking-widest uppercase">
                 {tab.borrower.full_name}
               </p>
               <p className="text-foreground mt-1 text-2xl font-bold tabular-nums">
@@ -664,7 +800,7 @@ export default function ExpenseTabDetailPage() {
               <p className="text-muted-foreground text-xs">outstanding</p>
             </div>
             <div className="text-right">
-              <p className="text-emerald-400 text-sm font-semibold tabular-nums">
+              <p className="text-sm font-semibold text-emerald-400 tabular-nums">
                 {fmt(tab.total_paid, tab.currency)}
               </p>
               <p className="text-muted-foreground text-[10px]">paid</p>
@@ -676,25 +812,108 @@ export default function ExpenseTabDetailPage() {
           </div>
         </div>
 
-        {/* Month pills — horizontal scroll */}
-        <div className="scrollbar-none -mx-6 flex items-center gap-2 overflow-x-auto px-6 pb-2">
-          {sortedPeriods.map((p) => (
-            <MonthPill
-              key={p.period}
-              period={p.period}
-              is_locked={p.is_locked}
-              paid_status={p.paid_status}
-              isSelected={p.period === selectedPeriod}
-              onClick={() => setSelectedPeriod(p.period)}
-            />
-          ))}
+        {/* Month navigation — grouped by year */}
+        <div className="space-y-2">
+          {years.map((year) => {
+            const yearPeriods = periodsByYear[year];
+            const isCurrentYear = year === currentYear;
+            const isExpanded = isCurrentYear || expandedYears.has(year);
 
-          {/* Admin: open a past month */}
-          {isAdmin && (
-            <MonthPickerPopover
-              existingPeriods={sortedPeriods.map((p) => p.period)}
-              onSelect={handleAddPastMonth}
-            />
+            // Real (non-virtual) periods only for archive logic
+            const realPeriods = yearPeriods.filter((p) => p.id !== "__virtual__");
+            const allPaid = realPeriods.length > 0 && realPeriods.every((p) => p.paid_status === "paid");
+            const allArchived = realPeriods.length > 0 && realPeriods.every((p) => p.is_archived);
+            const canArchiveYear = isAdmin && !isCurrentYear && allPaid && !allArchived && realPeriods.length > 0;
+
+            const yearTotalOwed = realPeriods.reduce((s, p) => s + p.total_owed, 0);
+
+            return (
+              <div key={year}>
+                {/* Year header row */}
+                <div className="flex items-center justify-between gap-2 pb-1.5">
+                  <div className="flex items-center gap-2">
+                    {!isCurrentYear && (
+                      <button
+                        type="button"
+                        onClick={() => toggleYear(year)}
+                        className="text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        <ChevronRight
+                          className={cn(
+                            "h-3.5 w-3.5 transition-transform duration-200",
+                            isExpanded && "rotate-90"
+                          )}
+                        />
+                      </button>
+                    )}
+                    <span className="text-muted-foreground text-[11px] font-semibold tracking-wider uppercase">
+                      {year}
+                    </span>
+                    {allArchived && (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[10px] font-medium text-violet-400">
+                        <Archive className="h-2.5 w-2.5" />
+                        Archived
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Archive Year button */}
+                  {canArchiveYear && (
+                    <button
+                      type="button"
+                      onClick={() => setShowArchiveYear(year)}
+                      className="flex items-center gap-1 text-[10px] font-medium text-muted-foreground hover:text-violet-400 transition-colors"
+                    >
+                      <Archive className="h-3 w-3" />
+                      Archive {year}
+                    </button>
+                  )}
+
+                  {/* Collapsed summary for non-current past years */}
+                  {!isCurrentYear && !isExpanded && realPeriods.length > 0 && (
+                    <span className="text-muted-foreground text-[10px]">
+                      {realPeriods.length} month{realPeriods.length !== 1 ? "s" : ""}
+                      {yearTotalOwed > 0 ? ` · ${fmt(yearTotalOwed, tab.currency)}` : ""}
+                    </span>
+                  )}
+                </div>
+
+                {/* Month pills row (shown when expanded) */}
+                {isExpanded && (
+                  <div className="scrollbar-none -mx-6 flex items-center gap-2 overflow-x-auto px-6 pb-2">
+                    {yearPeriods.map((p) => (
+                      <MonthPill
+                        key={p.period}
+                        period={p.period}
+                        is_locked={p.is_locked}
+                        is_archived={p.is_archived}
+                        paid_status={p.paid_status}
+                        isSelected={p.period === selectedPeriod}
+                        onClick={() => handlePeriodSelect(p.period)}
+                      />
+                    ))}
+
+                    {/* Add past month — only in the current year section */}
+                    {isCurrentYear && isAdmin && (
+                      <MonthPickerPopover
+                        existingPeriods={sortedPeriods.map((p) => p.period)}
+                        onSelect={handleAddPastMonth}
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {/* If no periods exist yet, show add past month button standalone */}
+          {years.length === 0 && isAdmin && (
+            <div className="flex items-center gap-2 pb-2">
+              <MonthPickerPopover
+                existingPeriods={[]}
+                onSelect={handleAddPastMonth}
+              />
+            </div>
           )}
         </div>
       </div>
@@ -711,9 +930,9 @@ export default function ExpenseTabDetailPage() {
             className="p-6 pt-4"
           >
             {/* Month header */}
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-foreground text-base font-semibold">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <h2 className="text-foreground truncate text-base font-semibold">
                   {formatPeriodLabel(selectedPeriod)}
                 </h2>
                 {!isVirtual && activePeriod && (
@@ -721,49 +940,95 @@ export default function ExpenseTabDetailPage() {
                     {activePeriod.paid_status === "paid"
                       ? "Fully paid"
                       : activePeriod.paid_status === "partial"
-                      ? `${fmt(activePeriod.outstanding, tab.currency)} remaining`
-                      : activePeriod.total_owed > 0
-                      ? "Unpaid"
-                      : "No items yet"}
+                        ? `${fmt(activePeriod.outstanding, tab.currency)} remaining`
+                        : activePeriod.total_owed > 0
+                          ? "Unpaid"
+                          : "No items yet"}
                   </p>
                 )}
               </div>
 
               {isAdmin && !isVirtual && activePeriod && (
-                <div className="flex items-center gap-2">
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {/* Delete month — only enabled when empty */}
+                  {!activePeriod.is_archived && (
+                    <button
+                      type="button"
+                      disabled={activePeriod.items.length > 0 || activePeriod.payments.length > 0}
+                      onClick={() => setShowDeletePeriod(true)}
+                      className="border-border/60 text-muted-foreground hover:border-rose-500/30 hover:text-rose-400 flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 sm:px-3"
+                      title={
+                        activePeriod.items.length > 0 || activePeriod.payments.length > 0
+                          ? "Remove all items and payments before deleting this month"
+                          : "Delete this month"
+                      }
+                    >
+                      <Trash2 className="h-3 w-3 shrink-0" />
+                      <span className="hidden sm:inline">Delete</span>
+                    </button>
+                  )}
+
+                  {/* Archive month — fully-paid, non-archived, has content */}
+                  {!activePeriod.is_archived && activePeriod.paid_status === "paid" && activePeriod.items.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowArchivePeriod(true)}
+                      className="flex items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 px-2 py-1.5 text-xs font-medium text-violet-400 transition-colors hover:bg-violet-500/20 sm:px-3"
+                    >
+                      <Archive className="h-3 w-3 shrink-0" />
+                      <span className="hidden sm:inline">Archive</span>
+                    </button>
+                  )}
+
+                  {/* Archived badge — static, no button */}
+                  {activePeriod.is_archived && (
+                    <div className="flex items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 px-2 py-1.5 text-xs font-medium text-violet-400 sm:px-3">
+                      <Archive className="h-3 w-3 shrink-0" />
+                      <span className="hidden sm:inline">Archived</span>
+                    </div>
+                  )}
+
                   {/* Lock/Unlock */}
-                  <button
-                    type="button"
-                    disabled={toggleLock.isPending}
-                    onClick={() =>
-                      toggleLock.mutate({
-                        periodId: activePeriod.id,
-                        is_locked: !activePeriod.is_locked,
-                      })
-                    }
-                    className={cn(
-                      "flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors",
-                      activePeriod.is_locked
-                        ? "border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20"
-                        : "border-border/60 text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    {activePeriod.is_locked ? (
-                      <><Unlock className="h-3 w-3" /> Unlock</>
-                    ) : (
-                      <><Lock className="h-3 w-3" /> Lock</>
-                    )}
-                  </button>
+                  {!activePeriod.is_archived && (
+                    <button
+                      type="button"
+                      disabled={toggleLock.isPending}
+                      onClick={() =>
+                        toggleLock.mutate({
+                          periodId: activePeriod.id,
+                          is_locked: !activePeriod.is_locked,
+                        })
+                      }
+                      className={cn(
+                        "flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors sm:px-3",
+                        activePeriod.is_locked
+                          ? "border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20"
+                          : "border-border/60 text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      {activePeriod.is_locked ? (
+                        <>
+                          <Unlock className="h-3 w-3 shrink-0" />
+                          <span className="hidden sm:inline">Unlock</span>
+                        </>
+                      ) : (
+                        <>
+                          <Lock className="h-3 w-3 shrink-0" />
+                          <span className="hidden sm:inline">Lock</span>
+                        </>
+                      )}
+                    </button>
+                  )}
 
                   {/* Record Payment */}
-                  {activePeriod.outstanding > 0 && (
+                  {activePeriod.outstanding > 0 && !activePeriod.is_archived && (
                     <button
                       type="button"
                       onClick={() => setShowPaymentModal(true)}
-                      className="flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-400 transition-colors hover:bg-emerald-500/20"
+                      className="flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-1.5 text-xs font-medium text-emerald-400 transition-colors hover:bg-emerald-500/20 sm:px-3"
                     >
-                      <CheckCircle2 className="h-3 w-3" />
-                      Payment
+                      <CheckCircle2 className="h-3 w-3 shrink-0" />
+                      <span className="hidden sm:inline">Payment</span>
                     </button>
                   )}
                 </div>
@@ -772,7 +1037,8 @@ export default function ExpenseTabDetailPage() {
 
             {/* Items + payments list */}
             <div className="bg-card border-border/60 overflow-hidden rounded-xl border">
-              {isVirtual || (activePeriod?.items.length === 0 && activePeriod?.payments.length === 0) ? (
+              {isVirtual ||
+              (activePeriod?.items.length === 0 && activePeriod?.payments.length === 0) ? (
                 <div className="px-4 py-10 text-center">
                   <p className="text-muted-foreground text-sm">
                     {isAdmin ? "Add the first item below." : "No items this month yet."}
@@ -786,7 +1052,11 @@ export default function ExpenseTabDetailPage() {
                       item={item}
                       currency={tab.currency}
                       isAdmin={isAdmin}
+                      isLocked={activePeriod.is_locked}
                       onDelete={(iid) => deleteItem.mutate(iid)}
+                      onEdit={(iid, desc, amt, split) =>
+                        updateItem.mutate({ id: iid, description: desc, amount: amt, is_already_split: split })
+                      }
                     />
                   ))}
                   {activePeriod?.payments.map((payment) => (
@@ -795,6 +1065,7 @@ export default function ExpenseTabDetailPage() {
                       payment={payment}
                       currency={tab.currency}
                       isAdmin={isAdmin}
+                      isLocked={activePeriod.is_locked}
                       onDelete={(pid) => deletePayment.mutate(pid)}
                     />
                   ))}
@@ -813,7 +1084,7 @@ export default function ExpenseTabDetailPage() {
                   {activePeriod.total_paid > 0 && (
                     <div className="flex justify-between text-xs">
                       <span className="text-muted-foreground">Paid</span>
-                      <span className="font-medium tabular-nums text-emerald-400">
+                      <span className="font-medium text-emerald-400 tabular-nums">
                         -{fmt(activePeriod.total_paid, tab.currency)}
                       </span>
                     </div>
@@ -860,6 +1131,51 @@ export default function ExpenseTabDetailPage() {
           />
         )}
       </AnimatePresence>
+
+      {/* ── Confirm dialogs ──────────────────────────────────────── */}
+      <ConfirmDialog
+        open={showDeletePeriod}
+        title={`Delete ${activePeriod ? formatPeriodLabel(activePeriod.period) : "this month"}?`}
+        description="This month has no items or payments and will be permanently removed."
+        confirmLabel="Delete month"
+        isPending={deletePeriod.isPending}
+        onConfirm={() =>
+          activePeriod &&
+          deletePeriod.mutate(activePeriod.id, { onSuccess: () => setShowDeletePeriod(false) })
+        }
+        onCancel={() => setShowDeletePeriod(false)}
+      />
+
+      <ConfirmDialog
+        open={showArchivePeriod}
+        title={`Archive ${activePeriod ? formatPeriodLabel(activePeriod.period) : "this month"}?`}
+        description="This month is fully paid and will be archived and locked. You can still view it but no further changes will be allowed."
+        confirmLabel="Archive month"
+        variant="warning"
+        isPending={archivePeriod.isPending}
+        onConfirm={() =>
+          activePeriod &&
+          archivePeriod.mutate(activePeriod.id, { onSuccess: () => setShowArchivePeriod(false) })
+        }
+        onCancel={() => setShowArchivePeriod(false)}
+      />
+
+      <ConfirmDialog
+        open={showArchiveYear !== null}
+        title={`Archive all of ${showArchiveYear}?`}
+        description={`Every month in ${showArchiveYear} is fully paid. They will all be archived and locked together.`}
+        confirmLabel={`Archive ${showArchiveYear}`}
+        variant="warning"
+        isPending={archiveYear.isPending}
+        onConfirm={() => {
+          if (!showArchiveYear) return;
+          const ids = (periodsByYear[showArchiveYear] ?? [])
+            .filter((p) => p.id !== "__virtual__")
+            .map((p) => p.id);
+          archiveYear.mutate(ids, { onSuccess: () => setShowArchiveYear(null) });
+        }}
+        onCancel={() => setShowArchiveYear(null)}
+      />
     </div>
   );
 }

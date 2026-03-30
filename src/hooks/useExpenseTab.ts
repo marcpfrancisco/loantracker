@@ -28,6 +28,7 @@ export interface ExpensePeriod {
   id: string;
   period: string; // "2026-01-01"
   is_locked: boolean;
+  is_archived: boolean;
   items: ExpenseItem[];
   payments: ExpensePayment[];
   // Computed
@@ -61,7 +62,7 @@ async function fetchExpenseTab(tabId: string): Promise<ExpenseTabDetail> {
       `id, borrower_id, currency, region, title, status,
        profiles!expense_tabs_borrower_id_fkey(id, full_name),
        expense_periods(
-         id, period, is_locked, created_at,
+         id, period, is_locked, is_archived, created_at,
          expense_items(id, description, amount, is_already_split, borrower_owes, entry_date, created_at),
          expense_payments(id, amount, notes, payment_date, created_at)
        )`
@@ -111,6 +112,7 @@ async function fetchExpenseTab(tabId: string): Promise<ExpenseTabDetail> {
         id: p.id,
         period: p.period,
         is_locked: p.is_locked,
+        is_archived: p.is_archived ?? false,
         items,
         payments,
         total_owed: period_owed,

@@ -1,6 +1,15 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { X, ExternalLink, Loader2, AlertCircle, FileText, ChevronLeft, MessageSquare, Paperclip } from "lucide-react";
+import {
+  X,
+  ExternalLink,
+  Loader2,
+  AlertCircle,
+  FileText,
+  ChevronLeft,
+  MessageSquare,
+  Paperclip,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
 import { useProof } from "@/hooks/useProof";
@@ -94,13 +103,16 @@ export function ReviewProofModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}
             transition={{ type: "spring", bounce: 0.2, duration: 0.35 }}
-            className="bg-background border-border/60 fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl border shadow-2xl"
+            className="bg-background border-border/60 fixed top-1/2 left-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-2xl border shadow-2xl"
           >
             {/* Header */}
             <div className="border-border/60 flex items-center gap-3 border-b px-5 py-4">
               {view === "rejecting" && (
                 <button
-                  onClick={() => { setView("proof"); setAdminNote(""); }}
+                  onClick={() => {
+                    setView("proof");
+                    setAdminNote("");
+                  }}
                   disabled={reviewing}
                   className="text-muted-foreground hover:text-foreground cursor-pointer rounded-lg p-1 transition-colors disabled:opacity-50"
                 >
@@ -111,9 +123,7 @@ export function ReviewProofModal({
                 <h2 className="text-foreground font-semibold">
                   {view === "rejecting" ? "Reject Payment" : "Review Proof"}
                 </h2>
-                <p className="text-muted-foreground mt-0.5 text-xs">
-                  Installment #{installmentNo}
-                </p>
+                <p className="text-muted-foreground mt-0.5 text-xs">Installment #{installmentNo}</p>
               </div>
               <button
                 onClick={handleClose}
@@ -158,7 +168,7 @@ export function ReviewProofModal({
                   {/* Receipt */}
                   {proof.file_url ? (
                     isImage && proof.signedUrl ? (
-                      <div className="overflow-hidden rounded-xl border border-border/60">
+                      <div className="border-border/60 overflow-hidden rounded-xl border">
                         <img
                           src={proof.signedUrl}
                           alt="Payment receipt"
@@ -214,7 +224,7 @@ export function ReviewProofModal({
                         onChange={(e) => setAdminNote(e.target.value)}
                         rows={3}
                         placeholder="Explain why this payment is being rejected…"
-                        className="bg-muted/50 border-border/60 focus:border-primary/60 w-full resize-none rounded-lg border px-3 py-2 text-sm outline-none transition-colors placeholder:text-muted-foreground/50"
+                        className="bg-muted/50 border-border/60 focus:border-primary/60 placeholder:text-muted-foreground/50 w-full resize-none rounded-lg border px-3 py-2 text-sm transition-colors outline-none"
                         autoFocus
                       />
                     </div>
@@ -247,7 +257,10 @@ export function ReviewProofModal({
                 ) : (
                   <>
                     <button
-                      onClick={() => { setView("proof"); setAdminNote(""); }}
+                      onClick={() => {
+                        setView("proof");
+                        setAdminNote("");
+                      }}
                       disabled={reviewing}
                       className="border-border/60 text-muted-foreground hover:text-foreground cursor-pointer rounded-lg border px-4 py-2 text-sm transition-colors disabled:opacity-50"
                     >

@@ -21,7 +21,10 @@ Deno.serve(async (req: Request) => {
     // ── 1. Extract JWT from Authorization header ───────────────────────────────
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return Response.json({ error: "Missing authorization header" }, { status: 401, headers: corsHeaders });
+      return Response.json(
+        { error: "Missing authorization header" },
+        { status: 401, headers: corsHeaders }
+      );
     }
 
     const token = authHeader.replace("Bearer ", "");
@@ -34,10 +37,21 @@ Deno.serve(async (req: Request) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
-    const { data: { user }, error: userError } = await supabaseUser.auth.getUser(token);
-    console.log("[invite-borrower] getUser error:", userError?.message ?? "none", "user:", user?.id ?? "null");
+    const {
+      data: { user },
+      error: userError,
+    } = await supabaseUser.auth.getUser(token);
+    console.log(
+      "[invite-borrower] getUser error:",
+      userError?.message ?? "none",
+      "user:",
+      user?.id ?? "null"
+    );
     if (userError || !user) {
-      return Response.json({ error: `Unauthorized: ${userError?.message ?? "no user"}` }, { status: 401, headers: corsHeaders });
+      return Response.json(
+        { error: `Unauthorized: ${userError?.message ?? "no user"}` },
+        { status: 401, headers: corsHeaders }
+      );
     }
 
     // ── 3. Verify caller is an admin (service role bypasses RLS) ──────────────
@@ -54,24 +68,36 @@ Deno.serve(async (req: Request) => {
       .single();
 
     if (profileError || profile?.role !== "admin") {
-      return Response.json({ error: "Forbidden: admin access required" }, { status: 403, headers: corsHeaders });
+      return Response.json(
+        { error: "Forbidden: admin access required" },
+        { status: 403, headers: corsHeaders }
+      );
     }
 
     // ── 4. Parse and validate payload ─────────────────────────────────────────
-    const body = await req.json() as Partial<InvitePayload>;
+    const body = (await req.json()) as Partial<InvitePayload>;
     const { email, full_name, region } = body;
 
     if (!email || !full_name || !region) {
-      return Response.json({ error: "Missing required fields: email, full_name, region" }, { status: 400, headers: corsHeaders });
+      return Response.json(
+        { error: "Missing required fields: email, full_name, region" },
+        { status: 400, headers: corsHeaders }
+      );
     }
 
     if (!["PH", "UAE"].includes(region)) {
-      return Response.json({ error: "Invalid region. Must be PH or UAE." }, { status: 400, headers: corsHeaders });
+      return Response.json(
+        { error: "Invalid region. Must be PH or UAE." },
+        { status: 400, headers: corsHeaders }
+      );
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      return Response.json({ error: "Invalid email address." }, { status: 400, headers: corsHeaders });
+      return Response.json(
+        { error: "Invalid email address." },
+        { status: 400, headers: corsHeaders }
+      );
     }
 
     // ── 5. Send invite using the already-created admin client ─────────────────
@@ -91,7 +117,6 @@ Deno.serve(async (req: Request) => {
     }
 
     return Response.json({ success: true }, { headers: corsHeaders });
-
   } catch (err) {
     console.error("invite-borrower error:", err);
     return Response.json({ error: "Internal server error" }, { status: 500, headers: corsHeaders });

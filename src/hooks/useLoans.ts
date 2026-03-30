@@ -1,6 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import type { CurrencyType, LoanStatus, LoanType, CreditSourceType, RegionType } from "@/types/database";
+import type {
+  CurrencyType,
+  LoanStatus,
+  LoanType,
+  CreditSourceType,
+  RegionType,
+} from "@/types/database";
 
 export interface LoanListItem {
   id: string;
@@ -49,9 +55,7 @@ async function fetchLoans(): Promise<LoanListItem[]> {
         name: loan.credit_sources?.name ?? "Unknown",
         type: loan.credit_sources?.type ?? "custom",
       },
-      borrower: loan.profiles
-        ? { id: loan.profiles.id, full_name: loan.profiles.full_name }
-        : null,
+      borrower: loan.profiles ? { id: loan.profiles.id, full_name: loan.profiles.full_name } : null,
       paidCount: installments.filter((i) => i.status === "paid").length,
       pendingCount: installments.filter((i) => i.status === "pending").length,
       nextDueDate: unpaid[0]?.due_date ?? null,

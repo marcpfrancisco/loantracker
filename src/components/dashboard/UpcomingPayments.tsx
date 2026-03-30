@@ -55,10 +55,12 @@ export function UpcomingPayments({ installments, loading, showBorrower }: Upcomi
       {/* Header — click to collapse */}
       <button
         onClick={() => setIsOpen((v) => !v)}
-        className="border-border/60 flex w-full cursor-pointer items-center gap-2.5 border-b px-4 py-3.5 transition-colors hover:bg-muted/30"
+        className="border-border/60 hover:bg-muted/30 flex w-full cursor-pointer items-center gap-2.5 border-b px-4 py-3.5 transition-colors"
       >
         <CalendarClock className="text-muted-foreground h-4 w-4 shrink-0" />
-        <h2 className="text-foreground flex-1 text-left text-sm font-semibold">Upcoming Payments</h2>
+        <h2 className="text-foreground flex-1 text-left text-sm font-semibold">
+          Upcoming Payments
+        </h2>
 
         {!loading && installments.length > 0 && (
           <span className="bg-primary/10 text-primary rounded-full px-2 py-0.5 text-xs font-medium">

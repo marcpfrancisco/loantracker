@@ -23,8 +23,15 @@ function generateInstallments(
   loanId: string,
   payload: CreateLoanPayload
 ): TablesInsert<"installments">[] {
-  const { principal, interest_rate, service_fee, installments_total, started_at, due_day_of_month, loan_type } =
-    payload;
+  const {
+    principal,
+    interest_rate,
+    service_fee,
+    installments_total,
+    started_at,
+    due_day_of_month,
+    loan_type,
+  } = payload;
 
   const { baseAmount, lastAmount } = computeInstallmentAmounts(loan_type, {
     principal,
@@ -50,7 +57,7 @@ function generateInstallments(
   });
 }
 
-async function createLoan(payload: CreateLoanPayload): Promise<void> {
+async function createLoan(payload: CreateLoanPayload): Promise<{ loanId: string }> {
   const { data: loan, error: loanError } = await supabase
     .from("loans")
     .insert({
@@ -76,6 +83,8 @@ async function createLoan(payload: CreateLoanPayload): Promise<void> {
   const installments = generateInstallments(loan.id, payload);
   const { error: installError } = await supabase.from("installments").insert(installments);
   if (installError) throw installError;
+
+  return { loanId: loan.id };
 }
 
 export function useCreateLoan() {
@@ -83,13 +92,14 @@ export function useCreateLoan() {
 
   return useMutation({
     mutationFn: createLoan,
-    onSuccess: () => {
+    onSuccess: ({ loanId }) => {
       toast.success("Loan created successfully.");
       void queryClient.invalidateQueries({ queryKey: ["loans"] });
       void queryClient.invalidateQueries({ queryKey: ["admin", "stats"] });
       void queryClient.invalidateQueries({ queryKey: ["admin", "borrowers"] });
       void queryClient.invalidateQueries({ queryKey: ["my-loans"] });
       void queryClient.invalidateQueries({ queryKey: ["upcoming-installments"] });
+      void supabase.functions.invoke("notify-loan-created", { body: { loanId } });
     },
     onError: () => {
       toast.error("Failed to create loan. Please try again.");

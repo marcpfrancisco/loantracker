@@ -138,7 +138,7 @@ export function LoanCard({ loan, borrowerName }: LoanCardProps) {
             {loan.nextDueDate ? formatDueDate(loan.nextDueDate) : "All installments submitted"}
           </span>
           {loan.pendingCount > 0 && (
-            <span className="bg-amber-500/15 text-amber-400 ml-auto rounded-full px-2 py-0.5 text-[10px] font-medium">
+            <span className="ml-auto rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-400">
               {loan.pendingCount} pending review
             </span>
           )}

@@ -1,9 +1,5 @@
 {
   "permissions": {
-    "allow": [
-      "Bash(npm list:*)",
-      "Bash(npm run:*)",
-      "Bash(npx shadcn@latest add sonner)"
-    ]
+    "allow": ["Bash(npm list:*)", "Bash(npm run:*)", "Bash(npx shadcn@latest add sonner)"]
   }
 }

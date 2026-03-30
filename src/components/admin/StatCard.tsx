@@ -17,10 +17,22 @@ const accentStyles = {
   rose: "bg-rose-500/10 text-rose-400 border-rose-500/20",
 };
 
-export function StatCard({ icon: Icon, label, value, sub, accent = "default", loading }: StatCardProps) {
+export function StatCard({
+  icon: Icon,
+  label,
+  value,
+  sub,
+  accent = "default",
+  loading,
+}: StatCardProps) {
   return (
     <div className="bg-card border-border/60 flex flex-col gap-4 rounded-xl border p-5">
-      <div className={cn("flex h-10 w-10 items-center justify-center rounded-lg border", accentStyles[accent])}>
+      <div
+        className={cn(
+          "flex h-10 w-10 items-center justify-center rounded-lg border",
+          accentStyles[accent]
+        )}
+      >
         <Icon className="h-5 w-5" />
       </div>
 

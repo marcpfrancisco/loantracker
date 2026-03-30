@@ -1,6 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import type { CurrencyType, LoanStatus, LoanType, CreditSourceType, RegionType, PaymentStatus } from "@/types/database";
+import type {
+  CurrencyType,
+  LoanStatus,
+  LoanType,
+  CreditSourceType,
+  RegionType,
+  PaymentStatus,
+} from "@/types/database";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

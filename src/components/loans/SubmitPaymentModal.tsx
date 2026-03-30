@@ -128,15 +128,13 @@ export function SubmitPaymentModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}
             transition={{ type: "spring", bounce: 0.2, duration: 0.35 }}
-            className="bg-background border-border/60 fixed left-1/2 top-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-2xl border shadow-2xl"
+            className="bg-background border-border/60 fixed top-1/2 left-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-2xl border shadow-2xl"
           >
             {/* Header */}
             <div className="border-border/60 flex items-center justify-between border-b px-5 py-4">
               <div>
                 <h2 className="text-foreground font-semibold">Submit Payment</h2>
-                <p className="text-muted-foreground mt-0.5 text-xs">
-                  Installment #{installmentNo}
-                </p>
+                <p className="text-muted-foreground mt-0.5 text-xs">Installment #{installmentNo}</p>
               </div>
               <button
                 onClick={handleClose}
@@ -160,7 +158,7 @@ export function SubmitPaymentModal({
                   rows={3}
                   placeholder="e.g. Paid via GCash on Mar 27, ref #12345…"
                   disabled={isPending}
-                  className="bg-muted/50 border-border/60 focus:border-primary/60 w-full resize-none rounded-lg border px-3 py-2 text-sm outline-none transition-colors placeholder:text-muted-foreground/50 disabled:opacity-50"
+                  className="bg-muted/50 border-border/60 focus:border-primary/60 placeholder:text-muted-foreground/50 w-full resize-none rounded-lg border px-3 py-2 text-sm transition-colors outline-none disabled:opacity-50"
                   autoFocus
                 />
               </div>
@@ -168,18 +166,18 @@ export function SubmitPaymentModal({
               {/* Receipt upload — optional */}
               <div className="flex flex-col gap-1.5">
                 <label className="text-foreground text-xs font-medium">
-                  Receipt{" "}
-                  <span className="text-muted-foreground font-normal">(optional)</span>
+                  Receipt <span className="text-muted-foreground font-normal">(optional)</span>
                 </label>
 
                 {file ? (
                   /* File selected — show info row */
                   <div className="border-border/60 flex items-center gap-3 rounded-xl border px-3 py-2.5">
                     <div className="bg-primary/10 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg">
-                      {isImage
-                        ? <ImageIcon className="text-primary h-4 w-4" />
-                        : <FileText className="text-primary h-4 w-4" />
-                      }
+                      {isImage ? (
+                        <ImageIcon className="text-primary h-4 w-4" />
+                      ) : (
+                        <FileText className="text-primary h-4 w-4" />
+                      )}
                     </div>
                     {isImage && preview ? (
                       <img
@@ -204,7 +202,10 @@ export function SubmitPaymentModal({
                   /* Drop zone */
                   <div
                     onClick={() => !isPending && inputRef.current?.click()}
-                    onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setIsDragging(true);
+                    }}
                     onDragLeave={() => setIsDragging(false)}
                     onDrop={handleDrop}
                     className={cn(
@@ -217,9 +218,7 @@ export function SubmitPaymentModal({
                   >
                     <Paperclip className="text-muted-foreground h-5 w-5" />
                     <div className="text-center">
-                      <p className="text-foreground text-sm font-medium">
-                        Attach receipt
-                      </p>
+                      <p className="text-foreground text-sm font-medium">Attach receipt</p>
                       <p className="text-muted-foreground mt-0.5 text-xs">
                         JPG, PNG, WebP, HEIC, PDF · max {MAX_SIZE_MB} MB
                       </p>

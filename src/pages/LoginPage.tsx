@@ -37,9 +37,7 @@ function getSavedEmail(): string {
 export default function LoginPage() {
   const navigate = useNavigate();
   const [serverError, setServerError] = useState<string | null>(null);
-  const [rememberMe, setRememberMe] = useState(
-    () => localStorage.getItem(REMEMBER_KEY) === "1"
-  );
+  const [rememberMe, setRememberMe] = useState(() => localStorage.getItem(REMEMBER_KEY) === "1");
 
   const {
     register,
@@ -160,7 +158,7 @@ export default function LoginPage() {
                 />
                 <label
                   htmlFor="remember-me"
-                  className="text-muted-foreground cursor-pointer select-none text-sm"
+                  className="text-muted-foreground cursor-pointer text-sm select-none"
                 >
                   Remember me
                 </label>

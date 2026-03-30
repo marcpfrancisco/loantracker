@@ -17,10 +17,7 @@ export interface AdminStats {
 
 async function fetchAdminStats(): Promise<AdminStats> {
   const [borrowersRes, proofsRes, activeLoansRes, defaultedRes, paidRes] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("id", { count: "exact", head: true })
-      .eq("role", "borrower"),
+    supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "borrower"),
 
     supabase
       .from("payment_proofs")
@@ -32,10 +29,7 @@ async function fetchAdminStats(): Promise<AdminStats> {
       .select("id, region, principal, service_fee, interest_rate, currency")
       .eq("status", "active"),
 
-    supabase
-      .from("loans")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "defaulted"),
+    supabase.from("loans").select("id", { count: "exact", head: true }).eq("status", "defaulted"),
 
     // Sum of paid installment amounts grouped by loan currency
     supabase

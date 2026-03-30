@@ -19,9 +19,11 @@ async function inviteBorrower(payload: InviteBorrowerPayload): Promise<void> {
   if (error) {
     let message = error.message;
     try {
-      const body = await (error.context as Response).json() as { error?: string };
+      const body = (await (error.context as Response).json()) as { error?: string };
       if (body.error) message = body.error;
-    } catch { /* body not JSON — use the default message */ }
+    } catch {
+      /* body not JSON — use the default message */
+    }
     throw new Error(message);
   }
 

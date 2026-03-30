@@ -29,27 +29,29 @@ async function fetchOverdueInstallments(): Promise<OverdueInstallment[]> {
 
   if (error) throw error;
 
-  return (data ?? [])
-    // Only show overdue on active loans — skip defaulted/cancelled/completed
-    .filter((i) => i.loans?.status === "active")
-    .map((i) => {
-      const due = new Date(i.due_date + "T00:00:00");
-      const now = new Date();
-      const diffMs = now.getTime() - due.getTime();
-      const daysOverdue = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  return (
+    (data ?? [])
+      // Only show overdue on active loans — skip defaulted/cancelled/completed
+      .filter((i) => i.loans?.status === "active")
+      .map((i) => {
+        const due = new Date(i.due_date + "T00:00:00");
+        const now = new Date();
+        const diffMs = now.getTime() - due.getTime();
+        const daysOverdue = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-      return {
-        id: i.id,
-        installment_no: i.installment_no,
-        due_date: i.due_date,
-        amount: Number(i.amount),
-        currency: (i.loans?.currency ?? "PHP") as CurrencyType,
-        loan_id: i.loans?.id ?? "",
-        source_name: i.loans?.credit_sources?.name ?? "Unknown",
-        borrower_name: i.loans?.profiles?.full_name ?? "Unknown",
-        days_overdue: daysOverdue,
-      };
-    });
+        return {
+          id: i.id,
+          installment_no: i.installment_no,
+          due_date: i.due_date,
+          amount: Number(i.amount),
+          currency: (i.loans?.currency ?? "PHP") as CurrencyType,
+          loan_id: i.loans?.id ?? "",
+          source_name: i.loans?.credit_sources?.name ?? "Unknown",
+          borrower_name: i.loans?.profiles?.full_name ?? "Unknown",
+          days_overdue: daysOverdue,
+        };
+      })
+  );
 }
 
 export function useOverdueInstallments() {

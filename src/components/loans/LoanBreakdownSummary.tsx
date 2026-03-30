@@ -63,8 +63,7 @@ export function LoanBreakdownSummary({
         Loan Breakdown
       </h3>
 
-      <div className="bg-muted/30 border-border/40 rounded-xl border px-4 py-3 space-y-2 text-sm">
-
+      <div className="bg-muted/30 border-border/40 space-y-2 rounded-xl border px-4 py-3 text-sm">
         {/* ── Principal + Interest ── */}
         <Row label="Principal" value={fmt(principal, currency)} />
 
@@ -91,21 +90,11 @@ export function LoanBreakdownSummary({
         {/* ── Installment schedule ── */}
         {lastIsDifferent ? (
           <>
-            <Row
-              label={`${baseCount} × monthly payment`}
-              value={fmt(baseAmount, currency)}
-            />
-            <Row
-              label="Final payment"
-              value={fmt(lastAmount, currency)}
-              subtle
-            />
+            <Row label={`${baseCount} × monthly payment`} value={fmt(baseAmount, currency)} />
+            <Row label="Final payment" value={fmt(lastAmount, currency)} subtle />
           </>
         ) : (
-          <Row
-            label={`${installmentsTotal} × monthly payment`}
-            value={fmt(baseAmount, currency)}
-          />
+          <Row label={`${installmentsTotal} × monthly payment`} value={fmt(baseAmount, currency)} />
         )}
 
         {/* ── Maribank stamp tax + actual disbursement ── */}
@@ -113,22 +102,22 @@ export function LoanBreakdownSummary({
           <>
             <Divider />
             <div className="flex items-start justify-between gap-4 pt-0.5">
-              <span className="text-amber-400/80 text-xs leading-snug">
+              <span className="text-xs leading-snug text-amber-400/80">
                 Stamp Tax
                 <span className="text-muted-foreground ml-1 font-normal">
                   (deducted before disbursement)
                 </span>
               </span>
-              <span className="text-amber-400/80 shrink-0 tabular-nums text-xs">
+              <span className="shrink-0 text-xs text-amber-400/80 tabular-nums">
                 − {fmt(serviceFee, currency)}
               </span>
             </div>
 
-            <div className="bg-emerald-500/10 border-emerald-500/20 flex items-center justify-between gap-4 rounded-lg border px-3 py-2">
-              <span className="text-emerald-400 text-xs font-semibold">
+            <div className="flex items-center justify-between gap-4 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-2">
+              <span className="text-xs font-semibold text-emerald-400">
                 Borrower Actually Receives
               </span>
-              <span className="text-emerald-400 tabular-nums text-sm font-bold">
+              <span className="text-sm font-bold text-emerald-400 tabular-nums">
                 {fmt(principal - serviceFee, currency)}
               </span>
             </div>
@@ -168,10 +157,10 @@ function Row({
       <span
         className={
           subtle
-            ? "text-muted-foreground tabular-nums text-xs"
+            ? "text-muted-foreground text-xs tabular-nums"
             : bold
-              ? "text-foreground tabular-nums text-sm font-semibold"
-              : "text-foreground/90 tabular-nums text-xs"
+              ? "text-foreground text-sm font-semibold tabular-nums"
+              : "text-foreground/90 text-xs tabular-nums"
         }
       >
         {value}

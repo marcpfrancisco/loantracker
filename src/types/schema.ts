@@ -47,7 +47,6 @@ export interface CreditSourceConfig {
 // ── Configs ───────────────────────────────────────────────────────────────────
 
 export const CREDIT_SOURCE_CONFIGS: CreditSourceConfig[] = [
-
   // ── Philippines ─────────────────────────────────────────────────────────────
 
   {

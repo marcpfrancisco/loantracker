@@ -105,10 +105,26 @@ function LoanSection({ loan, index }: { loan: StatementLoan; index: number }) {
       <div className="border-border/30 flex flex-wrap gap-x-5 gap-y-2 border-b px-4 py-3">
         {[
           { label: "Principal", value: fmt(loan.principal, loan.currency), className: "" },
-          loan.interest_rate !== null && { label: "Rate", value: `${loan.interest_rate}%`, className: "" },
-          loan.service_fee > 0 && { label: "Fee", value: fmt(loan.service_fee, loan.currency), className: "" },
-          { label: "Total", value: fmt(loan.totalRepayable, loan.currency), className: "font-semibold text-foreground" },
-          { label: "Paid", value: fmt(loan.totalPaid, loan.currency), className: "text-emerald-400" },
+          loan.interest_rate !== null && {
+            label: "Rate",
+            value: `${loan.interest_rate}%`,
+            className: "",
+          },
+          loan.service_fee > 0 && {
+            label: "Fee",
+            value: fmt(loan.service_fee, loan.currency),
+            className: "",
+          },
+          {
+            label: "Total",
+            value: fmt(loan.totalRepayable, loan.currency),
+            className: "font-semibold text-foreground",
+          },
+          {
+            label: "Paid",
+            value: fmt(loan.totalPaid, loan.currency),
+            className: "text-emerald-400",
+          },
           {
             label: "Outstanding",
             value: fmt(loan.totalOutstanding, loan.currency),
@@ -123,7 +139,7 @@ function LoanSection({ loan, index }: { loan: StatementLoan; index: number }) {
             return (
               <div key={item.label} className="flex items-baseline gap-1.5">
                 <span className="text-muted-foreground text-[11px]">{item.label}</span>
-                <span className={cn("text-xs font-medium text-foreground", item.className)}>
+                <span className={cn("text-foreground text-xs font-medium", item.className)}>
                   {item.value}
                 </span>
               </div>
@@ -139,7 +155,7 @@ function LoanSection({ loan, index }: { loan: StatementLoan; index: number }) {
               {["#", "Due Date", "Amount", "Status", "Paid Date"].map((h) => (
                 <th
                   key={h}
-                  className="text-muted-foreground px-4 py-2 text-[10px] font-semibold uppercase tracking-wider"
+                  className="text-muted-foreground px-4 py-2 text-[10px] font-semibold tracking-wider uppercase"
                 >
                   {h}
                 </th>
@@ -156,7 +172,9 @@ function LoanSection({ loan, index }: { loan: StatementLoan; index: number }) {
                   inst.status === "paid" && "opacity-60"
                 )}
               >
-                <td className="text-muted-foreground px-4 py-2.5 text-center text-xs">{inst.installment_no}</td>
+                <td className="text-muted-foreground px-4 py-2.5 text-center text-xs">
+                  {inst.installment_no}
+                </td>
                 <td className="text-foreground px-4 py-2.5 text-xs">{fmtDate(inst.due_date)}</td>
                 <td className="text-foreground px-4 py-2.5 text-right text-xs font-semibold tabular-nums">
                   {fmt(inst.amount, loan.currency)}
@@ -194,7 +212,11 @@ interface LoanStatementDrawerProps {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function LoanStatementDrawer({ borrowerId, borrowerName, onClose }: LoanStatementDrawerProps) {
+export function LoanStatementDrawer({
+  borrowerId,
+  borrowerName,
+  onClose,
+}: LoanStatementDrawerProps) {
   const isOpen = !!borrowerId;
   const { data: statement, isLoading, error } = useBorrowerStatement(borrowerId);
 
@@ -218,7 +240,7 @@ export function LoanStatementDrawer({ borrowerId, borrowerName, onClose }: LoanS
           {/* Panel — slides from right on desktop, bottom on mobile */}
           <motion.div
             key="panel"
-            className="fixed inset-y-0 right-0 z-50 flex w-full flex-col bg-background shadow-2xl md:w-[680px]"
+            className="bg-background fixed inset-y-0 right-0 z-50 flex w-full flex-col shadow-2xl md:w-[680px]"
             initial={{ x: "100%" }}
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
@@ -241,7 +263,7 @@ export function LoanStatementDrawer({ borrowerId, borrowerName, onClose }: LoanS
                     <button
                       type="button"
                       onClick={() => exportStatementCSV(statement)}
-                      className="text-muted-foreground hover:text-foreground hover:bg-muted/50 flex items-center gap-1.5 rounded-lg border border-transparent px-3 py-1.5 text-xs font-medium transition-colors hover:border-border"
+                      className="text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:border-border flex items-center gap-1.5 rounded-lg border border-transparent px-3 py-1.5 text-xs font-medium transition-colors"
                     >
                       <TableProperties className="h-3.5 w-3.5" />
                       CSV
@@ -282,33 +304,49 @@ export function LoanStatementDrawer({ borrowerId, borrowerName, onClose }: LoanS
                   {/* Borrower info strip */}
                   <div className="border-border/60 bg-muted/30 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border px-5 py-4">
                     <div>
-                      <p className="text-muted-foreground text-[10px] uppercase tracking-widest">Borrower</p>
-                      <p className="text-foreground mt-0.5 text-sm font-semibold">{statement.borrower.full_name}</p>
+                      <p className="text-muted-foreground text-[10px] tracking-widest uppercase">
+                        Borrower
+                      </p>
+                      <p className="text-foreground mt-0.5 text-sm font-semibold">
+                        {statement.borrower.full_name}
+                      </p>
                     </div>
                     <div>
-                      <p className="text-muted-foreground text-[10px] uppercase tracking-widest">Region</p>
+                      <p className="text-muted-foreground text-[10px] tracking-widest uppercase">
+                        Region
+                      </p>
                       <div className="mt-1">
                         <RegionBadge region={statement.borrower.region} />
                       </div>
                     </div>
                     <div>
-                      <p className="text-muted-foreground text-[10px] uppercase tracking-widest">Total Loans</p>
-                      <p className="text-foreground mt-0.5 text-sm font-medium">{statement.loans.length}</p>
+                      <p className="text-muted-foreground text-[10px] tracking-widest uppercase">
+                        Total Loans
+                      </p>
+                      <p className="text-foreground mt-0.5 text-sm font-medium">
+                        {statement.loans.length}
+                      </p>
                     </div>
                     <div className="ml-auto">
-                      <p className="text-muted-foreground text-[10px] uppercase tracking-widest">Generated</p>
-                      <p className="text-muted-foreground mt-0.5 text-xs">{statement.generatedAt}</p>
+                      <p className="text-muted-foreground text-[10px] tracking-widest uppercase">
+                        Generated
+                      </p>
+                      <p className="text-muted-foreground mt-0.5 text-xs">
+                        {statement.generatedAt}
+                      </p>
                     </div>
                   </div>
 
                   {/* Loan sections */}
                   {statement.loans.length === 0 ? (
                     <div className="border-border/60 bg-card rounded-xl border px-4 py-12 text-center">
-                      <p className="text-muted-foreground text-sm">No loans found for this borrower.</p>
+                      <p className="text-muted-foreground text-sm">
+                        No loans found for this borrower.
+                      </p>
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      <p className="text-muted-foreground text-xs font-semibold uppercase tracking-widest">
+                      <p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
                         Loans
                       </p>
                       {statement.loans.map((loan, i) => (
@@ -320,19 +358,55 @@ export function LoanStatementDrawer({ borrowerId, borrowerName, onClose }: LoanS
                   {/* Summary totals */}
                   {statement.loans.length > 0 && (
                     <div className="space-y-3">
-                      <p className="text-muted-foreground text-xs font-semibold uppercase tracking-widest">
+                      <p className="text-muted-foreground text-xs font-semibold tracking-widest uppercase">
                         Summary
                       </p>
                       <div className="bg-card border-border/60 overflow-hidden rounded-xl border">
                         {(
                           [
-                            hasPHP && { label: "Total Principal (PHP)", value: fmt(statement.summary.PHP.principal, "PHP"), bold: false },
-                            hasPHP && { label: "Total Paid (PHP)", value: fmt(statement.summary.PHP.paid, "PHP"), color: "text-emerald-400", bold: false },
-                            hasPHP && { label: "Outstanding (PHP)", value: fmt(statement.summary.PHP.outstanding, "PHP"), color: statement.summary.PHP.outstanding > 0 ? "text-amber-400" : "text-emerald-400", bold: true },
-                            hasAED && { label: "Total Principal (AED)", value: fmt(statement.summary.AED.principal, "AED"), bold: false },
-                            hasAED && { label: "Total Paid (AED)", value: fmt(statement.summary.AED.paid, "AED"), color: "text-emerald-400", bold: false },
-                            hasAED && { label: "Outstanding (AED)", value: fmt(statement.summary.AED.outstanding, "AED"), color: statement.summary.AED.outstanding > 0 ? "text-amber-400" : "text-emerald-400", bold: true },
-                          ] as Array<{ label: string; value: string; color?: string; bold: boolean } | false>
+                            hasPHP && {
+                              label: "Total Principal (PHP)",
+                              value: fmt(statement.summary.PHP.principal, "PHP"),
+                              bold: false,
+                            },
+                            hasPHP && {
+                              label: "Total Paid (PHP)",
+                              value: fmt(statement.summary.PHP.paid, "PHP"),
+                              color: "text-emerald-400",
+                              bold: false,
+                            },
+                            hasPHP && {
+                              label: "Outstanding (PHP)",
+                              value: fmt(statement.summary.PHP.outstanding, "PHP"),
+                              color:
+                                statement.summary.PHP.outstanding > 0
+                                  ? "text-amber-400"
+                                  : "text-emerald-400",
+                              bold: true,
+                            },
+                            hasAED && {
+                              label: "Total Principal (AED)",
+                              value: fmt(statement.summary.AED.principal, "AED"),
+                              bold: false,
+                            },
+                            hasAED && {
+                              label: "Total Paid (AED)",
+                              value: fmt(statement.summary.AED.paid, "AED"),
+                              color: "text-emerald-400",
+                              bold: false,
+                            },
+                            hasAED && {
+                              label: "Outstanding (AED)",
+                              value: fmt(statement.summary.AED.outstanding, "AED"),
+                              color:
+                                statement.summary.AED.outstanding > 0
+                                  ? "text-amber-400"
+                                  : "text-emerald-400",
+                              bold: true,
+                            },
+                          ] as Array<
+                            { label: string; value: string; color?: string; bold: boolean } | false
+                          >
                         )
                           .filter(Boolean)
                           .map((row) => {

@@ -11,7 +11,7 @@ export function BottomNav() {
   const visibleItems = navItems.filter((item) => !item.adminOnly || isAdmin);
 
   return (
-    <nav className="border-border/60 bg-background/90 fixed bottom-0 left-0 right-0 flex h-16 shrink-0 items-stretch border-t backdrop-blur-md md:hidden">
+    <nav className="border-border/60 bg-background/90 fixed right-0 bottom-0 left-0 flex h-16 shrink-0 items-stretch border-t backdrop-blur-md md:hidden">
       {visibleItems.map((item) => (
         <NavLink
           key={item.to}

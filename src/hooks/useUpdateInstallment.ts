@@ -118,9 +118,16 @@ export function useUpdateInstallment(loanId: string) {
 
     onSuccess: (_data, { id, status }) => {
       toast.success(statusToastMessages[status]);
+      // Reconcile detail page with server truth (real paid_at, receipt_url, etc.)
+      // Runs as a background refetch — no loading state since optimistic cache exists.
+      void queryClient.invalidateQueries({ queryKey: ["loan", loanId] });
+      // Refresh all derived/list views
       void queryClient.invalidateQueries({ queryKey: ["loans"] });
+      void queryClient.invalidateQueries({ queryKey: ["loans-infinite"] });
       void queryClient.invalidateQueries({ queryKey: ["my-loans"] });
       void queryClient.invalidateQueries({ queryKey: ["upcoming-installments"] });
+      void queryClient.invalidateQueries({ queryKey: ["overdue-installments"] });
+      void queryClient.invalidateQueries({ queryKey: ["my-overdue-installments"] });
       void queryClient.invalidateQueries({ queryKey: ["admin", "stats"] });
       // Notify borrower via email (fire-and-forget — never blocks the UI)
       if (status === "paid") {

@@ -87,5 +87,9 @@ export function useLoanDetail(id: string | undefined) {
     queryKey: ["loan", id],
     queryFn: () => fetchLoanDetail(id!),
     enabled: !!id,
+    // 30s staleTime: prevents redundant refetches while the user is on the page.
+    // Invalidation from mutations bypasses this immediately, so post-update
+    // background refetches still happen to reconcile server truth.
+    staleTime: 1000 * 30,
   });
 }

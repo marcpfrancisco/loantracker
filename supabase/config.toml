@@ -13,4 +13,4 @@ content_path = "./supabase/email-templates/reset-password.html"
 [auth.email.notification.password_changed]
 enabled = true
 subject = "Your password has been changed"
-content_path = "./supabase/email-templates/password-changed.html"
+content_path = "./email-templates/password-changed.html"

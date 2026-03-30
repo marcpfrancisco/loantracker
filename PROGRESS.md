@@ -1,6 +1,6 @@
 # Global Loan Tracker — Progress & Roadmap
 
-> Last updated: 2026-03-28
+> Last updated: 2026-03-30
 
 ---
 
@@ -188,8 +188,10 @@ Currently items can only be deleted and re-added. An inline edit (description + 
 
 ### Medium Priority
 
-#### 7. Pagination / infinite scroll on Loans page
-As loan count grows, the current "fetch all" approach will slow down. Add cursor-based pagination or `useInfiniteQuery`.
+#### 7. Pagination / infinite scroll on Loans page ✅ Done
+~~As loan count grows, the current "fetch all" approach will slow down. Add cursor-based pagination or `useInfiniteQuery`.~~
+- `useLoansInfinite.ts` — `useInfiniteQuery` with `LOANS_PAGE_SIZE = 20`, cursor via `.range(pageParam, pageParam + 19)`
+- `LoansPage.tsx` — renders flat `data?.pages.flat()` list + "Load more" button when `hasNextPage` is true
 
 #### 8. Loan statement — include expense tab
 When generating a PDF or CSV statement for a borrower, optionally append their expense tab history. Both datasets are already available; they just need to be merged in `statementExport.ts`.
@@ -198,8 +200,11 @@ When generating a PDF or CSV statement for a borrower, optionally append their e
 - Bulk mark installments as paid (e.g., end-of-month sweep)
 - Bulk lock/unlock expense periods
 
-#### 10. Email notifications for payment confirmation
-When admin marks an installment as paid or approves a proof, send a confirmation email to the borrower via a Supabase Edge Function.
+#### 10. Email notifications for payment confirmation ✅ Done
+~~When admin marks an installment as paid or approves a proof, send a confirmation email to the borrower via a Supabase Edge Function.~~
+- `notify-payment-confirmed` Edge Function — called from `useUpdateInstallment.ts` when admin marks paid; sends styled HTML email via Brevo with installment details + "View Loan" CTA
+- `notify-rejection` Edge Function — called from `useReviewProof.ts` on reject; deletes receipt from Storage + sends rejection email with admin note as reason
+- Both functions verify JWT, confirm caller is admin (service role), gracefully skip if `BREVO_API_KEY` not set
 
 #### 11. Loan notes & attachments
 Allow admin to attach documents (contract PDF, screenshots) to individual loans, stored in Supabase Storage alongside payment proofs.
@@ -274,6 +279,10 @@ src/
 │   ├── useExpenseTabMutations.ts    # Add/delete items, payments, lock
 │   ├── useLoanDetail.ts
 │   ├── useLoans.ts / useMyLoans.ts
+│   ├── useLoansInfinite.ts          # Infinite scroll (LOANS_PAGE_SIZE=20, cursor-based)
+│   ├── useNotifications.ts          # In-app notification bell (TanStack Query + Realtime)
+│   ├── useReviewProof.ts            # Admin proof approve/reject → notify-rejection
+│   ├── useUpdateInstallment.ts      # Mark paid → notify-payment-confirmed
 │   └── ...
 ├── lib/
 │   ├── statementExport.ts           # PDF + CSV for loans AND expense tabs
@@ -290,13 +299,17 @@ src/
 │   ├── ProfilePage.tsx
 │   └── ResetPasswordPage.tsx
 ├── types/
-│   ├── database.ts                  # ⚠ Manually maintained — regenerate after migrations
+│   ├── database.ts                  # Auto-generated — run `npm run gen:types` after migrations
 │   └── schema.ts                    # Loan type / credit source configs
 └── router.tsx
 supabase/
+├── functions/
+│   ├── notify-payment-confirmed/    # Email borrower when payment approved
+│   └── notify-rejection/            # Email borrower + delete receipt on reject
 ├── migrations/
 │   ├── 001_initial_schema.sql
-│   └── 002_expense_tabs.sql
+│   ├── 002_expense_tabs.sql
+│   └── 003_notifications.sql        # notifications table + triggers + create_notification()
 └── email-templates/
     ├── invite-user.html
     └── reset-password.html

@@ -111,13 +111,23 @@ Deno.serve(async (req: Request) => {
 
     if (instError || !installments?.length) {
       console.error("[notify-payment-confirmed] Installment fetch error:", instError?.message);
-      return Response.json({ error: "Installments not found" }, { status: 404, headers: corsHeaders });
+      return Response.json(
+        { error: "Installments not found" },
+        { status: 404, headers: corsHeaders }
+      );
     }
 
     // ── 5. Group by borrower (all should be same loan in practice) ─────────────
     const byBorrower = new Map<
       string,
-      { borrowerId: string; borrowerName: string; sourceName: string; loanId: string; currency: string; rows: InstallmentRow[] }
+      {
+        borrowerId: string;
+        borrowerName: string;
+        sourceName: string;
+        loanId: string;
+        currency: string;
+        rows: InstallmentRow[];
+      }
     >();
 
     for (const inst of installments as InstallmentRow[]) {

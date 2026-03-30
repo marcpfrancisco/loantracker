@@ -263,7 +263,7 @@ export function printStatementPDF(statement: BorrowerStatement): void {
     <span>Generated ${statement.generatedAt}</span>
   </div>
 
-  <script>window.onload = function() { window.print(); }<\/script>
+  <script>window.onload = function() { window.print(); }<\\/script>
 </body>
 </html>`;
 
@@ -490,7 +490,7 @@ export function printExpenseTabPDF(tab: ExpenseTabDetail): void {
     <span>Generated ${generatedAt}</span>
   </div>
 
-  <script>window.onload = function() { window.print(); }<\/script>
+  <script>window.onload = function() { window.print(); }<\\/script>
 </body>
 </html>`;
 

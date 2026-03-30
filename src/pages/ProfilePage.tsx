@@ -21,7 +21,7 @@ import { useMyLoans } from "@/hooks/useMyLoans";
 import { useUpdateProfile } from "@/hooks/useUpdateProfile";
 import { useChangePassword } from "@/hooks/useChangePassword";
 import { RegionLabel } from "@/components/ui/region-badge";
-import type { LoanStatus, CreditSourceType, LoanType } from "@/types/database";
+import type { LoanStatus, CreditSourceType, LoanType } from "@/types/enums";
 
 // ── DiceBear ──────────────────────────────────────────────────────────────────
 

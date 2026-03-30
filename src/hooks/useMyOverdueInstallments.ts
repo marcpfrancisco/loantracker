@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
-import type { CurrencyType } from "@/types/database";
+import type { CurrencyType } from "@/types/enums";
 
 export interface MyOverdueInstallment {
   id: string;

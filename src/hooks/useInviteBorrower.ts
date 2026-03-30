@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
-import type { RegionType } from "@/types/database";
+import type { RegionType } from "@/types/enums";
 
 export interface InviteBorrowerPayload {
   email: string;

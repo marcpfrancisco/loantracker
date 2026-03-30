@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
-import type { PaymentStatus } from "@/types/database";
+import type { PaymentStatus } from "@/types/enums";
 import type { LoanDetail } from "@/hooks/useLoanDetail";
 
 interface UpdateInstallmentPayload {
@@ -50,7 +50,9 @@ export function useBulkMarkPaid(loanId: string) {
         return {
           ...old,
           installments: old.installments.map((i) =>
-            idSet.has(i.id) ? { ...i, status: "paid" as const, paid_at: new Date().toISOString() } : i
+            idSet.has(i.id)
+              ? { ...i, status: "paid" as const, paid_at: new Date().toISOString() }
+              : i
           ),
         };
       });

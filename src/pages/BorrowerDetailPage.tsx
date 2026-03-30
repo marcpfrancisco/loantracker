@@ -18,7 +18,7 @@ import { useBorrowerDetail } from "@/hooks/useBorrowerDetail";
 import { useCreateExpenseTab } from "@/hooks/useExpenseTabMutations";
 import { LoanStatementDrawer } from "@/components/admin/LoanStatementDrawer";
 import { RegionBadge } from "@/components/ui/region-badge";
-import type { CurrencyType } from "@/types/database";
+import type { CurrencyType } from "@/types/enums";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

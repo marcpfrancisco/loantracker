@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router";
 import {
   Users,
   CreditCard,
+  Settings2,
   FileCheck,
   AlertCircle,
   UserPlus,
@@ -24,6 +25,7 @@ import { useAdminPendingProofs } from "@/hooks/useAdminPendingProofs";
 import { StatCard } from "@/components/admin/StatCard";
 import { BorrowersList } from "@/components/admin/BorrowersList";
 import { InviteBorrowerDrawer } from "@/components/admin/InviteBorrowerDrawer";
+import { CreditSourcesDrawer } from "@/components/admin/CreditSourcesDrawer";
 import { LoanCard } from "@/components/dashboard/LoanCard";
 import { UpcomingPayments } from "@/components/dashboard/UpcomingPayments";
 import { RefreshButton } from "@/components/ui/refresh-button";
@@ -134,6 +136,7 @@ export default function AdminPage() {
     refetch: refetchProofs,
   } = useAdminPendingProofs();
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [sourcesOpen, setSourcesOpen] = useState(false);
 
   const isRefetching =
     statsFetching ||
@@ -164,6 +167,13 @@ export default function AdminPage() {
         </div>
         <div className="flex items-center gap-2">
           <RefreshButton onRefresh={handleRefresh} isRefetching={isRefetching} />
+          <button
+            onClick={() => setSourcesOpen(true)}
+            className="border-border/60 text-muted-foreground hover:text-foreground flex cursor-pointer items-center gap-2 rounded-lg border px-3.5 py-2 text-sm font-medium transition-colors"
+          >
+            <Settings2 className="h-4 w-4" />
+            <span className="hidden sm:inline">Credit Sources</span>
+          </button>
           <button
             onClick={() => setInviteOpen(true)}
             className="bg-primary text-primary-foreground hover:bg-primary/90 flex cursor-pointer items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium shadow-sm transition-colors"
@@ -457,6 +467,7 @@ export default function AdminPage() {
       </motion.div>
 
       <InviteBorrowerDrawer open={inviteOpen} onClose={() => setInviteOpen(false)} />
+      <CreditSourcesDrawer open={sourcesOpen} onClose={() => setSourcesOpen(false)} />
     </div>
   );
 }

@@ -14,7 +14,7 @@ import { useBorrowerStatement } from "@/hooks/useBorrowerStatement";
 import type { StatementLoan } from "@/hooks/useBorrowerStatement";
 import { exportStatementCSV, printStatementPDF } from "@/lib/statementExport";
 import { RegionBadge } from "@/components/ui/region-badge";
-import type { PaymentStatus, LoanStatus } from "@/types/database";
+import type { PaymentStatus, LoanStatus } from "@/types/enums";
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 

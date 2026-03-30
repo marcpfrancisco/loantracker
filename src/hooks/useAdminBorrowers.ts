@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import type { RegionType } from "@/types/database";
+import type { RegionType } from "@/types/enums";
 
 export interface BorrowerSummary {
   id: string;

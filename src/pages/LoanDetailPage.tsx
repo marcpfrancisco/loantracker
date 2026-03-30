@@ -1,7 +1,16 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router";
 import { motion } from "framer-motion";
-import { ArrowLeft, AlertCircle, User, MapPin, Calendar, FileText, CheckSquare, Loader2 } from "lucide-react";
+import {
+  ArrowLeft,
+  AlertCircle,
+  User,
+  MapPin,
+  Calendar,
+  FileText,
+  CheckSquare,
+  Loader2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { cardVariants } from "@/lib/animations";
 import { useAuth } from "@/hooks/useAuth";
@@ -10,7 +19,7 @@ import { useUpdateInstallment, useBulkMarkPaid } from "@/hooks/useUpdateInstallm
 import { useUpdateLoanStatus } from "@/hooks/useUpdateLoanStatus";
 import { InstallmentRow } from "@/components/loans/InstallmentRow";
 import { RegionLabel } from "@/components/ui/region-badge";
-import type { LoanStatus, LoanType, CreditSourceType, PaymentStatus } from "@/types/database";
+import type { LoanStatus, LoanType, CreditSourceType, PaymentStatus } from "@/types/enums";
 
 // ── Lookup maps ───────────────────────────────────────────────────────────────
 
@@ -349,14 +358,13 @@ export default function LoanDetailPage() {
               {/* Select-all checkbox + count */}
               {(() => {
                 const eligible = loan.installments.filter((i) => i.status !== "paid");
-                const allSelected = eligible.length > 0 && eligible.every((i) => selectedIds.has(i.id));
+                const allSelected =
+                  eligible.length > 0 && eligible.every((i) => selectedIds.has(i.id));
                 return (
                   <button
                     type="button"
                     onClick={() =>
-                      setSelectedIds(
-                        allSelected ? new Set() : new Set(eligible.map((i) => i.id))
-                      )
+                      setSelectedIds(allSelected ? new Set() : new Set(eligible.map((i) => i.id)))
                     }
                     className="flex cursor-pointer items-center gap-2"
                   >
@@ -367,8 +375,19 @@ export default function LoanDetailPage() {
                       )}
                     >
                       {allSelected && (
-                        <svg viewBox="0 0 10 8" className="h-2.5 w-2.5 text-white" fill="currentColor">
-                          <path d="M1 4l2.5 2.5L9 1" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                        <svg
+                          viewBox="0 0 10 8"
+                          className="h-2.5 w-2.5 text-white"
+                          fill="currentColor"
+                        >
+                          <path
+                            d="M1 4l2.5 2.5L9 1"
+                            stroke="currentColor"
+                            strokeWidth="1.5"
+                            fill="none"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
                         </svg>
                       )}
                     </div>
@@ -383,9 +402,7 @@ export default function LoanDetailPage() {
                   <button
                     type="button"
                     disabled={bulkPending}
-                    onClick={() =>
-                      bulkMarkPaid([...selectedIds], { onSuccess: exitBulkMode })
-                    }
+                    onClick={() => bulkMarkPaid([...selectedIds], { onSuccess: exitBulkMode })}
                     className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-emerald-500 disabled:opacity-60"
                   >
                     {bulkPending ? (

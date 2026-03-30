@@ -77,7 +77,9 @@ export function ConfirmDialog({
                 )}
               >
                 {isDanger ? (
-                  <Trash2 className={cn("h-5 w-5", isDanger ? "text-rose-400" : "text-amber-400")} />
+                  <Trash2
+                    className={cn("h-5 w-5", isDanger ? "text-rose-400" : "text-amber-400")}
+                  />
                 ) : (
                   <AlertTriangle className="h-5 w-5 text-amber-400" />
                 )}
@@ -85,7 +87,9 @@ export function ConfirmDialog({
 
               <p className="text-foreground text-sm font-semibold">{title}</p>
               {description && (
-                <p className="text-muted-foreground mt-1.5 text-sm leading-relaxed">{description}</p>
+                <p className="text-muted-foreground mt-1.5 text-sm leading-relaxed">
+                  {description}
+                </p>
               )}
             </div>
 

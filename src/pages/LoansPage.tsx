@@ -113,7 +113,10 @@ export default function LoansPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <RefreshButton onRefresh={() => void refetch()} isRefetching={isFetching && !isFetchingNextPage} />
+          <RefreshButton
+            onRefresh={() => void refetch()}
+            isRefetching={isFetching && !isFetchingNextPage}
+          />
           {isAdmin && (
             <button
               onClick={() => setDrawerOpen(true)}

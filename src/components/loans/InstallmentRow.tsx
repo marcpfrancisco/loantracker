@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { SubmitPaymentModal } from "@/components/loans/SubmitPaymentModal";
 import { ReviewProofModal } from "@/components/loans/ReviewProofModal";
 import type { InstallmentDetail } from "@/hooks/useLoanDetail";
-import type { PaymentStatus, CurrencyType } from "@/types/database";
+import type { PaymentStatus, CurrencyType } from "@/types/enums";
 
 interface InstallmentRowProps {
   installment: InstallmentDetail;
@@ -130,7 +130,14 @@ export function InstallmentRow({
             >
               {isSelected && (
                 <svg viewBox="0 0 10 8" className="h-2.5 w-2.5 text-white" fill="currentColor">
-                  <path d="M1 4l2.5 2.5L9 1" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                  <path
+                    d="M1 4l2.5 2.5L9 1"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
                 </svg>
               )}
             </div>
@@ -173,8 +180,8 @@ export function InstallmentRow({
         </span>
 
         {/* Action button — hidden in bulk mode */}
-        {!bulkMode && (
-          action ? (
+        {!bulkMode &&
+          (action ? (
             <button
               onClick={() => {
                 if (action.opensModal === "submit") setSubmitOpen(true);
@@ -201,8 +208,7 @@ export function InstallmentRow({
                     : "bg-zinc-500"
               )}
             />
-          )
-        )}
+          ))}
       </div>
 
       {/* Borrower: upload proof */}

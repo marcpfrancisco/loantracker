@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import type { LoanDetail } from "@/hooks/useLoanDetail";
-import type { PaymentStatus } from "@/types/database";
+import type { PaymentStatus } from "@/types/enums";
 
 export interface ReviewProofPayload {
   proofId: string;

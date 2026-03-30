@@ -1,7 +1,7 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import type { LoanListItem } from "./useLoans";
-import type { LoanStatus, RegionType } from "@/types/database";
+import type { LoanStatus, RegionType } from "@/types/enums";
 
 export const LOANS_PAGE_SIZE = 20;
 
@@ -51,9 +51,7 @@ async function fetchLoansPage({
         name: loan.credit_sources?.name ?? "Unknown",
         type: loan.credit_sources?.type ?? "custom",
       },
-      borrower: loan.profiles
-        ? { id: loan.profiles.id, full_name: loan.profiles.full_name }
-        : null,
+      borrower: loan.profiles ? { id: loan.profiles.id, full_name: loan.profiles.full_name } : null,
       paidCount: installments.filter((i) => i.status === "paid").length,
       pendingCount: installments.filter((i) => i.status === "pending").length,
       nextDueDate: unpaid[0]?.due_date ?? null,
@@ -64,8 +62,7 @@ async function fetchLoansPage({
 export function useLoansInfinite(status: StatusFilter, region: RegionFilter) {
   return useInfiniteQuery({
     queryKey: ["loans-infinite", status, region],
-    queryFn: ({ pageParam }) =>
-      fetchLoansPage({ pageParam: pageParam as number, status, region }),
+    queryFn: ({ pageParam }) => fetchLoansPage({ pageParam: pageParam as number, status, region }),
     initialPageParam: 0,
     getNextPageParam: (lastPage, allPages) => {
       if (lastPage.length < LOANS_PAGE_SIZE) return undefined;

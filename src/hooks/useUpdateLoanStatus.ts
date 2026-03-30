@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
-import type { LoanStatus } from "@/types/database";
+import type { LoanStatus } from "@/types/enums";
 import type { LoanDetail } from "@/hooks/useLoanDetail";
 
 interface UpdateLoanStatusPayload {

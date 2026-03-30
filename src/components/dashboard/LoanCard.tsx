@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { CalendarClock, ChevronRight, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { cardVariants } from "@/lib/animations";
-import type { LoanStatus, CreditSourceType } from "@/types/database";
+import type { LoanStatus, CreditSourceType } from "@/types/enums";
 
 export interface LoanCardData {
   id: string;

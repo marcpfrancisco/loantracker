@@ -1,11 +1,11 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { X, Mail, User, Loader2 } from "lucide-react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
 import { useInviteBorrower } from "@/hooks/useInviteBorrower";
-import type { RegionType } from "@/types/database";
+import type { RegionType } from "@/types/enums";
 
 // ── Schema ─────────────────────────────────────────────────────────────────────
 
@@ -41,7 +41,7 @@ export function InviteBorrowerDrawer({ open, onClose }: InviteBorrowerDrawerProp
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     reset,
     formState: { errors },
@@ -54,7 +54,10 @@ export function InviteBorrowerDrawer({ open, onClose }: InviteBorrowerDrawerProp
     },
   });
 
-  const selectedRegion = watch("region");
+  const selectedRegion = useWatch({
+    control,
+    name: "region",
+  });
 
   function handleClose() {
     if (isPending) return;

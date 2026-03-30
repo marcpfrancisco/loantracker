@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import type { ProofStatus } from "@/types/database";
+import type { ProofStatus } from "@/types/enums";
 
 export interface ProofDetail {
   id: string;

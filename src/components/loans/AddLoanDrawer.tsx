@@ -117,6 +117,7 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
   const { mutateAsync: createLoan, isPending } = useCreateLoan();
   const [dueDateOpen, setDueDateOpen] = useState(false);
   const [startDateOpen, setStartDateOpen] = useState(false);
+  const [tabbyAmounts, setTabbyAmounts] = useState<number[]>([]);
 
   const {
     register,
@@ -205,6 +206,22 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
 
   const watchedStartedAt = watch("started_at");
 
+  const isTabby = watchedLoanType === "tabby";
+
+  // Initialize Tabby split amounts whenever principal or installment count changes.
+  // The admin adjusts these to match the exact splits shown in the Tabby app.
+  useEffect(() => {
+    if (!isTabby) {
+      setTabbyAmounts([]);
+      return;
+    }
+    const n = Number(watchedInstallments) || 4;
+    const p = Number(watchedPrincipal) || 0;
+    const base = Math.floor((p / n) * 100) / 100;
+    const last = Math.round((p - base * (n - 1)) * 100) / 100;
+    setTabbyAmounts(Array.from({ length: n }, (_, i) => (i === n - 1 ? last : base)));
+  }, [isTabby, watchedPrincipal, watchedInstallments]);
+
   function handleClose() {
     reset();
     setDueDateOpen(false);
@@ -267,6 +284,8 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
       due_day_of_month: data.due_day_of_month ?? null,
       notes: data.notes ?? null,
       first_due_strategy: data.first_due_strategy ?? "always_next_month",
+      installment_overrides:
+        isTabby && tabbyAmounts.length === data.installments_total ? tabbyAmounts : undefined,
     });
 
     handleClose();
@@ -560,6 +579,56 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
                     />
                   </FieldWrapper>
                 </section>
+
+                {/* ── Tabby split amounts ────────────────────────────── */}
+                {isTabby && tabbyAmounts.length > 0 && (
+                  <section className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+                        Payment Splits
+                      </h3>
+                      <span className="text-muted-foreground text-[10px]">
+                        Match amounts shown in Tabby app
+                      </span>
+                    </div>
+
+                    <div className="border-border/60 rounded-lg border p-3 space-y-2">
+                      {tabbyAmounts.map((amt, i) => (
+                        <div key={i} className="flex items-center gap-3">
+                          <span className="text-muted-foreground w-24 shrink-0 text-xs">
+                            {i === 0 ? "Now (paid)" : `Payment ${i + 1}`}
+                          </span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={amt || ""}
+                            onChange={(e) => {
+                              const updated = [...tabbyAmounts];
+                              updated[i] = Number(e.target.value) || 0;
+                              setTabbyAmounts(updated);
+                            }}
+                            className={cn(inputClass, "flex-1")}
+                          />
+                        </div>
+                      ))}
+
+                      {/* Sum vs principal indicator */}
+                      {(() => {
+                        const sum = tabbyAmounts.reduce((s, a) => s + a, 0);
+                        const principal = Number(watchedPrincipal) || 0;
+                        const diff = Math.round((sum - principal) * 100) / 100;
+                        if (diff === 0) return null;
+                        return (
+                          <p className="text-xs text-rose-400 pt-1">
+                            Sum ({sum.toFixed(2)}) {diff > 0 ? "exceeds" : "is less than"} principal by{" "}
+                            {Math.abs(diff).toFixed(2)}
+                          </p>
+                        );
+                      })()}
+                    </div>
+                  </section>
+                )}
 
                 {/* ── Breakdown Summary ──────────────────────────────── */}
                 {borrowerRegion && activeConfig && (

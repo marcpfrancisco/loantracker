@@ -174,6 +174,27 @@ function computeLazCredit(params: InstallmentParams): InstallmentBreakdown {
 }
 
 /**
+ * Tabby Pay Later
+ *
+ * Formula:  total = principal (0% interest, no fees)
+ * Reason:   Tabby splits the purchase price into 4 equal payments at 0% interest.
+ *           The first payment is due immediately at checkout.
+ *           Subsequent payments are monthly on the same calendar day.
+ *
+ * Note: Tabby may show a non-equal first payment in its app depending on
+ *       merchant rounding. The `installment_overrides` in CreateLoanPayload
+ *       let the admin enter the exact amounts shown in Tabby.
+ *
+ * Example (AED 1,000 / 4 payments):
+ *   baseAmount = 250.00 × 3
+ *   lastAmount = 250.00
+ */
+function computeTabby(params: InstallmentParams): InstallmentBreakdown {
+  const { principal, installments_total } = params;
+  return { total: principal, feeExcludedFromTotal: false, ...splitEvenly(principal, installments_total) };
+}
+
+/**
  * Default / flat-rate strategy
  *
  * Formula:  total = principal + (principal × rate) + service_fee
@@ -198,6 +219,7 @@ const INSTALLMENT_STRATEGIES: Partial<Record<LoanType, InstallmentStrategy>> = {
   sloan: computeSLoan,
   gloan: computeGLoan,
   lazcredit: computeLazCredit,
+  tabby: computeTabby,
 };
 
 // ── Dispatcher ────────────────────────────────────────────────────────────────

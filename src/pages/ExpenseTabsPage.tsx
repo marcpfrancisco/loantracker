@@ -44,6 +44,7 @@ function PeriodPill({
     paid: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
     partial: "bg-amber-500/15 text-amber-400 border-amber-500/30",
     unpaid: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30",
+    locked: "bg-orange-500/15 text-orange-400 border-orange-500/30",
     archived: "bg-violet-500/15 text-violet-400 border-violet-500/30",
   };
 
@@ -54,7 +55,11 @@ function PeriodPill({
       : is_locked
         ? Lock
         : Unlock;
-  const styleKey = is_archived ? "archived" : paid_status;
+  const styleKey = is_archived
+    ? "archived"
+    : is_locked && paid_status !== "paid"
+      ? "locked"
+      : paid_status;
 
   return (
     <span

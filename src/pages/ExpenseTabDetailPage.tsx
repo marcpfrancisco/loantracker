@@ -80,6 +80,7 @@ const PAID_STATUS_STYLES = {
   paid: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
   partial: "bg-amber-500/15 text-amber-400 border-amber-500/30",
   unpaid: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30",
+  locked: "bg-orange-500/15 text-orange-400 border-orange-500/30",
 };
 
 // ── Month pills ───────────────────────────────────────────────────────────────
@@ -99,6 +100,14 @@ function MonthPill({
   isSelected: boolean;
   onClick: () => void;
 }) {
+  const ref = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (isSelected) {
+      ref.current?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+    }
+  }, [isSelected]);
+
   const Icon = is_archived
     ? Archive
     : paid_status === "paid"
@@ -109,13 +118,19 @@ function MonthPill({
 
   return (
     <button
+      ref={ref}
       type="button"
       onClick={onClick}
       className={cn(
         "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
         isSelected
           ? "bg-primary/15 border-primary/40 text-primary shadow-sm"
-          : cn(PAID_STATUS_STYLES[paid_status], "hover:opacity-80")
+          : cn(
+              is_locked && paid_status !== "paid"
+                ? PAID_STATUS_STYLES.locked
+                : PAID_STATUS_STYLES[paid_status],
+              "hover:opacity-80"
+            )
       )}
     >
       <Icon className="h-3 w-3" />

@@ -1,6 +1,6 @@
 # Global Loan Tracker — Progress & Roadmap
 
-> Last updated: 2026-04-07 (multi-org membership complete)
+> Last updated: 2026-04-07 (migration 007 applied ✅)
 
 ---
 
@@ -118,9 +118,9 @@
 ### SaaS / Multi-Tenant
 - [x] **Migration `005_multi_tenant.sql`** ✅ Applied — organizations + org_members tables; `org_id` added to profiles, credit_sources, loans, expense_tabs, notifications; all RLS policies rewritten with org isolation; `my_org_id()` helper function; `is_admin()` made org-scoped; `handle_new_user()` trigger reads `org_id` from user metadata; rollback script `005_multi_tenant_rollback.sql` provided
 - [x] **Migration `006_org_id_defaults.sql`** — adds `DEFAULT my_org_id()` to loans, credit_sources, expense_tabs so frontend inserts don't need to pass `org_id` explicitly. **Pending: apply in Supabase + run `npm run gen:types`**
-- [x] **Migration `007_multi_org_membership.sql`** — multi-org: `UNIQUE(user_id, org_id)` on org_members; `user_org_context` table (one row per user, tracks active org); `my_org_id()` reads `user_org_context`; `is_admin()` checks org_members for active org; drops `profiles.org_id`; updates `handle_new_user()` to no longer stamp org_id on profile. Rollback: `007_multi_org_membership_rollback.sql`. **Pending: apply in Supabase after 006**
-- [x] **`register-lender` Edge Function** — public registration endpoint; org name defaults to lender's full name (no `org_name` field); creates org → auth user → org_members → `user_org_context` → seeds credit sources; rollback on failure
-- [x] **`invite-borrower` Edge Function (updated)** — fetches caller's active org from `user_org_context`; verifies admin role in org_members; creates `org_members` + `user_org_context` for new borrower; no longer passes `org_id` in invite metadata
+- [x] **Migration `007_multi_org_membership.sql`** ✅ Applied — multi-org: `UNIQUE(user_id, org_id)` on org_members; `user_org_context` table (one row per user, tracks active org); `my_org_id()` reads `user_org_context`; `is_admin()` checks org_members for active org; drops `profiles.org_id`; recreates `admins_select/update_org_profiles` policies via `org_members` JOIN; updates `handle_new_user()` to no longer stamp org_id on profile. Rollback: `007_multi_org_membership_rollback.sql`
+- [x] **`register-lender` Edge Function** ✅ Deployed register-lender edge function — public registration endpoint; org name defaults to lender's full name (no `org_name` field); creates org → auth user → org_members → `user_org_context` → seeds credit sources; rollback on failure
+- [x] **`invite-borrower` Edge Function (updated)** ✅ Deployed invite-borrower edge function — fetches caller's active org from `user_org_context`; verifies admin role in org_members; creates `org_members` + `user_org_context` for new borrower; no longer passes `org_id` in invite metadata
 - [x] **`SignupPage.tsx`** — lender self-registration form (Full Name, Email, Region, Password); no `org_name` field (org defaults to full name); success state + redirect to login; guest-only route at `/signup`
 - [x] **`LoginPage.tsx`** — "New lender? Create an account" link to `/signup`
 - [ ] **`OrgPickerPage`** — shown after login when user belongs to 2+ orgs; lets user choose which context (lender vs borrower) to enter the dashboard as; single-org users skip straight to dashboard
@@ -143,10 +143,9 @@
 
 ### Pending Ops Tasks
 1. Apply `006_org_id_defaults.sql` in Supabase SQL Editor → then `npm run gen:types` (fixes TS type errors in insert hooks)
-2. Apply `007_multi_org_membership.sql` in Supabase SQL Editor (requires 006 to be applied first)
-3. Deploy `supabase functions deploy register-lender`
-4. Deploy `supabase functions deploy invite-borrower`
-5. Deploy `supabase functions deploy notify-loan-created`
+2. Deploy `supabase functions deploy register-lender`
+3. Deploy `supabase functions deploy invite-borrower`
+4. Deploy `supabase functions deploy notify-loan-created`
 
 ---
 

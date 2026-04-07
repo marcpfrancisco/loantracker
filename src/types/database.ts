@@ -30,7 +30,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name: string
-          org_id: string
+          org_id?: string
           region: Database["public"]["Enums"]["region_type"]
           type: Database["public"]["Enums"]["credit_source_type"]
           updated_at?: string
@@ -183,7 +183,7 @@ export type Database = {
           created_at?: string
           currency: Database["public"]["Enums"]["currency_type"]
           id?: string
-          org_id: string
+          org_id?: string
           region: Database["public"]["Enums"]["region_type"]
           status?: string
           title?: string
@@ -298,7 +298,7 @@ export type Database = {
           interest_rate?: number | null
           loan_type?: Database["public"]["Enums"]["loan_type"]
           notes?: string | null
-          org_id: string
+          org_id?: string
           principal: number
           region: Database["public"]["Enums"]["region_type"]
           service_fee?: number
@@ -528,7 +528,6 @@ export type Database = {
           created_at: string
           full_name: string
           id: string
-          org_id: string
           region: Database["public"]["Enums"]["region_type"]
           role: Database["public"]["Enums"]["user_role"]
           updated_at: string
@@ -538,7 +537,6 @@ export type Database = {
           created_at?: string
           full_name: string
           id: string
-          org_id: string
           region?: Database["public"]["Enums"]["region_type"]
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
@@ -548,14 +546,31 @@ export type Database = {
           created_at?: string
           full_name?: string
           id?: string
-          org_id?: string
           region?: Database["public"]["Enums"]["region_type"]
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
         }
+        Relationships: []
+      }
+      user_org_context: {
+        Row: {
+          org_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          org_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          org_id?: string
+          updated_at?: string
+          user_id?: string
+        }
         Relationships: [
           {
-            foreignKeyName: "profiles_org_id_fkey"
+            foreignKeyName: "user_org_context_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"

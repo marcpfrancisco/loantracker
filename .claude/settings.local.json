@@ -6,7 +6,8 @@
       "Bash(npx shadcn@latest add sonner)",
       "Bash(for f:*)",
       "Bash(do)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

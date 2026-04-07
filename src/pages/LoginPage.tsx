@@ -101,7 +101,7 @@ export default function LoginPage() {
           </p>
         </div>
 
-        <Card className="border-border/60 bg-card/80 shadow-2xl shadow-black/30 backdrop-blur-md">
+        <Card className="border-border/60 bg-card/80 shadow-2xl shadow-black/30 backdrop-blur-md mb-4">
           <CardHeader className="pb-4">
             <CardTitle className="text-xl">Welcome back</CardTitle>
             <CardDescription>Sign in to access your loan dashboard</CardDescription>
@@ -190,6 +190,12 @@ export default function LoginPage() {
             </form>
           </CardContent>
         </Card>
+        <p className="text-muted-foreground text-center text-sm">
+          New lender?{" "}
+          <Link to="/signup" className="text-foreground hover:underline font-medium">
+            Create an account
+          </Link>
+        </p>
       </motion.div>
     </div>
   );

@@ -20,6 +20,7 @@ export type Database = {
           id: string
           is_active: boolean
           name: string
+          org_id: string
           region: Database["public"]["Enums"]["region_type"]
           type: Database["public"]["Enums"]["credit_source_type"]
           updated_at: string
@@ -29,6 +30,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           name: string
+          org_id: string
           region: Database["public"]["Enums"]["region_type"]
           type: Database["public"]["Enums"]["credit_source_type"]
           updated_at?: string
@@ -38,11 +40,20 @@ export type Database = {
           id?: string
           is_active?: boolean
           name?: string
+          org_id?: string
           region?: Database["public"]["Enums"]["region_type"]
           type?: Database["public"]["Enums"]["credit_source_type"]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "credit_sources_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       expense_items: {
         Row: {
@@ -161,6 +172,7 @@ export type Database = {
           created_at: string
           currency: Database["public"]["Enums"]["currency_type"]
           id: string
+          org_id: string
           region: Database["public"]["Enums"]["region_type"]
           status: string
           title: string
@@ -171,6 +183,7 @@ export type Database = {
           created_at?: string
           currency: Database["public"]["Enums"]["currency_type"]
           id?: string
+          org_id: string
           region: Database["public"]["Enums"]["region_type"]
           status?: string
           title?: string
@@ -181,6 +194,7 @@ export type Database = {
           created_at?: string
           currency?: Database["public"]["Enums"]["currency_type"]
           id?: string
+          org_id?: string
           region?: Database["public"]["Enums"]["region_type"]
           status?: string
           title?: string
@@ -192,6 +206,13 @@ export type Database = {
             columns: ["borrower_id"]
             isOneToOne: true
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_tabs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -256,6 +277,7 @@ export type Database = {
           interest_rate: number | null
           loan_type: Database["public"]["Enums"]["loan_type"]
           notes: string | null
+          org_id: string
           principal: number
           region: Database["public"]["Enums"]["region_type"]
           service_fee: number
@@ -276,6 +298,7 @@ export type Database = {
           interest_rate?: number | null
           loan_type?: Database["public"]["Enums"]["loan_type"]
           notes?: string | null
+          org_id: string
           principal: number
           region: Database["public"]["Enums"]["region_type"]
           service_fee?: number
@@ -296,6 +319,7 @@ export type Database = {
           interest_rate?: number | null
           loan_type?: Database["public"]["Enums"]["loan_type"]
           notes?: string | null
+          org_id?: string
           principal?: number
           region?: Database["public"]["Enums"]["region_type"]
           service_fee?: number
@@ -313,6 +337,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "loans_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "loans_source_id_fkey"
             columns: ["source_id"]
             isOneToOne: false
@@ -327,6 +358,7 @@ export type Database = {
           created_at: string
           data: Json
           id: string
+          org_id: string | null
           read_at: string | null
           title: string
           type: string
@@ -337,6 +369,7 @@ export type Database = {
           created_at?: string
           data?: Json
           id?: string
+          org_id?: string | null
           read_at?: string | null
           title: string
           type: string
@@ -347,10 +380,81 @@ export type Database = {
           created_at?: string
           data?: Json
           id?: string
+          org_id?: string | null
           read_at?: string | null
           title?: string
           type?: string
           user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      org_members: {
+        Row: {
+          created_at: string
+          id: string
+          org_id: string
+          role: Database["public"]["Enums"]["user_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          org_id: string
+          role: Database["public"]["Enums"]["user_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          org_id?: string
+          role?: Database["public"]["Enums"]["user_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_members_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          plan: string
+          region: Database["public"]["Enums"]["region_type"]
+          slug: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          plan?: string
+          region?: Database["public"]["Enums"]["region_type"]
+          slug: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          plan?: string
+          region?: Database["public"]["Enums"]["region_type"]
+          slug?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -424,6 +528,7 @@ export type Database = {
           created_at: string
           full_name: string
           id: string
+          org_id: string
           region: Database["public"]["Enums"]["region_type"]
           role: Database["public"]["Enums"]["user_role"]
           updated_at: string
@@ -433,6 +538,7 @@ export type Database = {
           created_at?: string
           full_name: string
           id: string
+          org_id: string
           region?: Database["public"]["Enums"]["region_type"]
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
@@ -442,11 +548,20 @@ export type Database = {
           created_at?: string
           full_name?: string
           id?: string
+          org_id?: string
           region?: Database["public"]["Enums"]["region_type"]
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -471,6 +586,7 @@ export type Database = {
         }[]
       }
       is_admin: { Args: never; Returns: boolean }
+      my_org_id: { Args: never; Returns: string }
     }
     Enums: {
       credit_source_type: "e_wallet" | "credit_card" | "bnpl" | "bank_transfer"

@@ -13,6 +13,7 @@ import BorrowerDetailPage from "@/pages/BorrowerDetailPage";
 import ExpenseTabsPage from "@/pages/ExpenseTabsPage";
 import ExpenseTabDetailPage from "@/pages/ExpenseTabDetailPage";
 import { RouteErrorPage } from "@/components/ErrorBoundary";
+import SignupPage from "@/pages/SignupPage";
 
 export const router = createBrowserRouter([
   // ── Root redirect ──────────────────────────────────────────────────────────
@@ -39,6 +40,11 @@ export const router = createBrowserRouter([
     path: "login",
     loader: requireGuest,
     Component: LoginPage,
+  },
+  {
+    path: "signup",
+    loader: requireGuest,
+    Component: SignupPage,
   },
   {
     path: "forgot-password",

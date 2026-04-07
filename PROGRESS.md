@@ -1,6 +1,6 @@
 # Global Loan Tracker — Progress & Roadmap
 
-> Last updated: 2026-03-30 (session 2)
+> Last updated: 2026-04-07 (multi-org membership complete)
 
 ---
 
@@ -115,6 +115,19 @@
 - [x] Supabase migration `001_initial_schema.sql` — core tables with RLS
 - [x] Supabase migration `002_expense_tabs.sql` — expense module tables with RLS
 
+### SaaS / Multi-Tenant
+- [x] **Migration `005_multi_tenant.sql`** ✅ Applied — organizations + org_members tables; `org_id` added to profiles, credit_sources, loans, expense_tabs, notifications; all RLS policies rewritten with org isolation; `my_org_id()` helper function; `is_admin()` made org-scoped; `handle_new_user()` trigger reads `org_id` from user metadata; rollback script `005_multi_tenant_rollback.sql` provided
+- [x] **Migration `006_org_id_defaults.sql`** — adds `DEFAULT my_org_id()` to loans, credit_sources, expense_tabs so frontend inserts don't need to pass `org_id` explicitly. **Pending: apply in Supabase + run `npm run gen:types`**
+- [x] **Migration `007_multi_org_membership.sql`** — multi-org: `UNIQUE(user_id, org_id)` on org_members; `user_org_context` table (one row per user, tracks active org); `my_org_id()` reads `user_org_context`; `is_admin()` checks org_members for active org; drops `profiles.org_id`; updates `handle_new_user()` to no longer stamp org_id on profile. Rollback: `007_multi_org_membership_rollback.sql`. **Pending: apply in Supabase after 006**
+- [x] **`register-lender` Edge Function** — public registration endpoint; org name defaults to lender's full name (no `org_name` field); creates org → auth user → org_members → `user_org_context` → seeds credit sources; rollback on failure
+- [x] **`invite-borrower` Edge Function (updated)** — fetches caller's active org from `user_org_context`; verifies admin role in org_members; creates `org_members` + `user_org_context` for new borrower; no longer passes `org_id` in invite metadata
+- [x] **`SignupPage.tsx`** — lender self-registration form (Full Name, Email, Region, Password); no `org_name` field (org defaults to full name); success state + redirect to login; guest-only route at `/signup`
+- [x] **`LoginPage.tsx`** — "New lender? Create an account" link to `/signup`
+- [ ] **`OrgPickerPage`** — shown after login when user belongs to 2+ orgs; lets user choose which context (lender vs borrower) to enter the dashboard as; single-org users skip straight to dashboard
+- [ ] **`useAuth` updates** — expose `activeOrgId`, `activeRole`, `switchOrg(orgId)` sourced from `user_org_context`; login flow upserts `user_org_context` on each sign-in for single-org users
+- [ ] Org Settings page — lender can update their org name and region
+- [ ] Billing / plan limits (free: max 5 borrowers / 20 active loans; pro: unlimited) — Stripe integration, deferred
+
 ---
 
 ## Known Limitations / Current State
@@ -126,10 +139,14 @@
 - The expense tab module has no "delete period" action — removing all items from a month leaves an empty period row in the DB.
 - Borrower confirmation status is detected via an RPC (`get_user_confirmation_statuses`) that queries `auth.users` — this requires a Supabase service-role function and may need a periodic refresh.
 - Tabby installment amounts are editable at loan creation time but cannot be edited after the loan is saved. If the admin enters wrong splits they must delete and re-create the loan.
+- **`OrgPickerPage` not yet built** — multi-org users (borrower who also lends) can't switch contexts yet. Migration 007 is ready; the org-picker UI and `useAuth` updates are still pending.
 
 ### Pending Ops Tasks
-- Run `supabase db push` for `004_expense_period_archive.sql` then `npm run gen:types`
-- Deploy `supabase functions deploy notify-loan-created`
+1. Apply `006_org_id_defaults.sql` in Supabase SQL Editor → then `npm run gen:types` (fixes TS type errors in insert hooks)
+2. Apply `007_multi_org_membership.sql` in Supabase SQL Editor (requires 006 to be applied first)
+3. Deploy `supabase functions deploy register-lender`
+4. Deploy `supabase functions deploy invite-borrower`
+5. Deploy `supabase functions deploy notify-loan-created`
 
 ---
 
@@ -317,9 +334,10 @@ src/
 │   ├── ExpenseTabsPage.tsx          # /tabs
 │   ├── LoanDetailPage.tsx           # /loans/:id
 │   ├── LoansPage.tsx
-│   ├── LoginPage.tsx
+│   ├── LoginPage.tsx                # + "Create an account" link
 │   ├── ProfilePage.tsx
-│   └── ResetPasswordPage.tsx
+│   ├── ResetPasswordPage.tsx
+│   └── SignupPage.tsx               # /signup — lender self-registration
 ├── types/
 │   ├── database.ts                  # Auto-generated — run `npm run gen:types` after migrations
 │   ├── enums.ts                     # Hand-maintained named type aliases (survives gen:types)
@@ -327,12 +345,21 @@ src/
 └── router.tsx
 supabase/
 ├── functions/
+│   ├── invite-borrower/             # Invite borrower — org-scoped, creates org_members row
+│   ├── notify-loan-created/         # Notify borrower on new loan (pending deploy)
 │   ├── notify-payment-confirmed/    # Email borrower when payment approved
-│   └── notify-rejection/            # Email borrower + delete receipt on reject
+│   ├── notify-rejection/            # Email borrower + delete receipt on reject
+│   └── register-lender/             # Public lender self-registration (creates org + user + seeds)
 ├── migrations/
 │   ├── 001_initial_schema.sql
 │   ├── 002_expense_tabs.sql
-│   └── 003_notifications.sql        # notifications table + triggers + create_notification()
+│   ├── 003_notifications.sql        # notifications table + triggers + create_notification()
+│   ├── 004_expense_period_archive.sql
+│   ├── 005_multi_tenant.sql         # organizations + org_members + org_id on all tables + RLS rewrite
+│   ├── 005_multi_tenant_rollback.sql # Safe revert for 005
+│   ├── 006_org_id_defaults.sql      # DEFAULT my_org_id() on loans/credit_sources/expense_tabs
+│   ├── 007_multi_org_membership.sql # user_org_context + UNIQUE(user_id,org_id) + drop profiles.org_id
+│   └── 007_multi_org_membership_rollback.sql # Safe revert for 007
 └── email-templates/
     ├── invite-user.html
     └── reset-password.html
@@ -340,4 +367,4 @@ supabase/
 
 ---
 
-*This document covers the state of the project as of 2026-03-30. Update it after each significant feature or migration.*
+*This document covers the state of the project as of 2026-04-07. Update it after each significant feature or migration.*

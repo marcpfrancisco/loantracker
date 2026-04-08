@@ -3,8 +3,9 @@ import { motion } from "framer-motion";
 import { Plus, AlertCircle, Loader2, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
-import { useLoansInfinite, LOANS_PAGE_SIZE } from "@/hooks/useLoansInfinite";
+import { useLoansInfinite, useDistinctLoanRegions, LOANS_PAGE_SIZE } from "@/hooks/useLoansInfinite";
 import type { StatusFilter, RegionFilter } from "@/hooks/useLoansInfinite";
+import { getFlagEmoji } from "@/lib/countries";
 import { LoanCard } from "@/components/dashboard/LoanCard";
 import { AddLoanDrawer } from "@/components/loans/AddLoanDrawer";
 import { RefreshButton } from "@/components/ui/refresh-button";
@@ -25,11 +26,7 @@ const statusOptions: { value: StatusFilter; label: string }[] = [
   { value: "cancelled", label: "Cancelled" },
 ];
 
-const regionOptions: { value: RegionFilter; label: string }[] = [
-  { value: "all", label: "All Regions" },
-  { value: "PH", label: "🇵🇭 PH" },
-  { value: "AE", label: "🇦🇪 AE" },
-];
+// regionOptions is built dynamically inside the page component
 
 // ── FilterPill ─────────────────────────────────────────────────────────────────
 
@@ -105,6 +102,17 @@ export default function LoansPage() {
   const totalLoaded = loans.length;
   const hasFilters = statusFilter !== "all" || regionFilter !== "all";
   const grouped = isAdmin ? groupLoansByBorrower(loans) : [];
+
+  // Distinct regions from a separate unfiltered query — stable regardless of
+  // which status/region filter pill is active. Avoids the bug where selecting
+  // "PH" caused the "AE" pill to disappear from the filter row.
+  const distinctRegions = useDistinctLoanRegions();
+  const regionOptions: { value: RegionFilter; label: string }[] = [
+    { value: "all", label: "All Regions" },
+    ...[...new Set([...(profile?.region ? [profile.region] : []), ...distinctRegions])].sort().map(
+      (r) => ({ value: r as RegionFilter, label: `${getFlagEmoji(r)} ${r}` })
+    ),
+  ];
 
   return (
     <div className="mx-auto max-w-3xl space-y-5 p-6">
@@ -210,7 +218,7 @@ export default function LoansPage() {
             animate="visible"
           >
             {grouped.map((group) => (
-              <motion.div key={group.id} variants={{ hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0 } }}>
+              <motion.div key={`${group.id}-${regionFilter}-${statusFilter}`} variants={{ hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0 } }}>
                 <BorrowerLoanGroup
                   borrowerName={group.name}
                   loans={group.loans}

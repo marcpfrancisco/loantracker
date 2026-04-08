@@ -1,4 +1,4 @@
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import type { LoanListItem } from "./useLoans";
 import type { LoanStatus, RegionType } from "@/types/enums";
@@ -57,6 +57,24 @@ async function fetchLoansPage({
       nextDueDate: unpaid[0]?.due_date ?? null,
     };
   });
+}
+
+// ── Distinct loan regions ─────────────────────────────────────────────────────
+// Returns the set of distinct regions that have at least one loan in this org.
+// This query is unfiltered (no status/region param) so the result is stable
+// regardless of which filter pill is currently active on the Loans page.
+
+export function useDistinctLoanRegions(): string[] {
+  const { data } = useQuery({
+    queryKey: ["loans-distinct-regions"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("loans").select("region");
+      if (error) throw error;
+      return [...new Set((data ?? []).map((r) => r.region as string))].sort();
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+  return data ?? [];
 }
 
 export function useLoansInfinite(status: StatusFilter, region: RegionFilter) {

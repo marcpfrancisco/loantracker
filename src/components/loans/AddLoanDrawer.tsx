@@ -14,7 +14,7 @@ import { useCreateLoan } from "@/hooks/useCreateLoan";
 import { getLoanTypesForSource, getLoanTypeConfig, type FirstDueStrategy } from "@/types/schema";
 import { LoanBreakdownSummary } from "@/components/loans/LoanBreakdownSummary";
 import type { LoanType, RegionType, CurrencyType } from "@/types/enums";
-import { getDefaultCurrency } from "@/lib/countries";
+import { getDefaultCurrency, getFlagEmoji, getCountryName } from "@/lib/countries";
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
@@ -325,7 +325,7 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
                 <h2 className="text-foreground font-semibold">Add Loan</h2>
                 {borrowerRegion && (
                   <p className="text-muted-foreground mt-0.5 text-xs">
-                    {borrowerRegion === "PH" ? "🇵🇭 Philippines · PHP" : "🇦🇪 UAE · AED"}
+                    {getFlagEmoji(borrowerRegion)} {getCountryName(borrowerRegion)} · {getDefaultCurrency(borrowerRegion)}
                   </p>
                 )}
               </div>

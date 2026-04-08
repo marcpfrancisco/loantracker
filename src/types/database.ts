@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      credit_source_loan_type_defaults: {
+        Row: {
+          credit_source_id: string
+          due_day: number | null
+          id: string
+          installments: number | null
+          interest_rate: number | null
+          loan_type: string
+          org_id: string
+        }
+        Insert: {
+          credit_source_id: string
+          due_day?: number | null
+          id?: string
+          installments?: number | null
+          interest_rate?: number | null
+          loan_type: string
+          org_id?: string
+        }
+        Update: {
+          credit_source_id?: string
+          due_day?: number | null
+          id?: string
+          installments?: number | null
+          interest_rate?: number | null
+          loan_type?: string
+          org_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credit_source_loan_type_defaults_credit_source_id_fkey"
+            columns: ["credit_source_id"]
+            isOneToOne: false
+            referencedRelation: "credit_sources"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credit_source_loan_type_defaults_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       credit_sources: {
         Row: {
           created_at: string

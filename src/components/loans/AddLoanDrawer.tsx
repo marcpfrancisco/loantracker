@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useAdminBorrowers } from "@/hooks/useAdminBorrowers";
 import { useCreditSources } from "@/hooks/useCreditSources";
 import { useCreateLoan } from "@/hooks/useCreateLoan";
+import { useAllLoanTypeDefaults } from "@/hooks/useLoanTypeDefaults";
 import { getLoanTypesForSource, getLoanTypeConfig, type FirstDueStrategy } from "@/types/schema";
 import { LoanBreakdownSummary } from "@/components/loans/LoanBreakdownSummary";
 import type { LoanType, RegionType, CurrencyType } from "@/types/enums";
@@ -161,6 +162,9 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
     error: sourcesError,
   } = useCreditSources(borrowerRegion);
 
+  // Per-loan-type defaults — cached, cheap, shared across all add-loan forms
+  const { data: loanTypeDefaults = [] } = useAllLoanTypeDefaults();
+
   const selectedSource = creditSources.find((s) => s.id === watchedSourceId) ?? null;
   const availableLoanTypes = selectedSource ? getLoanTypesForSource(selectedSource.name) : [];
   const activeConfig = selectedSource
@@ -192,16 +196,50 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
     }
   }, [watchedSourceId, creditSources, setValue]);
 
-  // Apply template fields when loan type or source changes
+  // Apply template fields when loan type or source changes.
+  // Priority chain (highest to lowest):
+  // 1. Per-loan-type DB override (credit_source_loan_type_defaults)
+  // 2. Source-level DB override   (credit_sources.default_*)
+  // 3. Schema.ts config           (static per-loan-type values)
+  // 4. Null / 0 fallback
   useEffect(() => {
     if (!selectedSource) return;
     const config = getLoanTypeConfig(selectedSource.name, watchedLoanType);
-    if (!config) return;
 
-    setValue("installments_total", config.installments_total, { shouldValidate: false });
-    setValue("interest_rate", config.interest_rate ?? null, { shouldValidate: false });
-    setValue("service_fee", config.service_fee, { shouldValidate: false });
-    setValue("due_day_of_month", config.due_day_of_month ?? null, { shouldValidate: false });
+    // Base values from schema.ts
+    const schemaInstallments = config?.installments_total ?? 1;
+    const schemaInterestRate = config?.interest_rate ?? null;
+    const schemaDueDay       = config?.due_day_of_month ?? null;
+    const schemaServiceFee   = config?.service_fee ?? 0;
+
+    // 1. Per-loan-type DB override (highest priority)
+    const ltDefault = loanTypeDefaults.find(
+      (d) => d.credit_source_id === selectedSource.id && d.loan_type === watchedLoanType
+    );
+
+    // 2. Source-level DB override
+    // interest_rate stored as decimal (0.0295); form expects percentage.
+    const finalInstallments =
+      ltDefault?.installments != null
+        ? ltDefault.installments
+        : selectedSource.default_installments ?? schemaInstallments;
+
+    const finalInterestRate =
+      ltDefault?.interest_rate != null
+        ? +(ltDefault.interest_rate * 100).toFixed(4)
+        : selectedSource.default_interest_rate !== null
+          ? +(selectedSource.default_interest_rate * 100).toFixed(4)
+          : schemaInterestRate;
+
+    const finalDueDay =
+      ltDefault?.due_day != null
+        ? ltDefault.due_day
+        : selectedSource.default_due_day ?? schemaDueDay;
+
+    setValue("installments_total", finalInstallments, { shouldValidate: false });
+    setValue("interest_rate", finalInterestRate, { shouldValidate: false });
+    setValue("service_fee", schemaServiceFee, { shouldValidate: false });
+    setValue("due_day_of_month", finalDueDay, { shouldValidate: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedLoanType, watchedSourceId, setValue]);
 

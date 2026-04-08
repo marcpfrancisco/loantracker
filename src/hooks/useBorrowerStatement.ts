@@ -41,15 +41,18 @@ export interface StatementLoan {
   totalOutstanding: number;
 }
 
+export interface CurrencySummary {
+  principal: number;
+  paid: number;
+  outstanding: number;
+}
+
 export interface BorrowerStatement {
   borrower: { id: string; full_name: string; region: RegionType };
   loans: StatementLoan[];
   generatedAt: string;
-  // Totals across all loans (same currency groupings)
-  summary: {
-    PHP: { principal: number; paid: number; outstanding: number };
-    AED: { principal: number; paid: number; outstanding: number };
-  };
+  /** Totals grouped by ISO 4217 currency code, e.g. "PHP", "AED", "USD" */
+  summary: Record<string, CurrencySummary>;
 }
 
 // ── Fetcher ───────────────────────────────────────────────────────────────────
@@ -69,10 +72,7 @@ async function fetchBorrowerStatement(borrowerId: string): Promise<BorrowerState
   if (profileResult.error) throw profileResult.error;
   if (loansResult.error) throw loansResult.error;
 
-  const summary = {
-    PHP: { principal: 0, paid: 0, outstanding: 0 },
-    AED: { principal: 0, paid: 0, outstanding: 0 },
-  };
+  const summary: Record<string, CurrencySummary> = {};
 
   const loans: StatementLoan[] = (loansResult.data ?? []).map((loan) => {
     const installments: StatementInstallment[] = (loan.installments ?? [])
@@ -94,7 +94,8 @@ async function fetchBorrowerStatement(borrowerId: string): Promise<BorrowerState
       .filter((i) => i.status !== "paid")
       .reduce((s, i) => s + i.amount, 0);
 
-    const cur = loan.currency as "PHP" | "AED";
+    const cur = loan.currency;
+    if (!summary[cur]) summary[cur] = { principal: 0, paid: 0, outstanding: 0 };
     summary[cur].principal += Number(loan.principal);
     summary[cur].paid += totalPaid;
     summary[cur].outstanding += totalOutstanding;

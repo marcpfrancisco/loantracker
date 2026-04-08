@@ -6,7 +6,10 @@
       "Bash(npx shadcn@latest add sonner)",
       "Bash(for f:*)",
       "Bash(do)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(npx tsc:*)",
+      "Bash(npm install:*)",
+      "Bash(node -e \"const {countries} = require\\(''countries-list''\\); console.log\\(Object.keys\\(countries\\).slice\\(0,5\\)\\); console.log\\(JSON.stringify\\(countries[''PH'']\\)\\); console.log\\(JSON.stringify\\(countries[''AE'']\\)\\);\")"
     ]
   }
 }

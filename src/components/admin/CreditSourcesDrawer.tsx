@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { X, Plus, Pencil, Trash2, Check, Loader2, AlertCircle } from "lucide-react";
+import { X, Plus, Pencil, Trash2, Check, Loader2, AlertCircle, Globe } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAllCreditSources } from "@/hooks/useCreditSources";
 import type { CreditSourceRow } from "@/hooks/useCreditSources";
@@ -11,7 +11,9 @@ import {
   useDeleteCreditSource,
 } from "@/hooks/useCreditSourceMutations";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
-import type { CreditSourceType, RegionType } from "@/types/enums";
+import { CountryPicker } from "@/components/ui/country-picker";
+import { getFlagEmoji, getCountryName } from "@/lib/countries";
+import type { CreditSourceType } from "@/types/enums";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -46,13 +48,14 @@ function TypeBadge({ type }: { type: CreditSourceType }) {
 // ── Add form ──────────────────────────────────────────────────────────────────
 
 interface AddFormProps {
-  region: RegionType;
+  initialRegion: string;
   onDone: () => void;
 }
 
-function AddForm({ region, onDone }: AddFormProps) {
+function AddForm({ initialRegion, onDone }: AddFormProps) {
   const [name, setName] = useState("");
   const [type, setType] = useState<CreditSourceType>("bnpl");
+  const [region, setRegion] = useState(initialRegion);
   const [error, setError] = useState<string | null>(null);
   const create = useCreateCreditSource();
 
@@ -72,7 +75,13 @@ function AddForm({ region, onDone }: AddFormProps) {
 
   return (
     <div className="border-border/60 bg-muted/20 space-y-3 rounded-xl border p-3">
-      <p className="text-foreground text-xs font-semibold">New credit source · {region}</p>
+      <p className="text-foreground text-xs font-semibold">New credit source</p>
+
+      {/* Country */}
+      <div className="space-y-1">
+        <p className="text-muted-foreground text-xs">Country</p>
+        <CountryPicker value={region} onChange={setRegion} />
+      </div>
 
       {/* Name */}
       <input
@@ -319,9 +328,21 @@ interface CreditSourcesDrawerProps {
 }
 
 export function CreditSourcesDrawer({ open, onClose }: CreditSourcesDrawerProps) {
-  const [region, setRegion] = useState<RegionType>("PH");
+  const [activeRegion, setActiveRegion] = useState("PH");
   const [adding, setAdding] = useState(false);
   const { data: allSources = [], isLoading, error } = useAllCreditSources();
+
+  // Derive tabs from unique regions already in the org's credit sources.
+  // Always include PH and AE as baseline; others appear when sources exist.
+  const tabs = useMemo(() => {
+    const fromSources = [...new Set(allSources.map((s) => s.region))];
+    const defaults = ["PH", "AE"];
+    const merged = [...new Set([...defaults, ...fromSources])].sort();
+    return merged;
+  }, [allSources]);
+
+  // If activeRegion is no longer in tabs (e.g. all sources deleted), reset to first
+  const region = tabs.includes(activeRegion) ? activeRegion : (tabs[0] ?? "PH");
 
   const sources = allSources.filter((s) => s.region === region);
 
@@ -359,7 +380,7 @@ export function CreditSourcesDrawer({ open, onClose }: CreditSourcesDrawerProps)
               <div className="flex-1">
                 <h2 className="text-foreground font-semibold">Credit Sources</h2>
                 <p className="text-muted-foreground mt-0.5 text-xs">
-                  Manage lenders and credit sources available for loans.
+                  Manage lenders and credit sources per country.
                 </p>
               </div>
               <button
@@ -380,34 +401,49 @@ export function CreditSourcesDrawer({ open, onClose }: CreditSourcesDrawerProps)
               </button>
             </div>
 
-            {/* Region tabs */}
-            <div className="border-border/60 flex border-b px-5">
-              {(["PH", "UAE"] as RegionType[]).map((r) => (
+            {/* Country tabs — scrollable, dynamic */}
+            <div className="border-border/60 flex gap-1 overflow-x-auto border-b px-3 scrollbar-none">
+              {tabs.map((r) => (
                 <button
                   key={r}
                   type="button"
                   onClick={() => {
-                    setRegion(r);
+                    setActiveRegion(r);
                     setAdding(false);
                   }}
                   className={cn(
-                    "border-b-2 px-4 py-3 text-sm font-medium transition-colors",
+                    "flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-3 text-xs font-medium whitespace-nowrap transition-colors",
                     region === r
-                      ? r === "UAE"
-                        ? "border-amber-400 text-amber-400"
-                        : "border-primary text-primary"
+                      ? "border-primary text-primary"
                       : "text-muted-foreground hover:text-foreground border-transparent"
                   )}
                 >
-                  {r === "PH" ? "🇵🇭 Philippines" : "🇦🇪 UAE"}
+                  <span>{getFlagEmoji(r)}</span>
+                  <span>{getCountryName(r)}</span>
                 </button>
               ))}
+
+              {/* Add country tab */}
+              <button
+                type="button"
+                onClick={() => setAdding(true)}
+                title="Add sources for another country"
+                className="text-muted-foreground hover:text-foreground flex shrink-0 items-center gap-1 border-b-2 border-transparent px-3 py-3 text-xs font-medium transition-colors"
+              >
+                <Globe className="h-3.5 w-3.5" />
+                More
+              </button>
             </div>
 
             {/* Body */}
             <div className="flex-1 space-y-2 overflow-y-auto px-5 py-4">
               {/* Add form */}
-              {adding && <AddForm region={region} onDone={() => setAdding(false)} />}
+              {adding && (
+                <AddForm
+                  initialRegion={region}
+                  onDone={() => setAdding(false)}
+                />
+              )}
 
               {/* Error */}
               {error && (
@@ -439,7 +475,7 @@ export function CreditSourcesDrawer({ open, onClose }: CreditSourcesDrawerProps)
                   <p className="text-foreground text-sm font-medium">No sources yet</p>
                   <p className="text-muted-foreground mt-1 text-xs">
                     Click <span className="font-medium">Add</span> to create the first one for{" "}
-                    {region === "PH" ? "Philippines" : "UAE"}.
+                    {getCountryName(region)}.
                   </p>
                 </div>
               )}

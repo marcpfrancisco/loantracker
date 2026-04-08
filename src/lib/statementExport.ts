@@ -175,40 +175,22 @@ function loanSection(loan: StatementLoan, index: number): string {
 }
 
 export function printStatementPDF(statement: BorrowerStatement): void {
-  const hasPHP = statement.summary.PHP.principal > 0;
-  const hasAED = statement.summary.AED.principal > 0;
-
-  const summaryRows = [
-    hasPHP &&
-      `
-      <tr>
-        <td style="padding:10px 16px;color:#374151;border-bottom:1px solid #f3f4f6;">Total Principal (PHP)</td>
-        <td style="padding:10px 16px;text-align:right;font-weight:600;color:#111827;border-bottom:1px solid #f3f4f6;">${fmt(statement.summary.PHP.principal, "PHP")}</td>
-      </tr>
-      <tr>
-        <td style="padding:10px 16px;color:#374151;border-bottom:1px solid #f3f4f6;">Total Paid (PHP)</td>
-        <td style="padding:10px 16px;text-align:right;font-weight:600;color:#16a34a;border-bottom:1px solid #f3f4f6;">${fmt(statement.summary.PHP.paid, "PHP")}</td>
-      </tr>
-      <tr>
-        <td style="padding:10px 16px;color:#374151;border-bottom:1px solid #f3f4f6;">Outstanding (PHP)</td>
-        <td style="padding:10px 16px;text-align:right;font-weight:700;color:${statement.summary.PHP.outstanding > 0 ? "#d97706" : "#16a34a"};border-bottom:1px solid #f3f4f6;">${fmt(statement.summary.PHP.outstanding, "PHP")}</td>
+  const summaryRows = Object.entries(statement.summary)
+    .filter(([, s]) => s.principal > 0)
+    .flatMap(([cur, s]) => [
+      `<tr>
+        <td style="padding:10px 16px;color:#374151;border-bottom:1px solid #f3f4f6;">Total Principal (${cur})</td>
+        <td style="padding:10px 16px;text-align:right;font-weight:600;color:#111827;border-bottom:1px solid #f3f4f6;">${fmt(s.principal, cur)}</td>
       </tr>`,
-    hasAED &&
-      `
-      <tr>
-        <td style="padding:10px 16px;color:#374151;border-bottom:1px solid #f3f4f6;">Total Principal (AED)</td>
-        <td style="padding:10px 16px;text-align:right;font-weight:600;color:#111827;border-bottom:1px solid #f3f4f6;">${fmt(statement.summary.AED.principal, "AED")}</td>
-      </tr>
-      <tr>
-        <td style="padding:10px 16px;color:#374151;border-bottom:1px solid #f3f4f6;">Total Paid (AED)</td>
-        <td style="padding:10px 16px;text-align:right;font-weight:600;color:#16a34a;border-bottom:1px solid #f3f4f6;">${fmt(statement.summary.AED.paid, "AED")}</td>
-      </tr>
-      <tr>
-        <td style="padding:10px 16px;color:#374151;">Outstanding (AED)</td>
-        <td style="padding:10px 16px;text-align:right;font-weight:700;color:${statement.summary.AED.outstanding > 0 ? "#d97706" : "#16a34a"};">${fmt(statement.summary.AED.outstanding, "AED")}</td>
+      `<tr>
+        <td style="padding:10px 16px;color:#374151;border-bottom:1px solid #f3f4f6;">Total Paid (${cur})</td>
+        <td style="padding:10px 16px;text-align:right;font-weight:600;color:#16a34a;border-bottom:1px solid #f3f4f6;">${fmt(s.paid, cur)}</td>
       </tr>`,
-  ]
-    .filter(Boolean)
+      `<tr>
+        <td style="padding:10px 16px;color:#374151;border-bottom:1px solid #f3f4f6;">Outstanding (${cur})</td>
+        <td style="padding:10px 16px;text-align:right;font-weight:700;color:${s.outstanding > 0 ? "#d97706" : "#16a34a"};border-bottom:1px solid #f3f4f6;">${fmt(s.outstanding, cur)}</td>
+      </tr>`,
+    ])
     .join("");
 
   const html = `<!DOCTYPE html>

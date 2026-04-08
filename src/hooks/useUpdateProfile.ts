@@ -12,7 +12,7 @@ interface UpdateProfilePayload {
 }
 
 export function useUpdateProfile() {
-  const { profile, refreshProfile } = useAuth();
+  const { profile, activeOrgId, activeRole, refreshProfile } = useAuth();
 
   return useMutation({
     mutationFn: async ({ fullName, avatarFile, dicebearStyle }: UpdateProfilePayload) => {
@@ -40,6 +40,14 @@ export function useUpdateProfile() {
         .eq("id", profile.id);
 
       if (error) throw error;
+
+      // For lenders (admin), org name mirrors their full name — keep them in sync.
+      if (activeRole === "admin" && activeOrgId) {
+        await supabase
+          .from("organizations")
+          .update({ name: fullName })
+          .eq("id", activeOrgId);
+      }
     },
     onSuccess: async () => {
       await refreshProfile();

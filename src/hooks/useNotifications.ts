@@ -41,12 +41,23 @@ export function useNotifications() {
     enabled: !!profile?.id,
   });
 
-  // Realtime: new notifications arrive instantly without a manual refresh
+  // Realtime: new notifications arrive instantly without a manual refresh.
+  // We explicitly remove any stale channel with the same topic before subscribing.
+  // removeChannel() is async — without this guard, React StrictMode (or any fast
+  // re-render) can cause supabase.channel() to return the still-registered, already-
+  // subscribed instance, which throws "cannot add callbacks after subscribe()".
   useEffect(() => {
     if (!profile?.id) return;
 
+    const channelName = `notifications:${profile.id}`;
+
+    supabase
+      .getChannels()
+      .filter((ch) => ch.topic === `realtime:${channelName}`)
+      .forEach((ch) => void supabase.removeChannel(ch));
+
     const channel = supabase
-      .channel(`notifications:${profile.id}`)
+      .channel(channelName)
       .on(
         "postgres_changes",
         {

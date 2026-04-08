@@ -1,18 +1,20 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 
+export interface RegionStat {
+  count: number;
+  totalPrincipal: number;
+  currency: string;
+}
+
 export interface AdminStats {
   borrowerCount: number;
   pendingProofsCount: number;
   defaultedCount: number;
-  activeLoans: {
-    PH: { count: number; totalPrincipal: number };
-    UAE: { count: number; totalPrincipal: number };
-  };
-  portfolioOutstanding: {
-    PHP: number;
-    AED: number;
-  };
+  /** Keyed by ISO 3166-1 alpha-2 region code, e.g. "PH", "AE" */
+  activeLoans: Record<string, RegionStat>;
+  /** Keyed by ISO 4217 currency code, e.g. "PHP", "AED" */
+  portfolioOutstanding: Record<string, number>;
 }
 
 async function fetchAdminStats(): Promise<AdminStats> {
@@ -45,44 +47,51 @@ async function fetchAdminStats(): Promise<AdminStats> {
   if (paidRes.error) throw paidRes.error;
 
   const activeLoans = activeLoansRes.data ?? [];
-  const ph = activeLoans.filter((l) => l.region === "PH");
-  const uae = activeLoans.filter((l) => l.region === "UAE");
 
-  // Total amount disbursed (principal + service_fee) across active loans
-  const totalDisbursedPHP = activeLoans
-    .filter((l) => l.currency === "PHP")
-    .reduce((sum, l) => sum + Number(l.principal) + Number(l.service_fee), 0);
-  const totalDisbursedAED = activeLoans
-    .filter((l) => l.currency === "AED")
-    .reduce((sum, l) => sum + Number(l.principal) + Number(l.service_fee), 0);
+  // Group active loans by region
+  const activeLoansMap: Record<string, RegionStat> = {};
+  for (const loan of activeLoans) {
+    const region = loan.region ?? "??";
+    const currency = loan.currency ?? "";
+    if (!activeLoansMap[region]) {
+      activeLoansMap[region] = { count: 0, totalPrincipal: 0, currency };
+    }
+    activeLoansMap[region].count += 1;
+    activeLoansMap[region].totalPrincipal += Number(loan.principal);
+  }
 
-  // Total already collected from paid installments on active loans
+  // Total disbursed and collected grouped by currency
+  const disbursedByCurrency: Record<string, number> = {};
+  for (const loan of activeLoans) {
+    const currency = loan.currency ?? "";
+    disbursedByCurrency[currency] =
+      (disbursedByCurrency[currency] ?? 0) +
+      Number(loan.principal) +
+      Number(loan.service_fee);
+  }
+
   const paidRows = (paidRes.data ?? []).filter((i) => i.loans?.status === "active");
-  const collectedPHP = paidRows
-    .filter((i) => i.loans?.currency === "PHP")
-    .reduce((sum, i) => sum + Number(i.amount), 0);
-  const collectedAED = paidRows
-    .filter((i) => i.loans?.currency === "AED")
-    .reduce((sum, i) => sum + Number(i.amount), 0);
+  const collectedByCurrency: Record<string, number> = {};
+  for (const row of paidRows) {
+    const currency = row.loans?.currency ?? "";
+    collectedByCurrency[currency] = (collectedByCurrency[currency] ?? 0) + Number(row.amount);
+  }
+
+  // Outstanding = disbursed - collected, floor at 0
+  const portfolioOutstanding: Record<string, number> = {};
+  for (const currency of Object.keys(disbursedByCurrency)) {
+    portfolioOutstanding[currency] = Math.max(
+      0,
+      disbursedByCurrency[currency] - (collectedByCurrency[currency] ?? 0)
+    );
+  }
 
   return {
     borrowerCount: borrowersRes.count ?? 0,
     pendingProofsCount: proofsRes.count ?? 0,
     defaultedCount: defaultedRes.count ?? 0,
-    activeLoans: {
-      PH: {
-        count: ph.length,
-        totalPrincipal: ph.reduce((sum, l) => sum + Number(l.principal), 0),
-      },
-      UAE: {
-        count: uae.length,
-        totalPrincipal: uae.reduce((sum, l) => sum + Number(l.principal), 0),
-      },
-    },
-    portfolioOutstanding: {
-      PHP: Math.max(0, totalDisbursedPHP - collectedPHP),
-      AED: Math.max(0, totalDisbursedAED - collectedAED),
-    },
+    activeLoans: activeLoansMap,
+    portfolioOutstanding,
   };
 }
 

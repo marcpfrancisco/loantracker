@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { X, Mail, User, Loader2 } from "lucide-react";
 import { useForm, Controller } from "react-hook-form";
@@ -5,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
 import { useInviteBorrower } from "@/hooks/useInviteBorrower";
+import { useAuth } from "@/hooks/useAuth";
 import { CountryPicker } from "@/components/ui/country-picker";
 
 // ── Schema ─────────────────────────────────────────────────────────────────────
@@ -37,6 +39,7 @@ interface InviteBorrowerDrawerProps {
 
 export function InviteBorrowerDrawer({ open, onClose }: InviteBorrowerDrawerProps) {
   const { mutateAsync: invite, isPending } = useInviteBorrower();
+  const { profile } = useAuth();
 
   const {
     register,
@@ -49,9 +52,21 @@ export function InviteBorrowerDrawer({ open, onClose }: InviteBorrowerDrawerProp
     defaultValues: {
       email: "",
       full_name: "",
-      region: "PH",
+      region: profile?.region ?? "",
     },
   });
+
+  // Reset form with lender's region each time the drawer opens so the
+  // country picker defaults to the lender's country, not a stale value.
+  useEffect(() => {
+    if (open) {
+      reset({
+        email: "",
+        full_name: "",
+        region: profile?.region ?? "",
+      });
+    }
+  }, [open, profile?.region, reset]);
 
   function handleClose() {
     if (isPending) return;

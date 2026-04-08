@@ -51,12 +51,12 @@ export default function LoginPage() {
   const onSubmit = async (values: LoginFormData) => {
     setServerError(null);
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email: values.email,
       password: values.password,
     });
 
-    if (error) {
+    if (error || !data.user) {
       // Keep the message generic — do not distinguish "wrong email" vs "wrong password"
       setServerError("Invalid email or password. Please try again.");
       return;
@@ -70,7 +70,14 @@ export default function LoginPage() {
       localStorage.removeItem(REMEMBER_EMAIL_KEY);
     }
 
-    void navigate("/dashboard", { replace: true });
+    // Redirect multi-org users to the org picker; everyone else goes straight to dashboard
+    const { data: memberships } = await supabase
+      .from("org_members")
+      .select("org_id")
+      .eq("user_id", data.user.id);
+
+    const destination = (memberships?.length ?? 0) > 1 ? "/org-picker" : "/dashboard";
+    void navigate(destination, { replace: true });
   };
 
   return (
@@ -108,7 +115,7 @@ export default function LoginPage() {
           </CardHeader>
 
           <CardContent>
-            <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
+            <form onSubmit={(e) => void handleSubmit(onSubmit)(e)} noValidate className="space-y-4">
               {/* Email */}
               <div className="space-y-1.5">
                 <Label htmlFor="email">Email</Label>

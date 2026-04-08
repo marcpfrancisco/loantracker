@@ -23,16 +23,14 @@ export async function requireAuth() {
 /**
  * Use in admin-only route loaders.
  * Redirects to /login if unauthenticated, /dashboard if not admin.
+ * Uses is_admin() RPC which reads from org_members + user_org_context,
+ * so it correctly reflects the user's role in their active org.
  */
 export async function requireAdmin() {
   const session = await requireAuth();
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("*")
-    .eq("id", session.user.id)
-    .single();
-  if (profile?.role !== "admin") throw redirect("/dashboard");
-  return { session, profile };
+  const { data: isAdmin } = await supabase.rpc("is_admin");
+  if (!isAdmin) throw redirect("/dashboard");
+  return { session };
 }
 
 /**

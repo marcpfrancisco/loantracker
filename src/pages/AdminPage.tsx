@@ -14,6 +14,7 @@ import {
   Wallet,
   ChevronRight,
   MessageSquare,
+  Building2,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { useAdminStats } from "@/hooks/useAdminStats";
@@ -26,14 +27,18 @@ import { StatCard } from "@/components/admin/StatCard";
 import { BorrowersList } from "@/components/admin/BorrowersList";
 import { InviteBorrowerDrawer } from "@/components/admin/InviteBorrowerDrawer";
 import { CreditSourcesDrawer } from "@/components/admin/CreditSourcesDrawer";
-import { LoanCard } from "@/components/dashboard/LoanCard";
 import { UpcomingPayments } from "@/components/dashboard/UpcomingPayments";
 import { RefreshButton } from "@/components/ui/refresh-button";
 import { cardVariants } from "@/lib/animations";
+import {
+  BorrowerLoanGroup,
+  BorrowerLoanGroupSkeleton,
+  groupLoansByBorrower,
+} from "@/components/loans/BorrowerLoanGroup";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function formatCurrency(amount: number, currency: "PHP" | "AED"): string {
+function formatCurrency(amount: number, currency: string): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency,
@@ -61,25 +66,6 @@ function formatRelative(dateStr: string): string {
 }
 
 // ── Skeletons ─────────────────────────────────────────────────────────────────
-
-function LoanCardSkeleton() {
-  return (
-    <div className="bg-card border-border/60 flex flex-col gap-4 rounded-xl border p-4">
-      <div className="flex items-start justify-between">
-        <div className="flex flex-col gap-1.5">
-          <div className="bg-muted h-4 w-28 animate-pulse rounded" />
-          <div className="bg-muted h-3 w-20 animate-pulse rounded" />
-        </div>
-        <div className="bg-muted h-5 w-14 animate-pulse rounded" />
-      </div>
-      <div className="flex flex-col gap-1">
-        <div className="bg-muted h-7 w-32 animate-pulse rounded" />
-        <div className="bg-muted h-3 w-16 animate-pulse rounded" />
-      </div>
-      <div className="bg-muted h-1.5 w-full animate-pulse rounded-full" />
-    </div>
-  );
-}
 
 function RowSkeleton() {
   return (
@@ -155,7 +141,8 @@ export default function AdminPage() {
     void refetchProofs();
   }
 
-  const activeLoans = allLoans.filter((l) => l.status === "active").slice(0, 6);
+  const activeLoans = allLoans.filter((l) => l.status === "active");
+  const activeGroups = groupLoansByBorrower(activeLoans);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-6">
@@ -167,6 +154,13 @@ export default function AdminPage() {
         </div>
         <div className="flex items-center gap-2">
           <RefreshButton onRefresh={handleRefresh} isRefetching={isRefetching} />
+          <Link
+            to="/org-settings"
+            className="border-border/60 text-muted-foreground hover:text-foreground flex cursor-pointer items-center gap-2 rounded-lg border px-3.5 py-2 text-sm font-medium transition-colors"
+          >
+            <Building2 className="h-4 w-4" />
+            <span className="hidden sm:inline">Org Settings</span>
+          </Link>
           <button
             onClick={() => setSourcesOpen(true)}
             className="border-border/60 text-muted-foreground hover:text-foreground flex cursor-pointer items-center gap-2 rounded-lg border px-3.5 py-2 text-sm font-medium transition-colors"
@@ -208,34 +202,27 @@ export default function AdminPage() {
             accent="default"
           />
         </motion.div>
-        <motion.div variants={cardVariants}>
-          <StatCard
-            icon={CreditCard}
-            label="Active · PH"
-            value={stats?.activeLoans.PH.count ?? 0}
-            sub={
-              stats?.activeLoans.PH.totalPrincipal
-                ? formatCurrency(stats.activeLoans.PH.totalPrincipal, "PHP")
-                : undefined
-            }
-            loading={statsLoading}
-            accent="blue"
-          />
-        </motion.div>
-        <motion.div variants={cardVariants}>
-          <StatCard
-            icon={CreditCard}
-            label="Active · UAE"
-            value={stats?.activeLoans.UAE.count ?? 0}
-            sub={
-              stats?.activeLoans.UAE.totalPrincipal
-                ? formatCurrency(stats.activeLoans.UAE.totalPrincipal, "AED")
-                : undefined
-            }
-            loading={statsLoading}
-            accent="amber"
-          />
-        </motion.div>
+        {/* Dynamic active loans per region */}
+        {statsLoading
+          ? [0, 1].map((i) => (
+              <motion.div key={i} variants={cardVariants}>
+                <StatCard icon={CreditCard} label="Active · …" value={0} loading accent="blue" />
+              </motion.div>
+            ))
+          : Object.entries(stats?.activeLoans ?? {})
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([region, info], i) => (
+                <motion.div key={region} variants={cardVariants}>
+                  <StatCard
+                    icon={CreditCard}
+                    label={`Active · ${region}`}
+                    value={info.count}
+                    sub={info.totalPrincipal ? formatCurrency(info.totalPrincipal, info.currency) : undefined}
+                    loading={false}
+                    accent={i % 2 === 0 ? "blue" : "amber"}
+                  />
+                </motion.div>
+              ))}
         <motion.div variants={cardVariants}>
           <StatCard
             icon={FileCheck}
@@ -254,28 +241,26 @@ export default function AdminPage() {
         animate="visible"
         className="grid grid-cols-2 gap-3 lg:grid-cols-3"
       >
-        <motion.div variants={cardVariants}>
-          <StatCard
-            icon={Wallet}
-            label="Outstanding · PHP"
-            value={
-              statsLoading ? "—" : formatCurrency(stats?.portfolioOutstanding?.PHP ?? 0, "PHP")
-            }
-            loading={statsLoading}
-            accent="blue"
-          />
-        </motion.div>
-        <motion.div variants={cardVariants}>
-          <StatCard
-            icon={Wallet}
-            label="Outstanding · AED"
-            value={
-              statsLoading ? "—" : formatCurrency(stats?.portfolioOutstanding?.AED ?? 0, "AED")
-            }
-            loading={statsLoading}
-            accent="amber"
-          />
-        </motion.div>
+        {/* Dynamic outstanding per currency */}
+        {statsLoading
+          ? [0, 1].map((i) => (
+              <motion.div key={i} variants={cardVariants}>
+                <StatCard icon={Wallet} label="Outstanding · …" value="—" loading accent="blue" />
+              </motion.div>
+            ))
+          : Object.entries(stats?.portfolioOutstanding ?? {})
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([currency, amount], i) => (
+                <motion.div key={currency} variants={cardVariants}>
+                  <StatCard
+                    icon={Wallet}
+                    label={`Outstanding · ${currency}`}
+                    value={formatCurrency(amount, currency)}
+                    loading={false}
+                    accent={i % 2 === 0 ? "blue" : "amber"}
+                  />
+                </motion.div>
+              ))}
         <motion.div variants={cardVariants} className="col-span-2 lg:col-span-1">
           <StatCard
             icon={TrendingDown}
@@ -416,17 +401,19 @@ export default function AdminPage() {
         </motion.div>
       )}
 
-      {/* ── Active loans grid ─────────────────────────────────── */}
+      {/* ── Active loans grouped ──────────────────────────────── */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-foreground text-sm font-semibold">
             Active Loans
             {!loansLoading && activeLoans.length > 0 && (
-              <span className="text-muted-foreground ml-2 font-normal">({activeLoans.length})</span>
+              <span className="text-muted-foreground ml-2 font-normal">
+                {activeGroups.length} borrower{activeGroups.length !== 1 ? "s" : ""} · {activeLoans.length}
+              </span>
             )}
           </h2>
           <Link
-            to="/loans"
+            to="/loans?status=active"
             className="text-muted-foreground hover:text-foreground flex cursor-pointer items-center gap-1 text-xs transition-colors"
           >
             View all <ArrowRight className="h-3 w-3" />
@@ -434,9 +421,9 @@ export default function AdminPage() {
         </div>
 
         {loansLoading ? (
-          <div className="grid gap-3 sm:grid-cols-2">
-            <LoanCardSkeleton />
-            <LoanCardSkeleton />
+          <div className="space-y-3">
+            <BorrowerLoanGroupSkeleton rows={2} />
+            <BorrowerLoanGroupSkeleton rows={1} />
           </div>
         ) : activeLoans.length === 0 ? (
           <div className="border-border/60 bg-card rounded-xl border px-4 py-8 text-center">
@@ -444,13 +431,25 @@ export default function AdminPage() {
           </div>
         ) : (
           <motion.div
-            className="grid gap-3 sm:grid-cols-2"
-            variants={{ visible: { transition: { staggerChildren: 0.06 } } }}
+            className="space-y-3"
+            variants={{ visible: { transition: { staggerChildren: 0.05 } } }}
             initial="hidden"
             animate="visible"
           >
-            {activeLoans.map((loan) => (
-              <LoanCard key={loan.id} loan={loan} borrowerName={loan.borrower?.full_name} />
+            {activeGroups.map((group) => (
+              <motion.div key={group.id} variants={cardVariants}>
+                <BorrowerLoanGroup
+                  borrowerName={group.name}
+                  loans={group.loans}
+                  defaultOpen={
+                    group.loans.some(
+                      (l) =>
+                        l.nextDueDate !== null &&
+                        new Date(l.nextDueDate + "T00:00:00") < new Date(new Date().toDateString())
+                    ) || activeGroups.length <= 3
+                  }
+                />
+              </motion.div>
             ))}
           </motion.div>
         )}

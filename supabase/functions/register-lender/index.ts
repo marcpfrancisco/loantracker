@@ -96,9 +96,16 @@ Deno.serve(async (req: Request) => {
     // Lenders can rename it later from the Org Settings page.
     const orgName = full_name.trim();
 
+    // The application owner gets unlimited plan with no billing restrictions.
+    // Set OWNER_EMAIL as a Supabase Edge Function secret (same project settings).
+    const ownerEmail = Deno.env.get("OWNER_EMAIL") ?? "";
+    const plan = ownerEmail && email.trim().toLowerCase() === ownerEmail.toLowerCase()
+      ? "owner"
+      : "free";
+
     const { data: org, error: orgError } = await supabaseAdmin
       .from("organizations")
-      .insert({ name: orgName, slug: toSlug(orgName), region })
+      .insert({ name: orgName, slug: toSlug(orgName), region, plan })
       .select("id")
       .single();
 

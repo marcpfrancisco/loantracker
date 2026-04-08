@@ -178,7 +178,7 @@ export const CREDIT_SOURCE_CONFIGS: CreditSourceConfig[] = [
   {
     name: "Tabby",
     type: "bnpl",
-    region: "UAE",
+    region: "AE",
     loan_types: [
       {
         /**
@@ -204,7 +204,7 @@ export const CREDIT_SOURCE_CONFIGS: CreditSourceConfig[] = [
     /** Rates TBD — placeholder until admin provides breakdown */
     name: "Emirates NBD",
     type: "credit_card",
-    region: "UAE",
+    region: "AE",
     loan_types: [
       {
         loan_type: "credit_card",
@@ -223,7 +223,7 @@ export const CREDIT_SOURCE_CONFIGS: CreditSourceConfig[] = [
     /** Rates TBD */
     name: "Mashreq",
     type: "credit_card",
-    region: "UAE",
+    region: "AE",
     loan_types: [
       {
         loan_type: "credit_card",
@@ -242,7 +242,7 @@ export const CREDIT_SOURCE_CONFIGS: CreditSourceConfig[] = [
     /** Rates TBD */
     name: "ADCB",
     type: "credit_card",
-    region: "UAE",
+    region: "AE",
     loan_types: [
       {
         loan_type: "credit_card",

@@ -14,6 +14,8 @@ import ExpenseTabsPage from "@/pages/ExpenseTabsPage";
 import ExpenseTabDetailPage from "@/pages/ExpenseTabDetailPage";
 import { RouteErrorPage } from "@/components/ErrorBoundary";
 import SignupPage from "@/pages/SignupPage";
+import OrgPickerPage from "@/pages/OrgPickerPage";
+import OrgSettingsPage from "@/pages/OrgSettingsPage";
 
 export const router = createBrowserRouter([
   // ── Root redirect ──────────────────────────────────────────────────────────
@@ -58,6 +60,13 @@ export const router = createBrowserRouter([
     Component: ResetPasswordPage,
   },
 
+  // Org picker — shown after login for multi-org users; requires auth, not guest-only
+  {
+    path: "org-picker",
+    loader: requireAuth,
+    Component: OrgPickerPage,
+  },
+
   // ── Protected layout shell ─────────────────────────────────────────────────
   {
     loader: requireAuth,
@@ -80,6 +89,11 @@ export const router = createBrowserRouter([
         path: "admin",
         loader: requireAdmin,
         Component: AdminPage,
+      },
+      {
+        path: "org-settings",
+        loader: requireAdmin,
+        Component: OrgSettingsPage,
       },
       {
         path: "profile",

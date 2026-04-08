@@ -14,6 +14,7 @@ import { useCreateLoan } from "@/hooks/useCreateLoan";
 import { getLoanTypesForSource, getLoanTypeConfig, type FirstDueStrategy } from "@/types/schema";
 import { LoanBreakdownSummary } from "@/components/loans/LoanBreakdownSummary";
 import type { LoanType, RegionType, CurrencyType } from "@/types/enums";
+import { getDefaultCurrency } from "@/lib/countries";
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
@@ -66,7 +67,7 @@ type FormData = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function regionToCurrency(region: RegionType): CurrencyType {
-  return region === "UAE" ? "AED" : "PHP";
+  return getDefaultCurrency(region);
 }
 
 function ordinal(n: number): string {

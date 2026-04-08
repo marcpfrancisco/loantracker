@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion } from "framer-motion";
@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/ui/password-input";
+import { CountryPicker } from "@/components/ui/country-picker";
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
@@ -18,7 +19,7 @@ const signupSchema = z
   .object({
     full_name: z.string().min(2, "Name must be at least 2 characters"),
     email: z.string().email("Please enter a valid email address"),
-    region: z.enum(["PH", "UAE"], { message: "Select a region" }),
+    region: z.string().min(2, "Select a country"),
     password: z.string().min(8, "Password must be at least 8 characters"),
     confirm_password: z.string().min(1, "Please confirm your password"),
   })
@@ -39,6 +40,7 @@ export default function SignupPage() {
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema),
@@ -183,17 +185,19 @@ export default function SignupPage() {
                 )}
               </div>
 
-              {/* Region */}
+              {/* Country */}
               <div className="space-y-1.5">
-                <Label htmlFor="region">Primary Region</Label>
-                <select
-                  id="region"
-                  {...register("region")}
-                  className="bg-muted/50 border-border/60 focus:border-primary/60 w-full cursor-pointer rounded-lg border px-3 py-2 text-sm outline-none transition-colors"
-                >
-                  <option value="PH">🇵🇭 Philippines (PHP)</option>
-                  <option value="UAE">🇦🇪 UAE (AED)</option>
-                </select>
+                <Label htmlFor="region">Your Country</Label>
+                <Controller
+                  name="region"
+                  control={control}
+                  render={({ field }) => (
+                    <CountryPicker
+                      value={field.value}
+                      onChange={field.onChange}
+                    />
+                  )}
+                />
                 {errors.region && (
                   <p className="text-destructive text-xs">{errors.region.message}</p>
                 )}

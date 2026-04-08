@@ -19,6 +19,7 @@ import { useCreateExpenseTab } from "@/hooks/useExpenseTabMutations";
 import { LoanStatementDrawer } from "@/components/admin/LoanStatementDrawer";
 import { RegionBadge } from "@/components/ui/region-badge";
 import type { CurrencyType } from "@/types/enums";
+import { getDefaultCurrency } from "@/lib/countries";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -65,6 +66,7 @@ function getInitials(name: string) {
 
 interface CreateTabModalProps {
   borrowerId: string;
+  borrowerRegion: string;
   defaultCurrency: CurrencyType;
   borrowerName: string;
   onClose: () => void;
@@ -73,6 +75,7 @@ interface CreateTabModalProps {
 
 function CreateTabModal({
   borrowerId,
+  borrowerRegion,
   defaultCurrency,
   borrowerName,
   onClose,
@@ -88,7 +91,7 @@ function CreateTabModal({
       ? await createTab.mutateAsync({
           borrower_id: borrowerId,
           currency,
-          region: currency === "PHP" ? "PH" : "UAE",
+          region: borrowerRegion,
           title,
         })
       : { id: "" };
@@ -194,7 +197,7 @@ export default function BorrowerDetailPage() {
     );
   }
 
-  const defaultCurrency: CurrencyType = borrower.region === "UAE" ? "AED" : "PHP";
+  const defaultCurrency: CurrencyType = getDefaultCurrency(borrower.region);
   const activeLoans = borrower.loans.filter((l) => l.status === "active");
 
   return (
@@ -365,6 +368,7 @@ export default function BorrowerDetailPage() {
       {showCreateTab && (
         <CreateTabModal
           borrowerId={id!}
+          borrowerRegion={borrower.region}
           defaultCurrency={defaultCurrency}
           borrowerName={borrower.full_name}
           onClose={() => setShowCreateTab(false)}

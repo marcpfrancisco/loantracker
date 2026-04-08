@@ -21,7 +21,7 @@ export type Database = {
           is_active: boolean
           name: string
           org_id: string
-          region: Database["public"]["Enums"]["region_type"]
+          region: string
           type: Database["public"]["Enums"]["credit_source_type"]
           updated_at: string
         }
@@ -31,7 +31,7 @@ export type Database = {
           is_active?: boolean
           name: string
           org_id?: string
-          region: Database["public"]["Enums"]["region_type"]
+          region: string
           type: Database["public"]["Enums"]["credit_source_type"]
           updated_at?: string
         }
@@ -41,7 +41,7 @@ export type Database = {
           is_active?: boolean
           name?: string
           org_id?: string
-          region?: Database["public"]["Enums"]["region_type"]
+          region?: string
           type?: Database["public"]["Enums"]["credit_source_type"]
           updated_at?: string
         }
@@ -170,10 +170,10 @@ export type Database = {
         Row: {
           borrower_id: string
           created_at: string
-          currency: Database["public"]["Enums"]["currency_type"]
+          currency: string
           id: string
           org_id: string
-          region: Database["public"]["Enums"]["region_type"]
+          region: string
           status: string
           title: string
           updated_at: string
@@ -181,10 +181,10 @@ export type Database = {
         Insert: {
           borrower_id: string
           created_at?: string
-          currency: Database["public"]["Enums"]["currency_type"]
+          currency: string
           id?: string
           org_id?: string
-          region: Database["public"]["Enums"]["region_type"]
+          region: string
           status?: string
           title?: string
           updated_at?: string
@@ -192,10 +192,10 @@ export type Database = {
         Update: {
           borrower_id?: string
           created_at?: string
-          currency?: Database["public"]["Enums"]["currency_type"]
+          currency?: string
           id?: string
           org_id?: string
-          region?: Database["public"]["Enums"]["region_type"]
+          region?: string
           status?: string
           title?: string
           updated_at?: string
@@ -268,7 +268,7 @@ export type Database = {
         Row: {
           borrower_id: string
           created_at: string
-          currency: Database["public"]["Enums"]["currency_type"]
+          currency: string
           due_day_of_month: number | null
           ended_at: string | null
           first_due_strategy: string
@@ -279,7 +279,7 @@ export type Database = {
           notes: string | null
           org_id: string
           principal: number
-          region: Database["public"]["Enums"]["region_type"]
+          region: string
           service_fee: number
           source_id: string
           started_at: string
@@ -289,7 +289,7 @@ export type Database = {
         Insert: {
           borrower_id: string
           created_at?: string
-          currency: Database["public"]["Enums"]["currency_type"]
+          currency: string
           due_day_of_month?: number | null
           ended_at?: string | null
           first_due_strategy?: string
@@ -300,7 +300,7 @@ export type Database = {
           notes?: string | null
           org_id?: string
           principal: number
-          region: Database["public"]["Enums"]["region_type"]
+          region: string
           service_fee?: number
           source_id: string
           started_at?: string
@@ -310,7 +310,7 @@ export type Database = {
         Update: {
           borrower_id?: string
           created_at?: string
-          currency?: Database["public"]["Enums"]["currency_type"]
+          currency?: string
           due_day_of_month?: number | null
           ended_at?: string | null
           first_due_strategy?: string
@@ -321,7 +321,7 @@ export type Database = {
           notes?: string | null
           org_id?: string
           principal?: number
-          region?: Database["public"]["Enums"]["region_type"]
+          region?: string
           service_fee?: number
           source_id?: string
           started_at?: string
@@ -434,7 +434,7 @@ export type Database = {
           id: string
           name: string
           plan: string
-          region: Database["public"]["Enums"]["region_type"]
+          region: string
           slug: string
           updated_at: string
         }
@@ -443,7 +443,7 @@ export type Database = {
           id?: string
           name: string
           plan?: string
-          region?: Database["public"]["Enums"]["region_type"]
+          region?: string
           slug: string
           updated_at?: string
         }
@@ -452,7 +452,7 @@ export type Database = {
           id?: string
           name?: string
           plan?: string
-          region?: Database["public"]["Enums"]["region_type"]
+          region?: string
           slug?: string
           updated_at?: string
         }
@@ -528,7 +528,7 @@ export type Database = {
           created_at: string
           full_name: string
           id: string
-          region: Database["public"]["Enums"]["region_type"]
+          region: string
           role: Database["public"]["Enums"]["user_role"]
           updated_at: string
         }
@@ -537,7 +537,7 @@ export type Database = {
           created_at?: string
           full_name: string
           id: string
-          region?: Database["public"]["Enums"]["region_type"]
+          region?: string
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
         }
@@ -546,7 +546,7 @@ export type Database = {
           created_at?: string
           full_name?: string
           id?: string
-          region?: Database["public"]["Enums"]["region_type"]
+          region?: string
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
         }
@@ -602,10 +602,13 @@ export type Database = {
       }
       is_admin: { Args: never; Returns: boolean }
       my_org_id: { Args: never; Returns: string }
+      my_profile_role: {
+        Args: never
+        Returns: Database["public"]["Enums"]["user_role"]
+      }
     }
     Enums: {
       credit_source_type: "e_wallet" | "credit_card" | "bnpl" | "bank_transfer"
-      currency_type: "PHP" | "AED"
       loan_status: "active" | "completed" | "defaulted" | "cancelled"
       loan_type:
         | "tabby"
@@ -618,7 +621,6 @@ export type Database = {
         | "maribank_credit"
       payment_status: "unpaid" | "pending" | "paid"
       proof_status: "pending" | "approved" | "rejected"
-      region_type: "PH" | "UAE"
       user_role: "admin" | "borrower"
     }
     CompositeTypes: {
@@ -748,7 +750,6 @@ export const Constants = {
   public: {
     Enums: {
       credit_source_type: ["e_wallet", "credit_card", "bnpl", "bank_transfer"],
-      currency_type: ["PHP", "AED"],
       loan_status: ["active", "completed", "defaulted", "cancelled"],
       loan_type: [
         "tabby",
@@ -762,7 +763,6 @@ export const Constants = {
       ],
       payment_status: ["unpaid", "pending", "paid"],
       proof_status: ["pending", "approved", "rejected"],
-      region_type: ["PH", "UAE"],
       user_role: ["admin", "borrower"],
     },
   },

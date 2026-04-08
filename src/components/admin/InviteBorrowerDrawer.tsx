@@ -1,24 +1,24 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { X, Mail, User, Loader2 } from "lucide-react";
-import { useForm, useWatch } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { cn } from "@/lib/utils";
 import { useInviteBorrower } from "@/hooks/useInviteBorrower";
-import type { RegionType } from "@/types/enums";
+import { CountryPicker } from "@/components/ui/country-picker";
 
 // ── Schema ─────────────────────────────────────────────────────────────────────
 
 const inviteSchema = z.object({
   email: z.string().email("Enter a valid email address"),
   full_name: z.string().min(2, "Enter at least 2 characters").max(100),
-  region: z.enum(["PH", "UAE"]),
+  region: z.string().min(2, "Select a country"),
 });
 
 type FormData = {
   email: string;
   full_name: string;
-  region: RegionType;
+  region: string;
 };
 
 // ── Sub-components ─────────────────────────────────────────────────────────────
@@ -42,7 +42,6 @@ export function InviteBorrowerDrawer({ open, onClose }: InviteBorrowerDrawerProp
     register,
     handleSubmit,
     control,
-    setValue,
     reset,
     formState: { errors },
   } = useForm<FormData>({
@@ -52,11 +51,6 @@ export function InviteBorrowerDrawer({ open, onClose }: InviteBorrowerDrawerProp
       full_name: "",
       region: "PH",
     },
-  });
-
-  const selectedRegion = useWatch({
-    control,
-    name: "region",
   });
 
   function handleClose() {
@@ -162,30 +156,22 @@ export function InviteBorrowerDrawer({ open, onClose }: InviteBorrowerDrawerProp
                 {/* Region */}
                 <div>
                   <label className="text-foreground mb-1.5 block text-xs font-medium">
-                    Region <span className="text-rose-400">*</span>
+                    Country <span className="text-rose-400">*</span>
                   </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {(["PH", "UAE"] as RegionType[]).map((r) => (
-                      <button
-                        key={r}
-                        type="button"
-                        onClick={() => setValue("region", r)}
-                        className={cn(
-                          "cursor-pointer rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors",
-                          selectedRegion === r
-                            ? r === "UAE"
-                              ? "border-amber-500/40 bg-amber-500/15 text-amber-400"
-                              : "border-primary/40 bg-primary/15 text-primary"
-                            : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
-                        )}
-                      >
-                        {r === "PH" ? "🇵🇭 Philippines" : "🇦🇪 UAE"}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-muted-foreground mt-2 text-xs">
-                    Determines the borrower's currency and loan templates. Cannot be changed later.
-                  </p>
+                  <Controller
+                    name="region"
+                    control={control}
+                    render={({ field }) => (
+                      <CountryPicker value={field.value} onChange={field.onChange} />
+                    )}
+                  />
+                  {errors.region ? (
+                    <p className="mt-1 text-xs text-rose-400">{errors.region.message}</p>
+                  ) : (
+                    <p className="text-muted-foreground mt-2 text-xs">
+                      Determines the borrower's default currency and loan templates.
+                    </p>
+                  )}
                 </div>
 
                 {/* Info banner */}

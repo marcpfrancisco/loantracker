@@ -13,6 +13,20 @@ import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/ui/password-input";
 import { CountryPicker } from "@/components/ui/country-picker";
 
+// ── Country detection ─────────────────────────────────────────────────────────
+// Parse the country subtag from the browser's BCP 47 locale string.
+// e.g. "ar-AE" → "AE", "fil-PH" → "PH", "en-US" → "US", "en" → ""
+function detectCountry(): string {
+  const lang =
+    (typeof navigator !== "undefined" && (navigator.language || navigator.languages?.[0])) || "";
+  const parts = lang.split("-");
+  if (parts.length >= 2) {
+    const code = parts[parts.length - 1].toUpperCase();
+    if (/^[A-Z]{2}$/.test(code)) return code;
+  }
+  return "";
+}
+
 // ── Schema ────────────────────────────────────────────────────────────────────
 
 const signupSchema = z
@@ -44,7 +58,7 @@ export default function SignupPage() {
     formState: { errors, isSubmitting },
   } = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema),
-    defaultValues: { region: "PH" },
+    defaultValues: { region: detectCountry() },
   });
 
   const onSubmit = async (values: SignupFormData) => {

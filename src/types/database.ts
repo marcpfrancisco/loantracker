@@ -17,6 +17,9 @@ export type Database = {
       credit_sources: {
         Row: {
           created_at: string
+          default_due_day: number | null
+          default_installments: number | null
+          default_interest_rate: number | null
           id: string
           is_active: boolean
           name: string
@@ -27,6 +30,9 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          default_due_day?: number | null
+          default_installments?: number | null
+          default_interest_rate?: number | null
           id?: string
           is_active?: boolean
           name: string
@@ -37,6 +43,9 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          default_due_day?: number | null
+          default_installments?: number | null
+          default_interest_rate?: number | null
           id?: string
           is_active?: boolean
           name?: string

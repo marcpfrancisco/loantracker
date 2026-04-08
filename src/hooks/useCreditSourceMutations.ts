@@ -2,13 +2,24 @@ import type { CreditSourceType, RegionType } from "./../types/enums";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 
+interface CreditSourceDefaults {
+  default_interest_rate?: number | null;
+  default_installments?: number | null;
+  default_due_day?: number | null;
+}
+
 // ── Create ────────────────────────────────────────────────────────────────────
 
 export function useCreateCreditSource() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (params: { name: string; type: CreditSourceType; region: RegionType }) => {
-      const { error } = await supabase.from("credit_sources").insert(params);
+    mutationFn: async (
+      params: { name: string; type: CreditSourceType; region: RegionType } & CreditSourceDefaults
+    ) => {
+      const { error } = await supabase
+        .from("credit_sources")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .insert(params as any);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -17,16 +28,20 @@ export function useCreateCreditSource() {
   });
 }
 
-// ── Update name / type ────────────────────────────────────────────────────────
+// ── Update name / type / defaults ─────────────────────────────────────────────
 
 export function useUpdateCreditSource() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (params: { id: string; name: string; type: CreditSourceType }) => {
+    mutationFn: async (
+      params: { id: string; name: string; type: CreditSourceType } & CreditSourceDefaults
+    ) => {
+      const { id, ...rest } = params;
       const { error } = await supabase
         .from("credit_sources")
-        .update({ name: params.name.trim(), type: params.type })
-        .eq("id", params.id);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .update({ ...rest, name: rest.name.trim() } as any)
+        .eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {

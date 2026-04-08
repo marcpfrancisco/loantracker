@@ -7,6 +7,9 @@ export interface CreditSourceOption {
   name: string;
   type: CreditSourceType;
   region: RegionType;
+  default_interest_rate: number | null;
+  default_installments: number | null;
+  default_due_day: number | null;
 }
 
 export interface CreditSourceRow extends CreditSourceOption {
@@ -14,9 +17,10 @@ export interface CreditSourceRow extends CreditSourceOption {
 }
 
 async function fetchCreditSources(region: RegionType | null): Promise<CreditSourceOption[]> {
-  let query = supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let query = (supabase as any)
     .from("credit_sources")
-    .select("id, name, type, region")
+    .select("id, name, type, region, default_interest_rate, default_installments, default_due_day")
     .eq("is_active", true)
     .order("name");
 
@@ -24,7 +28,7 @@ async function fetchCreditSources(region: RegionType | null): Promise<CreditSour
 
   const { data, error } = await query;
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []) as CreditSourceOption[];
 }
 
 export function useCreditSources(region: RegionType | null) {
@@ -39,9 +43,10 @@ export function useCreditSources(region: RegionType | null) {
 // ── Admin: all sources including inactive ─────────────────────────────────────
 
 async function fetchAllCreditSources(): Promise<CreditSourceRow[]> {
-  const { data, error } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase as any)
     .from("credit_sources")
-    .select("id, name, type, region, is_active")
+    .select("id, name, type, region, is_active, default_interest_rate, default_installments, default_due_day")
     .order("region")
     .order("name");
   if (error) throw error;

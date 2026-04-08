@@ -16,11 +16,14 @@ export function useCreateCreditSource() {
     mutationFn: async (
       params: { name: string; type: CreditSourceType; region: RegionType } & CreditSourceDefaults
     ) => {
-      const { error } = await supabase
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { data, error } = await (supabase as any)
         .from("credit_sources")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .insert(params as any);
+        .insert(params)
+        .select("id")
+        .single();
       if (error) throw error;
+      return data as { id: string };
     },
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["credit-sources"] });

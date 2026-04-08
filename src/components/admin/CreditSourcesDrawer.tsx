@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { X, Plus, Pencil, Trash2, Check, Loader2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -11,9 +11,17 @@ import {
   useToggleCreditSourceActive,
   useDeleteCreditSource,
 } from "@/hooks/useCreditSourceMutations";
+import {
+  useAllLoanTypeDefaults,
+  useUpsertLoanTypeDefaults,
+  useReplaceSourceLoanTypeDefaults,
+} from "@/hooks/useLoanTypeDefaults";
+import type { LoanTypeDefault } from "@/hooks/useLoanTypeDefaults";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CountryPicker } from "@/components/ui/country-picker";
 import { getFlagEmoji, getCountryName } from "@/lib/countries";
+import { getSourceConfig } from "@/types/schema";
+import type { LoanTypeConfig } from "@/types/schema";
 import type { CreditSourceType } from "@/types/enums";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -51,6 +59,7 @@ function TypeBadge({ type }: { type: CreditSourceType }) {
 // ── Shared default-fields section ─────────────────────────────────────────────
 
 interface DefaultFieldsProps {
+  label?: string;
   interestRate: string;
   installments: string;
   dueDay: string;
@@ -60,6 +69,7 @@ interface DefaultFieldsProps {
 }
 
 function DefaultFields({
+  label = "Loan Defaults",
   interestRate,
   installments,
   dueDay,
@@ -70,7 +80,7 @@ function DefaultFields({
   return (
     <div className="space-y-2">
       <p className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
-        Loan Defaults <span className="normal-case font-normal">(optional)</span>
+        {label} <span className="normal-case font-normal">(optional)</span>
       </p>
       <div className="grid grid-cols-3 gap-2">
         {/* Interest rate */}
@@ -127,6 +137,218 @@ function DefaultFields({
   );
 }
 
+// ── LoanTypeDefaultsEditor ────────────────────────────────────────────────────
+// Per-loan-type editable defaults for schema-known sources.
+
+export interface LtDefaultRow {
+  loan_type: string;
+  interest_rate: string; // display as percentage string, e.g. "4.95"
+  installments: string;
+  due_day: string;
+}
+
+interface LoanTypeDefaultsEditorProps {
+  loanTypes: LoanTypeConfig[];
+  value: LtDefaultRow[];
+  onChange: (rows: LtDefaultRow[]) => void;
+}
+
+function LoanTypeDefaultsEditor({ loanTypes, value, onChange }: LoanTypeDefaultsEditorProps) {
+  function updateRow(index: number, patch: Partial<LtDefaultRow>) {
+    const next = value.map((r, i) => (i === index ? { ...r, ...patch } : r));
+    onChange(next);
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
+        Per-Type Defaults <span className="normal-case font-normal">(optional)</span>
+      </p>
+      {loanTypes.map((lt, i) => {
+        const row = value[i];
+        if (!row) return null;
+        return (
+          <div key={lt.loan_type} className="space-y-1.5">
+            <p className="text-foreground text-[11px] font-semibold">{lt.label}</p>
+            <div className="grid grid-cols-3 gap-2">
+              {/* Interest % */}
+              <div className="space-y-1">
+                <p className="text-muted-foreground text-[10px]">Interest %</p>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    value={row.interest_rate}
+                    onChange={(e) => updateRow(i, { interest_rate: e.target.value })}
+                    placeholder={
+                      lt.interest_rate !== null ? String(lt.interest_rate) : "e.g. 3.5"
+                    }
+                    className="bg-muted/50 border-border/60 focus:border-primary/60 placeholder:text-muted-foreground/40 w-full rounded-lg border py-1.5 pl-2.5 pr-5 text-xs transition-colors outline-none"
+                  />
+                  <span className="text-muted-foreground absolute top-1/2 right-2 -translate-y-1/2 text-[10px]">
+                    %
+                  </span>
+                </div>
+              </div>
+
+              {/* Installments */}
+              <div className="space-y-1">
+                <p className="text-muted-foreground text-[10px]">Installments</p>
+                <input
+                  type="number"
+                  min="1"
+                  max="360"
+                  step="1"
+                  value={row.installments}
+                  onChange={(e) => updateRow(i, { installments: e.target.value })}
+                  placeholder={String(lt.installments_total)}
+                  className="bg-muted/50 border-border/60 focus:border-primary/60 placeholder:text-muted-foreground/40 w-full rounded-lg border px-2.5 py-1.5 text-xs transition-colors outline-none"
+                />
+              </div>
+
+              {/* Due day */}
+              <div className="space-y-1">
+                <p className="text-muted-foreground text-[10px]">Due Day</p>
+                <input
+                  type="number"
+                  min="1"
+                  max="28"
+                  step="1"
+                  value={row.due_day}
+                  onChange={(e) => updateRow(i, { due_day: e.target.value })}
+                  placeholder={
+                    lt.due_day_of_month !== null ? String(lt.due_day_of_month) : "e.g. 15"
+                  }
+                  className="bg-muted/50 border-border/60 focus:border-primary/60 placeholder:text-muted-foreground/40 w-full rounded-lg border px-2.5 py-1.5 text-xs transition-colors outline-none"
+                />
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── CustomLoanTypeEditor ──────────────────────────────────────────────────────
+// User-defined per-loan-type defaults for custom (non-schema) sources.
+
+interface CustomLoanTypeEditorProps {
+  value: LtDefaultRow[];
+  onChange: (rows: LtDefaultRow[]) => void;
+}
+
+function CustomLoanTypeEditor({ value, onChange }: CustomLoanTypeEditorProps) {
+  function addRow() {
+    onChange([...value, { loan_type: "", interest_rate: "", installments: "", due_day: "" }]);
+  }
+
+  function removeRow(index: number) {
+    onChange(value.filter((_, i) => i !== index));
+  }
+
+  function updateRow(index: number, patch: Partial<LtDefaultRow>) {
+    onChange(value.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <p className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
+          Per Loan Type <span className="normal-case font-normal">(optional)</span>
+        </p>
+        <button
+          type="button"
+          onClick={addRow}
+          className="text-primary hover:text-primary/80 flex items-center gap-1 text-[10px] font-medium transition-colors"
+        >
+          <Plus className="h-3 w-3" />
+          Add type
+        </button>
+      </div>
+
+      {value.length === 0 && (
+        <p className="text-muted-foreground/60 text-[10px]">
+          No loan types defined. Click "Add type" to set per-type defaults.
+        </p>
+      )}
+
+      {value.map((row, i) => (
+        <div key={i} className="bg-muted/30 space-y-1.5 rounded-lg p-2">
+          {/* Loan type name + remove */}
+          <div className="flex items-center gap-1.5">
+            <input
+              type="text"
+              value={row.loan_type}
+              onChange={(e) => updateRow(i, { loan_type: e.target.value })}
+              placeholder="e.g. SPayLater, Installment"
+              className="bg-muted/50 border-border/60 focus:border-primary/60 placeholder:text-muted-foreground/40 min-w-0 flex-1 rounded-lg border px-2.5 py-1.5 text-xs transition-colors outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => removeRow(i)}
+              className="text-muted-foreground hover:text-rose-400 rounded p-1 transition-colors"
+              title="Remove"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          {/* Defaults */}
+          <div className="grid grid-cols-3 gap-2">
+            <div className="space-y-1">
+              <p className="text-muted-foreground text-[10px]">Interest %</p>
+              <div className="relative">
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={row.interest_rate}
+                  onChange={(e) => updateRow(i, { interest_rate: e.target.value })}
+                  placeholder="e.g. 3.5"
+                  className="bg-muted/50 border-border/60 focus:border-primary/60 placeholder:text-muted-foreground/40 w-full rounded-lg border py-1.5 pl-2.5 pr-5 text-xs transition-colors outline-none"
+                />
+                <span className="text-muted-foreground absolute top-1/2 right-2 -translate-y-1/2 text-[10px]">
+                  %
+                </span>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <p className="text-muted-foreground text-[10px]">Installments</p>
+              <input
+                type="number"
+                min="1"
+                max="360"
+                step="1"
+                value={row.installments}
+                onChange={(e) => updateRow(i, { installments: e.target.value })}
+                placeholder="e.g. 12"
+                className="bg-muted/50 border-border/60 focus:border-primary/60 placeholder:text-muted-foreground/40 w-full rounded-lg border px-2.5 py-1.5 text-xs transition-colors outline-none"
+              />
+            </div>
+            <div className="space-y-1">
+              <p className="text-muted-foreground text-[10px]">Due Day</p>
+              <input
+                type="number"
+                min="1"
+                max="28"
+                step="1"
+                value={row.due_day}
+                onChange={(e) => updateRow(i, { due_day: e.target.value })}
+                placeholder="e.g. 15"
+                className="bg-muted/50 border-border/60 focus:border-primary/60 placeholder:text-muted-foreground/40 w-full rounded-lg border px-2.5 py-1.5 text-xs transition-colors outline-none"
+              />
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function parseOptionalFloat(v: string): number | null {
@@ -150,10 +372,80 @@ function fmtInt(v: number | null): string {
   return String(v);
 }
 
+/**
+ * Builds initial `LtDefaultRow[]` for the editor.
+ * Priority per field: DB row → schema.ts value → empty string.
+ */
+function buildLtDefaultRows(
+  loanTypes: LoanTypeConfig[],
+  dbRows: LoanTypeDefault[]
+): LtDefaultRow[] {
+  return loanTypes.map((lt) => {
+    const db = dbRows.find((r) => r.loan_type === lt.loan_type);
+    return {
+      loan_type: lt.loan_type,
+      interest_rate: db?.interest_rate != null
+        ? fmtRate(db.interest_rate)
+        : lt.interest_rate !== null
+          ? String(lt.interest_rate)
+          : "",
+      installments: db?.installments != null
+        ? fmtInt(db.installments)
+        : lt.installments_total
+          ? String(lt.installments_total)
+          : "",
+      due_day: db?.due_day != null
+        ? fmtInt(db.due_day)
+        : lt.due_day_of_month != null
+          ? String(lt.due_day_of_month)
+          : "",
+    };
+  });
+}
+
+// ── Schema fallback defaults (for custom sources only) ────────────────────────
+
+interface SourceEditDefaults {
+  interestRate: string;
+  installments: string;
+  dueDay: string;
+}
+
+function getEditDefaults(source: CreditSourceRow): SourceEditDefaults {
+  return {
+    interestRate: source.default_interest_rate !== null ? fmtRate(source.default_interest_rate) : "",
+    installments: source.default_installments !== null ? fmtInt(source.default_installments) : "",
+    dueDay: source.default_due_day !== null ? fmtInt(source.default_due_day) : "",
+  };
+}
+
+/**
+ * Formats a per-loan-type summary line for view mode.
+ * Shows DB override if present, otherwise falls back to schema.ts.
+ */
+function formatLtSummary(
+  loanTypes: LoanTypeConfig[],
+  dbRows: LoanTypeDefault[]
+): string {
+  return loanTypes
+    .map((lt) => {
+      const db = dbRows.find((r) => r.loan_type === lt.loan_type);
+      const rate = db?.interest_rate != null
+        ? `${+(db.interest_rate * 100).toFixed(2)}%`
+        : lt.interest_rate !== null
+          ? `${lt.interest_rate}%`
+          : null;
+      const inst = db?.installments != null
+        ? `${db.installments} mo`
+        : `${lt.installments_total} mo`;
+      return [lt.label, rate, inst].filter(Boolean).join(" · ");
+    })
+    .join("  /  ");
+}
+
 // ── Add form ──────────────────────────────────────────────────────────────────
 
 interface AddFormProps {
-  // The country to pre-select in the picker — always the lender's own region
   defaultRegion: string;
   onDone: (savedRegion?: string) => void;
 }
@@ -165,8 +457,26 @@ function AddForm({ defaultRegion, onDone }: AddFormProps) {
   const [interestRate, setInterestRate] = useState("");
   const [installments, setInstallments] = useState("");
   const [dueDay, setDueDay] = useState("");
+  const [ltDefaults, setLtDefaults] = useState<LtDefaultRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const create = useCreateCreditSource();
+  const upsert = useUpsertLoanTypeDefaults();
+
+  // When the name matches a known schema source, switch to per-loan-type editor
+  const schemaConfig = getSourceConfig(name.trim());
+  const isKnownSource = schemaConfig !== null && schemaConfig.loan_types.length > 0;
+
+  // Re-initialise ltDefaults rows whenever the matched schema source changes
+  useEffect(() => {
+    if (schemaConfig) {
+      setLtDefaults(buildLtDefaultRows(schemaConfig.loan_types, []));
+    } else {
+      setLtDefaults([]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [schemaConfig?.name]);
+
+  const isSaving = create.isPending || upsert.isPending;
 
   async function handleSave() {
     if (!name.trim()) {
@@ -175,18 +485,40 @@ function AddForm({ defaultRegion, onDone }: AddFormProps) {
     }
     setError(null);
     try {
-      await create.mutateAsync({
+      const created = await create.mutateAsync({
         name: name.trim(),
         type,
         region,
-        default_interest_rate: interestRate
+        default_interest_rate: !isKnownSource && interestRate
           ? parseOptionalFloat(interestRate) !== null
             ? parseOptionalFloat(interestRate)! / 100
             : null
           : null,
-        default_installments: parseOptionalInt(installments),
-        default_due_day: parseOptionalInt(dueDay),
+        default_installments: !isKnownSource ? parseOptionalInt(installments) : null,
+        default_due_day: !isKnownSource ? parseOptionalInt(dueDay) : null,
       });
+
+      // Upsert per-loan-type defaults (known: all rows; custom: filter out unnamed rows)
+      const ltRowsToSave = isKnownSource
+        ? ltDefaults
+        : ltDefaults.filter((r) => r.loan_type.trim() !== "");
+      if (created && ltRowsToSave.length > 0) {
+        await upsert.mutateAsync(
+          ltRowsToSave.map((row) => ({
+            credit_source_id: created.id,
+            loan_type: row.loan_type.trim(),
+            interest_rate:
+              row.interest_rate !== ""
+                ? (parseOptionalFloat(row.interest_rate) ?? null) !== null
+                  ? parseOptionalFloat(row.interest_rate)! / 100
+                  : null
+                : null,
+            installments: parseOptionalInt(row.installments),
+            due_day: parseOptionalInt(row.due_day),
+          }))
+        );
+      }
+
       onDone(region);
     } catch {
       setError("Failed to create. Try again.");
@@ -216,6 +548,11 @@ function AddForm({ defaultRegion, onDone }: AddFormProps) {
             error && !name.trim() && "border-rose-500/60"
           )}
         />
+        {isKnownSource && (
+          <p className="text-primary text-[10px]">
+            Schema-known source — per-type defaults loaded.
+          </p>
+        )}
       </div>
 
       {/* Type */}
@@ -237,15 +574,26 @@ function AddForm({ defaultRegion, onDone }: AddFormProps) {
         ))}
       </div>
 
-      {/* Default fields */}
-      <DefaultFields
-        interestRate={interestRate}
-        installments={installments}
-        dueDay={dueDay}
-        onInterestRateChange={setInterestRate}
-        onInstallmentsChange={setInstallments}
-        onDueDayChange={setDueDay}
-      />
+      {/* Defaults: per-type editor for known sources; source-level + custom types for others */}
+      {isKnownSource ? (
+        <LoanTypeDefaultsEditor
+          loanTypes={schemaConfig.loan_types}
+          value={ltDefaults}
+          onChange={setLtDefaults}
+        />
+      ) : (
+        <>
+          <DefaultFields
+            interestRate={interestRate}
+            installments={installments}
+            dueDay={dueDay}
+            onInterestRateChange={setInterestRate}
+            onInstallmentsChange={setInstallments}
+            onDueDayChange={setDueDay}
+          />
+          <CustomLoanTypeEditor value={ltDefaults} onChange={setLtDefaults} />
+        </>
+      )}
 
       {error && (
         <p className="flex items-center gap-1.5 text-xs text-rose-400">
@@ -258,7 +606,7 @@ function AddForm({ defaultRegion, onDone }: AddFormProps) {
         <button
           type="button"
           onClick={() => onDone()}
-          disabled={create.isPending}
+          disabled={isSaving}
           className="border-border/60 text-muted-foreground hover:text-foreground rounded-lg border px-3 py-1.5 text-xs transition-colors disabled:opacity-50"
         >
           Cancel
@@ -266,10 +614,10 @@ function AddForm({ defaultRegion, onDone }: AddFormProps) {
         <button
           type="button"
           onClick={() => void handleSave()}
-          disabled={create.isPending}
+          disabled={isSaving}
           className="bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
         >
-          {create.isPending ? (
+          {isSaving ? (
             <Loader2 className="h-3 w-3 animate-spin" />
           ) : (
             <Check className="h-3 w-3" />
@@ -285,29 +633,66 @@ function AddForm({ defaultRegion, onDone }: AddFormProps) {
 
 interface SourceRowProps {
   source: CreditSourceRow;
+  /** All loan-type default rows for this specific source (pre-filtered by source.id). */
+  loanTypeDefaults: LoanTypeDefault[];
 }
 
-function SourceRow({ source }: SourceRowProps) {
+function SourceRow({ source, loanTypeDefaults }: SourceRowProps) {
+  const schemaConfig = getSourceConfig(source.name);
+  const isKnownSource = schemaConfig !== null && schemaConfig.loan_types.length > 0;
+
+  // Edit state
   const [editing, setEditing] = useState(false);
   const [editName, setEditName] = useState(source.name);
   const [editType, setEditType] = useState<CreditSourceType>(source.type);
-  const [editInterestRate, setEditInterestRate] = useState(fmtRate(source.default_interest_rate));
-  const [editInstallments, setEditInstallments] = useState(fmtInt(source.default_installments));
-  const [editDueDay, setEditDueDay] = useState(fmtInt(source.default_due_day));
+  const defaults = getEditDefaults(source);
+  const [editInterestRate, setEditInterestRate] = useState(defaults.interestRate);
+  const [editInstallments, setEditInstallments] = useState(defaults.installments);
+  const [editDueDay, setEditDueDay] = useState(defaults.dueDay);
+  const [editedLtDefaults, setEditedLtDefaults] = useState<LtDefaultRow[]>(() =>
+    isKnownSource
+      ? buildLtDefaultRows(schemaConfig.loan_types, loanTypeDefaults)
+      : []
+  );
+  const [customLtRows, setCustomLtRows] = useState<LtDefaultRow[]>(() =>
+    !isKnownSource
+      ? loanTypeDefaults.map((d) => ({
+          loan_type: d.loan_type,
+          interest_rate: d.interest_rate != null ? fmtRate(d.interest_rate) : "",
+          installments: d.installments != null ? fmtInt(d.installments) : "",
+          due_day: d.due_day != null ? fmtInt(d.due_day) : "",
+        }))
+      : []
+  );
   const [editError, setEditError] = useState<string | null>(null);
   const [showDelete, setShowDelete] = useState(false);
 
   const update = useUpdateCreditSource();
+  const upsert = useUpsertLoanTypeDefaults();
+  const replace = useReplaceSourceLoanTypeDefaults();
   const toggle = useToggleCreditSourceActive();
   const del = useDeleteCreditSource();
 
   function startEdit() {
+    const d = getEditDefaults(source);
     setEditName(source.name);
     setEditType(source.type);
-    setEditInterestRate(fmtRate(source.default_interest_rate));
-    setEditInstallments(fmtInt(source.default_installments));
-    setEditDueDay(fmtInt(source.default_due_day));
+    setEditInterestRate(d.interestRate);
+    setEditInstallments(d.installments);
+    setEditDueDay(d.dueDay);
     setEditError(null);
+    if (isKnownSource) {
+      setEditedLtDefaults(buildLtDefaultRows(schemaConfig.loan_types, loanTypeDefaults));
+    } else {
+      setCustomLtRows(
+        loanTypeDefaults.map((d) => ({
+          loan_type: d.loan_type,
+          interest_rate: d.interest_rate != null ? fmtRate(d.interest_rate) : "",
+          installments: d.installments != null ? fmtInt(d.installments) : "",
+          due_day: d.due_day != null ? fmtInt(d.due_day) : "",
+        }))
+      );
+    }
     setEditing(true);
   }
 
@@ -323,23 +708,70 @@ function SourceRow({ source }: SourceRowProps) {
     }
     setEditError(null);
     try {
+      // 1. Update name / type / source-level defaults (only for custom sources)
       await update.mutateAsync({
         id: source.id,
         name: editName,
         type: editType,
-        default_interest_rate: editInterestRate
+        default_interest_rate: !isKnownSource && editInterestRate
           ? parseOptionalFloat(editInterestRate) !== null
             ? parseOptionalFloat(editInterestRate)! / 100
             : null
-          : null,
-        default_installments: parseOptionalInt(editInstallments),
-        default_due_day: parseOptionalInt(editDueDay),
+          : source.default_interest_rate,
+        default_installments: !isKnownSource
+          ? parseOptionalInt(editInstallments)
+          : source.default_installments,
+        default_due_day: !isKnownSource
+          ? parseOptionalInt(editDueDay)
+          : source.default_due_day,
       });
+
+      // 2. Save per-loan-type defaults
+      if (isKnownSource) {
+        // Known sources: upsert all (loan types are fixed, nothing to remove)
+        if (editedLtDefaults.length > 0) {
+          await upsert.mutateAsync(
+            editedLtDefaults.map((row) => ({
+              credit_source_id: source.id,
+              loan_type: row.loan_type,
+              interest_rate:
+                row.interest_rate !== ""
+                  ? (parseOptionalFloat(row.interest_rate) ?? null) !== null
+                    ? parseOptionalFloat(row.interest_rate)! / 100
+                    : null
+                  : null,
+              installments: parseOptionalInt(row.installments),
+              due_day: parseOptionalInt(row.due_day),
+            }))
+          );
+        }
+      } else {
+        // Custom sources: replace all (user may have removed rows)
+        const validRows = customLtRows.filter((r) => r.loan_type.trim() !== "");
+        await replace.mutateAsync({
+          sourceId: source.id,
+          rows: validRows.map((row) => ({
+            credit_source_id: source.id,
+            loan_type: row.loan_type.trim(),
+            interest_rate:
+              row.interest_rate !== ""
+                ? (parseOptionalFloat(row.interest_rate) ?? null) !== null
+                  ? parseOptionalFloat(row.interest_rate)! / 100
+                  : null
+                : null,
+            installments: parseOptionalInt(row.installments),
+            due_day: parseOptionalInt(row.due_day),
+          })),
+        });
+      }
+
       setEditing(false);
     } catch {
       setEditError("Failed to save. Try again.");
     }
   }
+
+  const isSaving = update.isPending || upsert.isPending || replace.isPending;
 
   if (editing) {
     return (
@@ -371,14 +803,27 @@ function SourceRow({ source }: SourceRowProps) {
           ))}
         </div>
 
-        <DefaultFields
-          interestRate={editInterestRate}
-          installments={editInstallments}
-          dueDay={editDueDay}
-          onInterestRateChange={setEditInterestRate}
-          onInstallmentsChange={setEditInstallments}
-          onDueDayChange={setEditDueDay}
-        />
+        {/* Per-loan-type defaults */}
+        {isKnownSource ? (
+          <LoanTypeDefaultsEditor
+            loanTypes={schemaConfig.loan_types}
+            value={editedLtDefaults}
+            onChange={setEditedLtDefaults}
+          />
+        ) : (
+          <>
+            <DefaultFields
+              label="Loan Defaults"
+              interestRate={editInterestRate}
+              installments={editInstallments}
+              dueDay={editDueDay}
+              onInterestRateChange={setEditInterestRate}
+              onInstallmentsChange={setEditInstallments}
+              onDueDayChange={setEditDueDay}
+            />
+            <CustomLoanTypeEditor value={customLtRows} onChange={setCustomLtRows} />
+          </>
+        )}
 
         {editError && (
           <p className="flex items-center gap-1.5 text-xs text-rose-400">
@@ -390,7 +835,7 @@ function SourceRow({ source }: SourceRowProps) {
           <button
             type="button"
             onClick={cancelEdit}
-            disabled={update.isPending}
+            disabled={isSaving}
             className="border-border/60 text-muted-foreground hover:text-foreground rounded-lg border px-3 py-1.5 text-xs transition-colors disabled:opacity-50"
           >
             Cancel
@@ -398,10 +843,10 @@ function SourceRow({ source }: SourceRowProps) {
           <button
             type="button"
             onClick={() => void saveEdit()}
-            disabled={update.isPending}
+            disabled={isSaving}
             className="bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
           >
-            {update.isPending ? (
+            {isSaving ? (
               <Loader2 className="h-3 w-3 animate-spin" />
             ) : (
               <Check className="h-3 w-3" />
@@ -443,21 +888,35 @@ function SourceRow({ source }: SourceRowProps) {
         {/* Name + type */}
         <div className="min-w-0 flex-1">
           <p className="text-foreground truncate text-sm font-medium">{source.name}</p>
-          {/* Show defaults summary if any are set */}
-          {(source.default_interest_rate !== null ||
-            source.default_installments !== null ||
-            source.default_due_day !== null) && (
+          {/* Summary line: per-type defaults for known sources, DB defaults for custom */}
+          {isKnownSource ? (
             <p className="text-muted-foreground mt-0.5 truncate text-[10px]">
-              {[
-                source.default_interest_rate !== null &&
-                  `${+(source.default_interest_rate * 100).toFixed(2)}% interest`,
-                source.default_installments !== null &&
-                  `${source.default_installments} installments`,
-                source.default_due_day !== null && `due day ${source.default_due_day}`,
-              ]
-                .filter(Boolean)
-                .join(" · ")}
+              {formatLtSummary(schemaConfig.loan_types, loanTypeDefaults)}
             </p>
+          ) : loanTypeDefaults.length > 0 ? (
+            <p className="text-muted-foreground mt-0.5 truncate text-[10px]">
+              {loanTypeDefaults
+                .map((d) => {
+                  const rate = d.interest_rate != null ? `${+(d.interest_rate * 100).toFixed(2)}%` : null;
+                  const inst = d.installments != null ? `${d.installments} mo` : null;
+                  return [d.loan_type, rate, inst].filter(Boolean).join(" · ");
+                })
+                .join("  /  ")}
+            </p>
+          ) : (
+            (() => {
+              const parts = [
+                source.default_interest_rate !== null &&
+                  `${+(source.default_interest_rate * 100).toFixed(2)}%`,
+                source.default_installments !== null && `${source.default_installments} mo`,
+                source.default_due_day !== null && `day ${source.default_due_day}`,
+              ].filter(Boolean);
+              return parts.length > 0 ? (
+                <p className="text-muted-foreground mt-0.5 truncate text-[10px]">
+                  {parts.join(" · ")}
+                </p>
+              ) : null;
+            })()
           )}
         </div>
         <TypeBadge type={source.type} />
@@ -505,22 +964,18 @@ interface CreditSourcesDrawerProps {
 
 export function CreditSourcesDrawer({ open, onClose }: CreditSourcesDrawerProps) {
   const { profile } = useAuth();
-  // Lender's own region is the baseline — never fall back to a hardcoded country
   const lenderRegion = profile?.region ?? "PH";
 
   const [activeTab, setActiveTab] = useState(lenderRegion);
   const { data: allSources = [], isLoading, error } = useAllCreditSources();
+  const { data: allLoanTypeDefaults = [] } = useAllLoanTypeDefaults();
 
-  // Country tabs = lender's own region + any other regions that already have sources.
-  // No hardcoded defaults — a lender in AE never sees a Philippines tab unless they
-  // explicitly added PH sources.
   const countryTabs = useMemo(() => {
     const regions = new Set<string>(allSources.map((s) => s.region));
-    regions.add(lenderRegion); // always include the lender's primary region
+    regions.add(lenderRegion);
     return [...regions].sort();
   }, [allSources, lenderRegion]);
 
-  // Normalise activeTab: if the current tab is gone after a delete, fall back to lenderRegion
   const safeTab =
     countryTabs.includes(activeTab) || activeTab === NEW_TAB ? activeTab : lenderRegion;
 
@@ -534,7 +989,6 @@ export function CreditSourcesDrawer({ open, onClose }: CreditSourcesDrawerProps)
     if (savedRegion) {
       setActiveTab(savedRegion);
     } else {
-      // Cancelled — return to lender's own region tab
       setActiveTab(lenderRegion);
     }
   }
@@ -580,7 +1034,7 @@ export function CreditSourcesDrawer({ open, onClose }: CreditSourcesDrawerProps)
               </button>
             </div>
 
-            {/* Tabs — country tabs + "+ New" tab */}
+            {/* Tabs */}
             <div className="border-border/60 flex gap-1 overflow-x-auto border-b px-3 scrollbar-none">
               {countryTabs.map((r) => (
                 <button
@@ -599,7 +1053,6 @@ export function CreditSourcesDrawer({ open, onClose }: CreditSourcesDrawerProps)
                 </button>
               ))}
 
-              {/* "+ New" tab — proper tab for adding a new credit source */}
               <button
                 type="button"
                 onClick={() => setActiveTab(NEW_TAB)}
@@ -617,12 +1070,10 @@ export function CreditSourcesDrawer({ open, onClose }: CreditSourcesDrawerProps)
 
             {/* Body */}
             <div className="flex-1 space-y-2 overflow-y-auto px-5 py-4">
-              {/* New source form (shown when "+ New" tab is active) */}
               {safeTab === NEW_TAB && (
                 <AddForm defaultRegion={lenderRegion} onDone={handleAddDone} />
               )}
 
-              {/* Error */}
               {error && (
                 <div className="flex items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-400">
                   <AlertCircle className="h-4 w-4 shrink-0" />
@@ -630,7 +1081,6 @@ export function CreditSourcesDrawer({ open, onClose }: CreditSourcesDrawerProps)
                 </div>
               )}
 
-              {/* Loading */}
               {isLoading && safeTab !== NEW_TAB && (
                 <div className="space-y-2">
                   {[1, 2, 3].map((i) => (
@@ -646,7 +1096,6 @@ export function CreditSourcesDrawer({ open, onClose }: CreditSourcesDrawerProps)
                 </div>
               )}
 
-              {/* Empty state */}
               {!isLoading && safeTab !== NEW_TAB && sources.length === 0 && (
                 <div className="border-border/60 bg-card rounded-xl border px-4 py-10 text-center">
                   <p className="text-foreground text-sm font-medium">No sources yet</p>
@@ -664,10 +1113,17 @@ export function CreditSourcesDrawer({ open, onClose }: CreditSourcesDrawerProps)
                 </div>
               )}
 
-              {/* Source list */}
               {!isLoading &&
                 safeTab !== NEW_TAB &&
-                sources.map((source) => <SourceRow key={source.id} source={source} />)}
+                sources.map((source) => (
+                  <SourceRow
+                    key={source.id}
+                    source={source}
+                    loanTypeDefaults={allLoanTypeDefaults.filter(
+                      (d) => d.credit_source_id === source.id
+                    )}
+                  />
+                ))}
             </div>
 
             {/* Footer hint */}

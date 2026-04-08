@@ -9,7 +9,7 @@ interface RegisterPayload {
   full_name: string;
   email: string;
   password: string;
-  region: "PH" | "UAE";
+  region: string; // ISO 3166-1 alpha-2 country code
 }
 
 // Seeded for every new org so lenders have sources ready on day one.
@@ -24,10 +24,10 @@ const CREDIT_SOURCE_SEEDS = [
   { name: "BPI",        type: "credit_card", region: "PH" },
   { name: "Metrobank",  type: "credit_card", region: "PH" },
   // UAE
-  { name: "Tabby",        type: "bnpl",        region: "UAE" },
-  { name: "Emirates NBD", type: "credit_card", region: "UAE" },
-  { name: "Mashreq",      type: "credit_card", region: "UAE" },
-  { name: "ADCB",         type: "credit_card", region: "UAE" },
+  { name: "Tabby",        type: "bnpl",        region: "AE" },
+  { name: "Emirates NBD", type: "credit_card", region: "AE" },
+  { name: "Mashreq",      type: "credit_card", region: "AE" },
+  { name: "ADCB",         type: "credit_card", region: "AE" },
 ];
 
 function toSlug(name: string): string {
@@ -53,7 +53,8 @@ Deno.serve(async (req: Request) => {
   try {
     // ── 1. Parse and validate payload ─────────────────────────────────────────
     const body = (await req.json()) as Partial<RegisterPayload>;
-    const { full_name, email, password, region } = body;
+    const { full_name, email, password } = body;
+    const region = body.region?.trim().toUpperCase() ?? "";
 
     if (!full_name?.trim() || !email?.trim() || !password || !region) {
       return Response.json(
@@ -62,9 +63,10 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    if (!["PH", "UAE"].includes(region)) {
+    // Validate ISO 3166-1 alpha-2 format (2 uppercase letters)
+    if (!/^[A-Z]{2}$/.test(region.trim().toUpperCase())) {
       return Response.json(
-        { error: "Invalid region. Must be PH or UAE." },
+        { error: "Invalid region. Must be a valid ISO 3166-1 alpha-2 country code (e.g. PH, AE, US)." },
         { status: 400, headers: corsHeaders }
       );
     }

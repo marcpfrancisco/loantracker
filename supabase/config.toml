@@ -1,3 +1,11 @@
+# ── Edge Function configuration ───────────────────────────────────────────────
+# register-lender is a public endpoint — no user session exists during signup.
+# JWT verification must be disabled so the Supabase gateway doesn't reject the
+# request before it reaches the function. The function uses the service role key
+# internally and performs its own input validation.
+[functions.register-lender]
+verify_jwt = false
+
 [auth.email.template.invite]
 subject = "You are invited to Global Loan Tracker App"
 content_path = "./supabase/email-templates/invite-user.html"

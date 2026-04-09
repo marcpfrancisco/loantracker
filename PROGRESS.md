@@ -57,6 +57,8 @@
 - [x] Installment status management (unpaid → pending → paid)
 - [x] Payment proof upload (borrower submits receipt; admin reviews/approves/rejects)
 - [x] Loan status management: active → completed / defaulted / cancelled
+- [x] **Loan editing** — admin can edit principal, interest rate, service fee, due day, notes; unpaid installments are recomputed; business rule: locked after first payment unless org plan = `owner`
+- [x] **Bulk mark installments paid** — admin bulk mode in `LoanDetailPage`; `useBulkMarkPaid` in `useUpdateInstallment.ts`; fires `notify-payment-confirmed` Edge Function
 - [x] Supported loan types: Maribank Credit, S-Loan, G-Loan, SPayLater, LazCredit, Tabby, Credit Card, Custom
 - [x] Loan breakdown summary — always shows "Borrower Actually Receives" block; visible to both admin and borrower
 - [x] Installment strategies: `computeMaribank`, `computeSLoan`, `computeGLoan`, `computeLazCredit`, `computeTabby`
@@ -82,6 +84,7 @@
   - Default due day of month
   - These pre-fill the Add Loan form when that source is selected (stored in `default_interest_rate`, `default_installments`, `default_due_day` columns — migration 011)
   - Source rows show a compact defaults summary line when any defaults are configured
+- [x] **Credit source defaults wired into Add Loan form** — `useEffect` in `AddLoanDrawer` applies a three-level priority chain: per-loan-type DB override → source-level defaults → schema.ts config
 - [x] **Region-aware tabs** — tabs are derived from the lender's own profile region + any regions that already have sources. An AE lender never sees a Philippines tab unless they explicitly added a PH source via "+ New"
 - [x] **CountryPicker in Add form** pre-selects the lender's own region; lender can change it to add sources for another country
 - [x] Toggle active/inactive per source (inactive hidden from loan forms, kept for history)
@@ -95,6 +98,7 @@
 - [x] **Migration `009_owner_plan.sql`** — added `'owner'` plan tier to `organizations.plan` constraint; set owner account plan via email lookup
 - [x] **Migration `010_flexible_regions.sql`** — converted `region_type`/`currency_type` Postgres enums to free-text `text` columns; renamed stored `'UAE'` → `'AE'` (ISO 3166-1 alignment); updated `handle_new_user()` trigger; dropped old enums
 - [x] **Migration `011_credit_source_defaults.sql`** — added `default_interest_rate` (numeric), `default_installments` (smallint), `default_due_day` (smallint, 1–28) to `credit_sources`; all nullable
+- [x] **Migration `012_per_loan_type_default.sql`** — `credit_source_loan_type_defaults` table; per-loan-type interest rate, installments, due day overrides; RLS; `org_id DEFAULT my_org_id()`
 - [x] **`register-lender` Edge Function** — public registration; `OWNER_EMAIL` secret auto-assigns `'owner'` plan; creates org → auth user → org_members → user_org_context → seeds credit sources
 - [x] **`invite-borrower` Edge Function** — fetches caller's active org from `user_org_context`; verifies admin role; creates `org_members` + `user_org_context` for new borrower
 - [x] **`AuthContext`** — exposes `activeOrgId`, `activeRole`, `switchOrg(orgId)`; fetches org context in parallel with profile on every auth event; single-org users upsert `user_org_context` on sign-in (self-healing)
@@ -115,6 +119,9 @@
 - [x] Expense Tabs list page (`/tabs`): admin sees all; borrower redirected to their own tab
 - [x] Expense Tab Detail page (`/tabs/:id`): totals card, month pills, QuickAdd bar, lock/unlock, payment recording, delete item/payment
 - [x] Export expense tab as **PDF** or **CSV**
+- [x] **Delete expense period** — admin-only; `useDeleteExpensePeriod` in `useExpenseTabMutations.ts`; confirmation dialog
+- [x] **Inline edit expense item** — `ItemRow` edit mode (description, amount, split toggle); `useUpdateExpenseItem` in `useExpenseTabMutations.ts`
+- [x] **Bulk lock/unlock expense periods** — admin bulk mode on month pills; select-all; `useBulkTogglePeriodLock` in `useExpenseTabMutations.ts`; Lock/Unlock action buttons
 
 ### Profile Page
 - [x] Display name, region (with flag), role
@@ -150,13 +157,10 @@
 ## Known Limitations
 
 - Payment proof storage has no CDN or expiry policy configured.
-- Expense tab: no "delete period" action — removing all items from a month leaves an empty period row.
-- Expense tab: items can only be deleted and re-added, not inline-edited.
 - Tabby installment amounts cannot be edited after loan creation — admin must delete and re-create the loan.
 - Billing enforcement (free plan borrower/loan caps) is not yet wired up in the frontend or enforced via RLS.
 - No push notifications for due date reminders (Web Push Phase 2 not yet implemented).
 - No FX conversion utility — multi-currency totals are always kept separate per currency.
-- Credit source defaults (`default_interest_rate` etc.) are stored but not yet wired into the Add Loan form auto-fill.
 
 ---
 
@@ -169,8 +173,8 @@ The `default_interest_rate`, `default_installments`, and `default_due_day` colum
 
 Implementation: in the `useEffect` that watches `watchedSourceId`, check `selectedSource.default_*` fields and `setValue` before the schema config defaults kick in.
 
-#### Loan Editing
-Allow the admin to edit a loan's principal, interest rate, notes, and due day after creation without deleting and re-creating. Key constraint: installment amounts may need to be recomputed.
+#### ~~Loan Editing~~ ✅ Done
+~~Allow the admin to edit a loan's principal, interest rate, notes, and due day after creation without deleting and re-creating. Key constraint: installment amounts may need to be recomputed.~~
 
 ### High Priority
 
@@ -191,9 +195,6 @@ Enforce `free` plan limits (5 borrowers / 20 active loans) in the invite flow an
 
 - **FX conversion utility** — `Money` class + admin-configurable exchange rate for a unified outstanding total across currencies on the dashboard
 - **Loan statement — include expense tab** — merge expense tab history into the PDF/CSV export per borrower
-- **Expense tab — edit item** — inline edit for description + amount (currently delete-and-re-add only)
-- **Expense tab — delete period** — remove empty month rows
-- **Admin bulk operations** — bulk mark installments paid, bulk lock/unlock periods
 
 ### Low Priority / Nice to Have
 

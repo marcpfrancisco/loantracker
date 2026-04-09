@@ -8,6 +8,7 @@ import type { Resolver } from "react-hook-form";
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useAuth } from "@/hooks/useAuth";
 import { useAdminBorrowers } from "@/hooks/useAdminBorrowers";
 import { useCreditSources } from "@/hooks/useCreditSources";
 import { useCreateLoan } from "@/hooks/useCreateLoan";
@@ -67,10 +68,6 @@ type FormData = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function regionToCurrency(region: RegionType): CurrencyType {
-  return getDefaultCurrency(region);
-}
-
 function ordinal(n: number): string {
   const s = ["th", "st", "nd", "rd"];
   const v = n % 100;
@@ -114,12 +111,14 @@ interface AddLoanDrawerProps {
 }
 
 export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
+  const { activeRegions } = useAuth();
   const { data: allBorrowers = [] } = useAdminBorrowers();
   const borrowers = allBorrowers.filter((b) => b.isConfirmed);
   const { mutateAsync: createLoan, isPending } = useCreateLoan();
   const [dueDateOpen, setDueDateOpen] = useState(false);
   const [startDateOpen, setStartDateOpen] = useState(false);
   const [tabbyAmounts, setTabbyAmounts] = useState<number[]>([]);
+  const [selectedRegion, setSelectedRegion] = useState<RegionType | null>(null);
 
   const {
     register,
@@ -160,7 +159,7 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
     data: creditSources = [],
     isLoading: sourcesLoading,
     error: sourcesError,
-  } = useCreditSources(borrowerRegion);
+  } = useCreditSources(selectedRegion);
 
   // Per-loan-type defaults — cached, cheap, shared across all add-loan forms
   const { data: loanTypeDefaults = [] } = useAllLoanTypeDefaults();
@@ -181,10 +180,28 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
       ? `Enter actual ${activeConfig.feeDisplayMode.label.toLowerCase()} amount shown in the app`
       : undefined;
 
-  // Reset source when borrower changes
+  // When borrower changes, sync selectedRegion.
+  // Prefer borrower's region if it's an active region, else first active region.
+  // Falls back to borrowerRegion directly when activeRegions hasn't loaded yet.
+  useEffect(() => {
+    if (!borrowerRegion) {
+      setSelectedRegion(null);
+      return;
+    }
+    const preferred =
+      activeRegions.length > 0
+        ? activeRegions.includes(borrowerRegion)
+          ? borrowerRegion
+          : activeRegions[0]
+        : borrowerRegion;
+    setSelectedRegion(preferred as RegionType);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [borrowerRegion]);
+
+  // When selectedRegion changes (currency override or borrower change), reset source
   useEffect(() => {
     setValue("source_id", "", { shouldValidate: false });
-  }, [watchedBorrowerId, setValue]);
+  }, [selectedRegion, setValue]);
 
   // Auto-select first loan type when source changes
   useEffect(() => {
@@ -263,6 +280,7 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
 
   function handleClose() {
     reset();
+    setSelectedRegion(null);
     setDueDateOpen(false);
     setStartDateOpen(false);
     onClose();
@@ -307,14 +325,14 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
   }
 
   async function onSubmit(data: FormData) {
-    if (!borrowerRegion) return;
+    if (!selectedRegion) return;
 
     await createLoan({
       borrower_id: data.borrower_id,
       source_id: data.source_id,
       loan_type: data.loan_type,
-      region: borrowerRegion,
-      currency: regionToCurrency(borrowerRegion),
+      region: selectedRegion,
+      currency: getDefaultCurrency(selectedRegion),
       principal: data.principal,
       interest_rate: data.interest_rate,
       service_fee: data.service_fee ?? 0,
@@ -330,7 +348,7 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
     handleClose();
   }
 
-  const currencyLabel = borrowerRegion ? regionToCurrency(borrowerRegion) : "PHP / AED";
+  const currencyLabel = selectedRegion ? getDefaultCurrency(selectedRegion) : "—";
   const showLoanTypeSelector = selectedSource && availableLoanTypes.length > 1;
 
   return (
@@ -361,9 +379,9 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
             <div className="border-border/60 flex shrink-0 items-center justify-between border-b px-5 py-4">
               <div>
                 <h2 className="text-foreground font-semibold">Add Loan</h2>
-                {borrowerRegion && (
+                {selectedRegion && (
                   <p className="text-muted-foreground mt-0.5 text-xs">
-                    {getFlagEmoji(borrowerRegion)} {getCountryName(borrowerRegion)} · {getDefaultCurrency(borrowerRegion)}
+                    {getFlagEmoji(selectedRegion)} {getCountryName(selectedRegion)} · {getDefaultCurrency(selectedRegion)}
                   </p>
                 )}
               </div>
@@ -403,14 +421,14 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
                     error={
                       sourcesError ? "Failed to load credit sources" : errors.source_id?.message
                     }
-                    hint={!borrowerRegion ? "Select a borrower first" : undefined}
+                    hint={!selectedRegion ? "Select a borrower first" : undefined}
                   >
                     <select
                       {...register("source_id")}
-                      disabled={!borrowerRegion || sourcesLoading}
+                      disabled={!selectedRegion || sourcesLoading}
                       className={cn(
                         selectClass,
-                        (!borrowerRegion || sourcesLoading) && "opacity-50"
+                        (!selectedRegion || sourcesLoading) && "opacity-50"
                       )}
                     >
                       <option value="">{sourcesLoading ? "Loading…" : "Select source…"}</option>
@@ -422,6 +440,40 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
                     </select>
                   </FieldWrapper>
                 </section>
+
+                {/* ── Loan Currency (only when org has multiple active regions) ── */}
+                {activeRegions.length >= 2 && borrowerRegion && (
+                  <section className="space-y-3">
+                    <h3 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+                      Loan Currency
+                    </h3>
+                    <div className="flex flex-wrap gap-2">
+                      {activeRegions.map((code) => (
+                        <button
+                          key={code}
+                          type="button"
+                          onClick={() => setSelectedRegion(code as RegionType)}
+                          className={cn(
+                            "cursor-pointer rounded-lg border px-3 py-2 text-xs font-medium transition-colors",
+                            selectedRegion === code
+                              ? "bg-primary/15 border-primary/40 text-primary"
+                              : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
+                          )}
+                        >
+                          {getFlagEmoji(code)} {getDefaultCurrency(code)}
+                          {code === borrowerRegion && (
+                            <span className="ml-1 opacity-60">(default)</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                    {selectedRegion !== borrowerRegion && borrowerRegion && (
+                      <p className="text-amber-400 text-xs">
+                        Borrower's default region is {getFlagEmoji(borrowerRegion)} {getDefaultCurrency(borrowerRegion)}. Recording this loan in a different currency.
+                      </p>
+                    )}
+                  </section>
+                )}
 
                 {/* ── Loan Type (only when source has multiple types) ── */}
                 {showLoanTypeSelector && (
@@ -670,14 +722,14 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
                 )}
 
                 {/* ── Breakdown Summary ──────────────────────────────── */}
-                {borrowerRegion && activeConfig && (
+                {selectedRegion && activeConfig && (
                   <LoanBreakdownSummary
                     loanTypeConfig={activeConfig}
                     principal={Number(watchedPrincipal) || 0}
                     interestRate={watchedInterestRate}
                     serviceFee={Number(watchedServiceFee) || 0}
                     installmentsTotal={Number(watchedInstallments) || 0}
-                    currency={regionToCurrency(borrowerRegion)}
+                    currency={getDefaultCurrency(selectedRegion) as CurrencyType}
                   />
                 )}
               </div>
@@ -693,7 +745,7 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
                 </button>
                 <button
                   type="submit"
-                  disabled={isPending || !borrowerRegion}
+                  disabled={isPending || !selectedRegion}
                   className="bg-primary text-primary-foreground flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-opacity disabled:opacity-50"
                 >
                   {isPending && <Loader2 className="h-4 w-4 animate-spin" />}

@@ -19,6 +19,7 @@ import {
   Pencil,
   Check,
   Archive,
+  CheckSquare,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
@@ -34,6 +35,8 @@ import {
   useUpdateExpenseItem,
   useArchivePeriod,
   useArchiveYear,
+  useBulkTogglePeriodLock,
+  type BulkLockTarget,
 } from "@/hooks/useExpenseTabMutations";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -92,6 +95,9 @@ function MonthPill({
   paid_status,
   isSelected,
   onClick,
+  bulkMode,
+  isChecked,
+  onBulkToggle,
 }: {
   period: string;
   is_locked: boolean;
@@ -99,14 +105,17 @@ function MonthPill({
   paid_status: "unpaid" | "partial" | "paid";
   isSelected: boolean;
   onClick: () => void;
+  bulkMode?: boolean;
+  isChecked?: boolean;
+  onBulkToggle?: () => void;
 }) {
   const ref = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    if (isSelected) {
+    if (isSelected && !bulkMode) {
       ref.current?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
     }
-  }, [isSelected]);
+  }, [isSelected, bulkMode]);
 
   const Icon = is_archived
     ? Archive
@@ -115,6 +124,49 @@ function MonthPill({
       : is_locked
         ? Lock
         : Unlock;
+
+  if (bulkMode) {
+    return (
+      <button
+        ref={ref}
+        type="button"
+        onClick={onBulkToggle}
+        className={cn(
+          "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
+          isChecked
+            ? "bg-primary/15 border-primary/40 text-primary ring-2 ring-primary/40 shadow-sm"
+            : cn(
+                is_locked && paid_status !== "paid"
+                  ? PAID_STATUS_STYLES.locked
+                  : PAID_STATUS_STYLES[paid_status],
+                "hover:opacity-80"
+              )
+        )}
+      >
+        {/* Checkbox */}
+        <div
+          className={cn(
+            "flex h-3 w-3 shrink-0 items-center justify-center rounded border transition-colors",
+            isChecked ? "bg-primary border-primary" : "border-current opacity-60"
+          )}
+        >
+          {isChecked && (
+            <svg viewBox="0 0 10 8" className="h-2 w-2 text-white" fill="currentColor">
+              <path
+                d="M1 4l2.5 2.5L9 1"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          )}
+        </div>
+        {formatPeriodShort(period)}
+      </button>
+    );
+  }
 
   return (
     <button
@@ -675,10 +727,13 @@ export default function ExpenseTabDetailPage() {
   const deletePeriod = useDeleteExpensePeriod(id!);
   const archivePeriod = useArchivePeriod(id!);
   const archiveYear = useArchiveYear(id!);
+  const bulkToggleLock = useBulkTogglePeriodLock(id!);
 
   const [showDeletePeriod, setShowDeletePeriod] = useState(false);
   const [showArchivePeriod, setShowArchivePeriod] = useState(false);
   const [showArchiveYear, setShowArchiveYear] = useState<string | null>(null);
+  const [bulkLockMode, setBulkLockMode] = useState(false);
+  const [selectedPeriodIds, setSelectedPeriodIds] = useState<Set<string>>(new Set());
 
   const currentYear = String(new Date().getFullYear());
   const [expandedYears, setExpandedYears] = useState<Set<string>>(() => new Set([currentYear]));
@@ -782,6 +837,31 @@ export default function ExpenseTabDetailPage() {
   // Sorted newest-first for pills display
   const sortedPeriods = [...virtualPeriods].sort((a, b) => b.period.localeCompare(a.period));
 
+  // Real (non-virtual) periods only — used for bulk lock/unlock
+  const allRealPeriods = sortedPeriods.filter((p) => p.id !== "__virtual__");
+
+  function exitBulkLockMode() {
+    setBulkLockMode(false);
+    setSelectedPeriodIds(new Set());
+  }
+
+  function togglePeriodSelection(periodId: string) {
+    setSelectedPeriodIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(periodId)) next.delete(periodId);
+      else next.add(periodId);
+      return next;
+    });
+  }
+
+  function handleBulkAction(lockTo: boolean) {
+    const targets: BulkLockTarget[] = allRealPeriods
+      .filter((p) => selectedPeriodIds.has(p.id) && p.is_locked !== lockTo)
+      .map((p) => ({ id: p.id, lockTo }));
+    if (targets.length === 0) return;
+    bulkToggleLock.mutate(targets, { onSuccess: exitBulkLockMode });
+  }
+
   // Group by year (newest year first)
   const periodsByYear = sortedPeriods.reduce<Record<string, typeof sortedPeriods>>((acc, p) => {
     const year = p.period.slice(0, 4);
@@ -878,6 +958,120 @@ export default function ExpenseTabDetailPage() {
 
         {/* Month navigation — grouped by year */}
         <div className="space-y-2">
+          {/* Bulk lock/unlock header */}
+          {isAdmin && allRealPeriods.length >= 2 && (
+            <div className="flex items-center justify-between gap-2 pb-1">
+              {bulkLockMode ? (
+                <>
+                  {/* Select-all + count */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const allSelected =
+                        allRealPeriods.length > 0 &&
+                        allRealPeriods.every((p) => selectedPeriodIds.has(p.id));
+                      setSelectedPeriodIds(
+                        allSelected ? new Set() : new Set(allRealPeriods.map((p) => p.id))
+                      );
+                    }}
+                    className="flex cursor-pointer items-center gap-2"
+                  >
+                    <div
+                      className={cn(
+                        "flex h-4 w-4 items-center justify-center rounded border transition-colors",
+                        allRealPeriods.length > 0 &&
+                          allRealPeriods.every((p) => selectedPeriodIds.has(p.id))
+                          ? "bg-primary border-primary"
+                          : "border-border/60"
+                      )}
+                    >
+                      {allRealPeriods.length > 0 &&
+                        allRealPeriods.every((p) => selectedPeriodIds.has(p.id)) && (
+                          <svg
+                            viewBox="0 0 10 8"
+                            className="h-2.5 w-2.5 text-white"
+                            fill="currentColor"
+                          >
+                            <path
+                              d="M1 4l2.5 2.5L9 1"
+                              stroke="currentColor"
+                              strokeWidth="1.5"
+                              fill="none"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        )}
+                    </div>
+                    <span className="text-foreground text-xs font-semibold">
+                      {selectedPeriodIds.size > 0
+                        ? `${selectedPeriodIds.size} selected`
+                        : "Select all"}
+                    </span>
+                  </button>
+
+                  {/* Bulk actions */}
+                  <div className="flex items-center gap-2">
+                    {selectedPeriodIds.size > 0 &&
+                      allRealPeriods.some(
+                        (p) => selectedPeriodIds.has(p.id) && !p.is_locked
+                      ) && (
+                        <button
+                          type="button"
+                          disabled={bulkToggleLock.isPending}
+                          onClick={() => handleBulkAction(true)}
+                          className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-orange-500/30 bg-orange-500/10 px-2.5 py-1 text-xs font-medium text-orange-400 transition-colors hover:bg-orange-500/20 disabled:opacity-50"
+                        >
+                          {bulkToggleLock.isPending ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Lock className="h-3 w-3" />
+                          )}
+                          Lock
+                        </button>
+                      )}
+                    {selectedPeriodIds.size > 0 &&
+                      allRealPeriods.some(
+                        (p) => selectedPeriodIds.has(p.id) && p.is_locked
+                      ) && (
+                        <button
+                          type="button"
+                          disabled={bulkToggleLock.isPending}
+                          onClick={() => handleBulkAction(false)}
+                          className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-400 transition-colors hover:bg-amber-500/20 disabled:opacity-50"
+                        >
+                          {bulkToggleLock.isPending ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <Unlock className="h-3 w-3" />
+                          )}
+                          Unlock
+                        </button>
+                      )}
+                    <button
+                      type="button"
+                      onClick={exitBulkLockMode}
+                      className="border-border/60 text-muted-foreground hover:text-foreground cursor-pointer rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="ml-auto">
+                  <button
+                    type="button"
+                    onClick={() => setBulkLockMode(true)}
+                    className="border-border/60 text-muted-foreground hover:text-foreground flex cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors"
+                  >
+                    <CheckSquare className="h-3 w-3" />
+                    Bulk
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {years.map((year) => {
             const yearPeriods = periodsByYear[year];
             const isCurrentYear = year === currentYear;
@@ -956,6 +1150,13 @@ export default function ExpenseTabDetailPage() {
                         paid_status={p.paid_status}
                         isSelected={p.period === selectedPeriod}
                         onClick={() => handlePeriodSelect(p.period)}
+                        bulkMode={bulkLockMode && p.id !== "__virtual__"}
+                        isChecked={selectedPeriodIds.has(p.id)}
+                        onBulkToggle={
+                          p.id !== "__virtual__"
+                            ? () => togglePeriodSelection(p.id)
+                            : undefined
+                        }
                       />
                     ))}
 

@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import type { CurrencyType, RegionType } from "@/types/enums";
 
@@ -217,6 +218,53 @@ export function useArchiveYear(tabId: string) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["expense-tab", tabId] });
       void qc.invalidateQueries({ queryKey: ["expense-tabs"] });
+    },
+  });
+}
+
+// ── Bulk lock / unlock periods ────────────────────────────────────────────────
+
+export interface BulkLockTarget {
+  id: string;
+  lockTo: boolean;
+}
+
+export function useBulkTogglePeriodLock(tabId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (targets: BulkLockTarget[]) => {
+      const lockIds = targets.filter((t) => t.lockTo).map((t) => t.id);
+      const unlockIds = targets.filter((t) => !t.lockTo).map((t) => t.id);
+
+      if (lockIds.length > 0) {
+        const { error } = await supabase
+          .from("expense_periods")
+          .update({ is_locked: true })
+          .in("id", lockIds);
+        if (error) throw error;
+      }
+      if (unlockIds.length > 0) {
+        const { error } = await supabase
+          .from("expense_periods")
+          .update({ is_locked: false })
+          .in("id", unlockIds);
+        if (error) throw error;
+      }
+    },
+    onSuccess: (_, targets) => {
+      const locked = targets.filter((t) => t.lockTo).length;
+      const unlocked = targets.filter((t) => !t.lockTo).length;
+      if (locked > 0 && unlocked > 0) {
+        toast.success(`${locked} locked, ${unlocked} unlocked.`);
+      } else if (locked > 0) {
+        toast.success(`${locked} period${locked > 1 ? "s" : ""} locked.`);
+      } else {
+        toast.success(`${unlocked} period${unlocked > 1 ? "s" : ""} unlocked.`);
+      }
+      void qc.invalidateQueries({ queryKey: ["expense-tab", tabId] });
+    },
+    onError: () => {
+      toast.error("Failed to update periods. Please try again.");
     },
   });
 }

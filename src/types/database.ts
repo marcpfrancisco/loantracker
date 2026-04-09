@@ -484,6 +484,7 @@ export type Database = {
       }
       organizations: {
         Row: {
+          active_regions: string[] | null
           created_at: string
           id: string
           name: string
@@ -493,6 +494,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          active_regions?: string[] | null
           created_at?: string
           id?: string
           name: string
@@ -502,6 +504,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          active_regions?: string[] | null
           created_at?: string
           id?: string
           name?: string

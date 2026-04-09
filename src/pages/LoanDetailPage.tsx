@@ -10,6 +10,8 @@ import {
   FileText,
   CheckSquare,
   Loader2,
+  Pencil,
+  Lock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { cardVariants } from "@/lib/animations";
@@ -19,6 +21,7 @@ import { useUpdateInstallment, useBulkMarkPaid } from "@/hooks/useUpdateInstallm
 import { useUpdateLoanStatus } from "@/hooks/useUpdateLoanStatus";
 import { InstallmentRow } from "@/components/loans/InstallmentRow";
 import { LoanBreakdownSummary } from "@/components/loans/LoanBreakdownSummary";
+import { EditLoanDrawer } from "@/components/loans/EditLoanDrawer";
 import { RegionLabel } from "@/components/ui/region-badge";
 import { getLoanTypeConfig, FALLBACK_LOAN_TYPE } from "@/types/schema";
 import type { LoanStatus, LoanType, CreditSourceType, PaymentStatus } from "@/types/enums";
@@ -100,8 +103,9 @@ function PageSkeleton() {
 export default function LoanDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { profile, activePlan } = useAuth();
   const isAdmin = profile?.role === "admin";
+  const isOwnerPlan = activePlan === "owner";
 
   const { data: loan, isLoading, error } = useLoanDetail(id);
   const {
@@ -114,6 +118,7 @@ export default function LoanDetailPage() {
 
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [editDrawerOpen, setEditDrawerOpen] = useState(false);
 
   function exitBulkMode() {
     setBulkMode(false);
@@ -155,6 +160,7 @@ export default function LoanDetailPage() {
     loan.installments_total > 0 ? paidInstallments.length / loan.installments_total : 0;
 
   const allPaid = paidInstallments.length === loan.installments_total;
+  const hasPayments = paidInstallments.length > 0;
 
   function handleInstallmentUpdate(installmentId: string, status: PaymentStatus) {
     updateInstallment({ id: installmentId, status, loanId: id ?? "" });
@@ -186,14 +192,39 @@ export default function LoanDetailPage() {
               {sourceTypeLabels[loan.credit_source.type]} · {loanTypeLabels[loan.loan_type]}
             </p>
           </div>
-          <span
-            className={cn(
-              "shrink-0 rounded border px-1.5 py-0.5 text-[10px] font-medium capitalize",
-              loanStatusStyles[loan.status]
+          <div className="flex shrink-0 items-center gap-2">
+            <span
+              className={cn(
+                "rounded border px-1.5 py-0.5 text-[10px] font-medium capitalize",
+                loanStatusStyles[loan.status]
+              )}
+            >
+              {loan.status}
+            </span>
+            {isAdmin && (
+              <button
+                onClick={() => setEditDrawerOpen(true)}
+                title={
+                  hasPayments && !isOwnerPlan
+                    ? "Editing locked — requires Owner plan when payments exist"
+                    : "Edit loan"
+                }
+                className={cn(
+                  "cursor-pointer rounded-lg p-1.5 transition-colors",
+                  hasPayments && !isOwnerPlan
+                    ? "text-muted-foreground/40 cursor-not-allowed"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                )}
+                disabled={hasPayments && !isOwnerPlan}
+              >
+                {hasPayments && !isOwnerPlan ? (
+                  <Lock className="h-3.5 w-3.5" />
+                ) : (
+                  <Pencil className="h-3.5 w-3.5" />
+                )}
+              </button>
             )}
-          >
-            {loan.status}
-          </span>
+          </div>
         </div>
 
         {/* Principal */}
@@ -484,6 +515,16 @@ export default function LoanDetailPage() {
           ))
         )}
       </motion.div>
+
+      {/* Edit Loan Drawer */}
+      {isAdmin && (
+        <EditLoanDrawer
+          open={editDrawerOpen}
+          onClose={() => setEditDrawerOpen(false)}
+          loan={loan}
+          isOwnerPlan={isOwnerPlan}
+        />
+      )}
     </div>
   );
 }

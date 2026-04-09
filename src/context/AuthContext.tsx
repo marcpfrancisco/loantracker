@@ -12,6 +12,8 @@ interface AuthContextValue {
   loading: boolean;
   activeOrgId: string | null;
   activeRole: UserRole | null;
+  activePlan: string | null;
+  activeRegions: string[];
   switchOrg: (orgId: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -25,6 +27,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [activeOrgId, setActiveOrgId] = useState<string | null>(null);
   const [activeRole, setActiveRole] = useState<UserRole | null>(null);
+  const [activePlan, setActivePlan] = useState<string | null>(null);
+  const [activeRegions, setActiveRegions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   async function fetchProfile(userId: string) {
@@ -90,6 +94,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     setActiveOrgId(orgId);
     setActiveRole(role);
+
+    const { data: org } = await supabase
+      .from("organizations")
+      .select("plan, region, active_regions")
+      .eq("id", orgId)
+      .single();
+    setActivePlan(org?.plan ?? null);
+    setActiveRegions(org?.active_regions ?? (org?.region ? [org.region] : []));
   }
 
   // Switches the user's active org context (for multi-org users).
@@ -140,6 +152,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfile(null);
         setActiveOrgId(null);
         setActiveRole(null);
+        setActivePlan(null);
+        setActiveRegions([]);
         if (event === "SIGNED_OUT") {
           window.location.replace("/login");
         }
@@ -166,7 +180,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ session, profile, loading, activeOrgId, activeRole, switchOrg, signOut, refreshProfile }}
+      value={{ session, profile, loading, activeOrgId, activeRole, activePlan, activeRegions, switchOrg, signOut, refreshProfile }}
     >
       {children}
     </AuthContext.Provider>

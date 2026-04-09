@@ -3,15 +3,16 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion } from "framer-motion";
-import { User, Loader2, Save, Hash } from "lucide-react";
+import { User, Loader2, Save, Hash, X } from "lucide-react";
 import { PlanBadge } from "@/components/ui/plan-badge";
 import { CountryPicker } from "@/components/ui/country-picker";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { cardVariants } from "@/lib/animations";
-import { RegionBadge } from "@/components/ui/region-badge";
+import { cn } from "@/lib/utils";
 import type { RegionType } from "@/types/enums";
+import { getFlagEmoji, getCountryName, getDefaultCurrency } from "@/lib/countries";
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
@@ -30,9 +31,10 @@ interface OrgData {
   slug: string;
   region: RegionType;
   plan: string;
+  active_regions: string[] | null;
 }
 
-// ── Section wrapper (matches ProfilePage style) ───────────────────────────────
+// ── Section wrapper ───────────────────────────────────────────────────────────
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -74,6 +76,47 @@ function OrgSettingsSkeleton() {
   );
 }
 
+// ── Region chip ───────────────────────────────────────────────────────────────
+
+function RegionChip({
+  code,
+  isPrimary,
+  onRemove,
+}: {
+  code: string;
+  isPrimary: boolean;
+  onRemove?: () => void;
+}) {
+  return (
+    <div
+      className={cn(
+        "flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs",
+        isPrimary
+          ? "border-primary/30 bg-primary/10 text-primary"
+          : "border-border/60 bg-muted/50 text-foreground"
+      )}
+    >
+      <span>{getFlagEmoji(code)}</span>
+      <span className="font-medium">{getCountryName(code)}</span>
+      <span className={cn("text-[11px]", isPrimary ? "text-primary/70" : "text-muted-foreground")}>
+        {getDefaultCurrency(code)}
+      </span>
+      {isPrimary && (
+        <span className="text-primary/60 ml-0.5 text-[10px]">primary</span>
+      )}
+      {!isPrimary && onRemove && (
+        <button
+          type="button"
+          onClick={onRemove}
+          className="text-muted-foreground hover:text-foreground ml-0.5 cursor-pointer transition-colors"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      )}
+    </div>
+  );
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const inputClass =
@@ -84,15 +127,22 @@ export default function OrgSettingsPage() {
   const [org, setOrg] = useState<OrgData | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  // Active regions managed outside RHF (array state)
+  const [localActiveRegions, setLocalActiveRegions] = useState<string[]>([]);
+  const [regionsDirty, setRegionsDirty] = useState(false);
+
   const {
     register,
     handleSubmit,
     reset,
+    watch,
     control,
     formState: { errors, isSubmitting, isDirty },
   } = useForm<OrgSettingsFormData>({
     resolver: zodResolver(orgSettingsSchema),
   });
+
+  const watchedRegion = watch("region");
 
   // ── Fetch org ───────────────────────────────────────────────────────────────
 
@@ -101,7 +151,7 @@ export default function OrgSettingsPage() {
 
     supabase
       .from("organizations")
-      .select("id, name, slug, region, plan")
+      .select("id, name, slug, region, plan, active_regions")
       .eq("id", activeOrgId)
       .single()
       .then(({ data, error }) => {
@@ -115,25 +165,54 @@ export default function OrgSettingsPage() {
           slug: data.slug,
           region: data.region as RegionType,
           plan: data.plan,
+          active_regions: data.active_regions,
         };
         setOrg(orgData);
-        // Name field pre-fills from profile full_name — org name and lender
-        // name are always kept in sync (P2P app, no separate "company" concept).
+        const initialRegions = data.active_regions ?? [data.region];
+        setLocalActiveRegions(initialRegions);
         reset({ name: profile?.full_name ?? orgData.name, region: orgData.region });
       });
   }, [activeOrgId, profile?.full_name, reset]);
+
+  // When primary region changes, auto-add it to active_regions if missing
+  useEffect(() => {
+    if (!watchedRegion) return;
+    setLocalActiveRegions((prev) => {
+      if (prev.includes(watchedRegion)) return prev;
+      setRegionsDirty(true);
+      return [...prev, watchedRegion];
+    });
+  }, [watchedRegion]);
+
+  // ── Region list helpers ─────────────────────────────────────────────────────
+
+  function addRegion(code: string) {
+    if (localActiveRegions.includes(code)) return;
+    setLocalActiveRegions((prev) => [...prev, code]);
+    setRegionsDirty(true);
+  }
+
+  function removeRegion(code: string) {
+    // Primary region cannot be removed
+    if (code === watchedRegion) return;
+    setLocalActiveRegions((prev) => prev.filter((r) => r !== code));
+    setRegionsDirty(true);
+  }
 
   // ── Save ────────────────────────────────────────────────────────────────────
 
   const onSubmit = async (values: OrgSettingsFormData) => {
     if (!activeOrgId || !profile) return;
 
-    // Update both tables in parallel — org name and lender profile name are
-    // the same concept in a P2P app (no separate "company" name).
+    // Always ensure primary region is in the active_regions list
+    const finalRegions = localActiveRegions.includes(values.region)
+      ? localActiveRegions
+      : [values.region, ...localActiveRegions];
+
     const [orgResult, profileResult] = await Promise.all([
       supabase
         .from("organizations")
-        .update({ name: values.name, region: values.region })
+        .update({ name: values.name, region: values.region, active_regions: finalRegions })
         .eq("id", activeOrgId),
       supabase
         .from("profiles")
@@ -146,8 +225,14 @@ export default function OrgSettingsPage() {
       return;
     }
 
-    setOrg((prev) => prev ? { ...prev, name: values.name, region: values.region as RegionType } : prev);
-    reset(values); // clear isDirty
+    setOrg((prev) =>
+      prev
+        ? { ...prev, name: values.name, region: values.region as RegionType, active_regions: finalRegions }
+        : prev
+    );
+    setLocalActiveRegions(finalRegions);
+    setRegionsDirty(false);
+    reset(values);
     toast.success("Settings saved.");
   };
 
@@ -162,6 +247,8 @@ export default function OrgSettingsPage() {
   }
 
   if (!org) return <OrgSettingsSkeleton />;
+
+  const canSave = isDirty || regionsDirty;
 
   return (
     <div className="mx-auto max-w-2xl space-y-5 p-6">
@@ -194,7 +281,7 @@ export default function OrgSettingsPage() {
             )}
           </div>
 
-          {/* Country */}
+          {/* Primary Country */}
           <div className="flex flex-col gap-1.5">
             <label className="text-foreground text-xs font-medium">
               Primary Country
@@ -213,14 +300,43 @@ export default function OrgSettingsPage() {
               <p className="text-destructive text-xs">{errors.region.message}</p>
             ) : (
               <p className="text-muted-foreground text-xs">
-                Determines the default currency for new loans.
+                Default currency for new loans. Always included in active regions.
               </p>
             )}
           </div>
 
+          {/* Active Regions */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-foreground text-xs font-medium">Active Regions</label>
+            {/* Chips row — only shown when there are active regions */}
+            {localActiveRegions.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {localActiveRegions.map((code) => (
+                  <RegionChip
+                    key={code}
+                    code={code}
+                    isPrimary={code === watchedRegion}
+                    onRemove={code !== watchedRegion ? () => removeRegion(code) : undefined}
+                  />
+                ))}
+              </div>
+            )}
+            {/* Add region — full-width picker; value="" always shows placeholder */}
+            <CountryPicker
+              value=""
+              onChange={addRegion}
+              placeholder="+ Add another region…"
+              showCurrency={true}
+            />
+            <p className="text-muted-foreground text-xs">
+              Determines which currencies are available when creating loans.
+              The primary country cannot be removed.
+            </p>
+          </div>
+
           <button
             type="submit"
-            disabled={isSubmitting || !isDirty}
+            disabled={isSubmitting || !canSave}
             className="bg-primary text-primary-foreground mt-1 flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
           >
             {isSubmitting ? (
@@ -247,14 +363,6 @@ export default function OrgSettingsPage() {
             <p className="text-muted-foreground text-xs">
               Auto-generated identifier — cannot be changed.
             </p>
-          </div>
-
-          {/* Current region badge */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-foreground text-xs font-medium">Active Region</label>
-            <div className="bg-muted/50 border-border/60 flex items-center gap-2 rounded-lg border px-3 py-2 text-sm">
-              <RegionBadge region={org.region} />
-            </div>
           </div>
 
           {/* Plan */}

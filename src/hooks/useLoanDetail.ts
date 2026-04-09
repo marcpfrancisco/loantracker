@@ -31,6 +31,7 @@ export interface LoanDetail {
   region: RegionType;
   started_at: string;
   ended_at: string | null;
+  due_day_of_month: number | null;
   notes: string | null;
   credit_source: { name: string; type: CreditSourceType };
   borrower: { id: string; full_name: string } | null;
@@ -41,7 +42,7 @@ async function fetchLoanDetail(id: string): Promise<LoanDetail> {
   const { data, error } = await supabase
     .from("loans")
     .select(
-      "id, loan_type, currency, principal, interest_rate, service_fee, installments_total, status, region, started_at, ended_at, notes, credit_sources!loans_source_id_fkey(name, type), profiles!loans_borrower_id_fkey(id, full_name), installments(id, installment_no, due_date, amount, status, paid_at, receipt_url)"
+      "id, loan_type, currency, principal, interest_rate, service_fee, installments_total, status, region, started_at, ended_at, due_day_of_month, notes, credit_sources!loans_source_id_fkey(name, type), profiles!loans_borrower_id_fkey(id, full_name), installments(id, installment_no, due_date, amount, status, paid_at, receipt_url)"
     )
     .eq("id", id)
     .single();
@@ -72,6 +73,7 @@ async function fetchLoanDetail(id: string): Promise<LoanDetail> {
     region: data.region,
     started_at: data.started_at,
     ended_at: data.ended_at,
+    due_day_of_month: data.due_day_of_month !== null ? Number(data.due_day_of_month) : null,
     notes: data.notes,
     credit_source: {
       name: data.credit_sources?.name ?? "Unknown",

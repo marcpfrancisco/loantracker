@@ -1,6 +1,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
+import {
+  computePaidStatus,
+  getPeriodClosedMessage,
+  isPeriodClosedForItems,
+} from "@/lib/expensePeriodRules";
 import type { CurrencyType, RegionType } from "@/types/enums";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -72,12 +77,34 @@ export function useAddExpenseItem(tabId: string) {
       const { data: periodData, error: periodError } = await supabase
         .from("expense_periods")
         .upsert({ tab_id: tabId, period: periodStr }, { onConflict: "tab_id,period" })
-        .select("id, is_locked")
+        .select(
+          `id, period, is_locked, is_archived,
+           expense_items(borrower_owes),
+           expense_payments(amount)`
+        )
         .single();
 
       if (periodError) throw periodError;
-      if (periodData.is_locked)
-        throw new Error("This month is locked. Unlock it first to add items.");
+
+      const totalOwed = (periodData.expense_items ?? []).reduce(
+        (s: number, i: { borrower_owes: number }) => s + Number(i.borrower_owes),
+        0
+      );
+      const totalPaid = (periodData.expense_payments ?? []).reduce(
+        (s: number, p: { amount: number }) => s + Number(p.amount),
+        0
+      );
+      const paid_status = computePaidStatus(totalOwed, totalPaid);
+      const closure = {
+        period: periodData.period,
+        is_locked: periodData.is_locked,
+        is_archived: periodData.is_archived ?? false,
+        paid_status,
+      };
+
+      if (isPeriodClosedForItems(closure)) {
+        throw new Error(getPeriodClosedMessage(closure));
+      }
 
       const { error: itemError } = await supabase.from("expense_items").insert({
         period_id: periodData.id,
@@ -178,8 +205,46 @@ export function useDeleteExpensePeriod(tabId: string) {
       if (error) throw error;
     },
     onSuccess: () => {
+      toast.success("Month deleted.");
       void qc.invalidateQueries({ queryKey: ["expense-tab", tabId] });
       void qc.invalidateQueries({ queryKey: ["expense-tabs"] });
+    },
+    onError: () => {
+      toast.error("Failed to delete month. Remove all items and payments first.");
+    },
+  });
+}
+
+// ── Delete all periods in a year (items + payments + periods) ─────────────────
+
+export function useDeleteExpenseYear(tabId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (periodIds: string[]) => {
+      if (periodIds.length === 0) return;
+
+      const { error: payError } = await supabase
+        .from("expense_payments")
+        .delete()
+        .in("period_id", periodIds);
+      if (payError) throw payError;
+
+      const { error: itemError } = await supabase
+        .from("expense_items")
+        .delete()
+        .in("period_id", periodIds);
+      if (itemError) throw itemError;
+
+      const { error } = await supabase.from("expense_periods").delete().in("id", periodIds);
+      if (error) throw error;
+    },
+    onSuccess: (_, periodIds) => {
+      toast.success(`${periodIds.length} month${periodIds.length !== 1 ? "s" : ""} deleted.`);
+      void qc.invalidateQueries({ queryKey: ["expense-tab", tabId] });
+      void qc.invalidateQueries({ queryKey: ["expense-tabs"] });
+    },
+    onError: () => {
+      toast.error("Failed to delete year. Please try again.");
     },
   });
 }

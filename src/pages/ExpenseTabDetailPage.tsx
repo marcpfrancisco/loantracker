@@ -19,7 +19,6 @@ import {
   Pencil,
   Check,
   Archive,
-  CheckSquare,
   SkipForward,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -32,7 +31,14 @@ import {
   PERIOD_STATUS_SEGMENT,
   PERIOD_STATUS_STYLES,
 } from "@/lib/expensePeriodStyles";
-import { getPeriodClosedMessage } from "@/lib/expensePeriodRules";
+import {
+  getPeriodClosedMessage,
+  isPeriodClosedForItems,
+  isPeriodClosedForPayments,
+  canTogglePeriodLock,
+  isPastMonth,
+  isPeriodSettled,
+} from "@/lib/expensePeriodRules";
 import { useAuth } from "@/hooks/useAuth";
 import { useExpenseTab } from "@/hooks/useExpenseTab";
 import type { ExpensePeriod, ExpenseItem, ExpensePayment } from "@/hooks/useExpenseTab";
@@ -47,8 +53,6 @@ import {
   useUpdateExpenseItem,
   useArchivePeriod,
   useArchiveYear,
-  useBulkTogglePeriodLock,
-  type BulkLockTarget,
 } from "@/hooks/useExpenseTabMutations";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -121,18 +125,20 @@ const PAID_STATUS_STYLES = PERIOD_STATUS_STYLES;
 
 function PeriodStatusLegend() {
   return (
-    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
-      {PERIOD_STATUS_LEGEND.map(({ status, label }) => (
-        <span
-          key={status}
-          className={cn(
-            "inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium",
-            PERIOD_STATUS_STYLES[status]
-          )}
-        >
-          {label}
-        </span>
-      ))}
+    <div className="-mx-1 overflow-x-auto px-1 sm:mx-0 sm:overflow-visible sm:px-0">
+      <div className="flex w-max min-w-0 flex-nowrap items-center gap-1.5 sm:w-auto sm:flex-wrap sm:gap-x-2.5 sm:gap-y-1">
+        {PERIOD_STATUS_LEGEND.map(({ status, label }) => (
+          <span
+            key={status}
+            className={cn(
+              "inline-flex shrink-0 items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium whitespace-nowrap",
+              PERIOD_STATUS_STYLES[status]
+            )}
+          >
+            {label}
+          </span>
+        ))}
+      </div>
     </div>
   );
 }
@@ -144,32 +150,36 @@ function MonthPill({
   is_locked,
   is_archived,
   paid_status,
+  outstanding,
+  total_owed,
   isVirtual,
   isSelected,
   onClick,
-  bulkMode,
-  isChecked,
-  onBulkToggle,
   monthLabelOnly = false,
-  outstanding = 0,
   currency,
 }: {
   period: string;
   is_locked: boolean;
   is_archived: boolean;
   paid_status: "unpaid" | "partial" | "paid";
+  outstanding: number;
+  total_owed: number;
   isVirtual?: boolean;
   isSelected: boolean;
   onClick: () => void;
-  bulkMode?: boolean;
-  isChecked?: boolean;
-  onBulkToggle?: () => void;
   monthLabelOnly?: boolean;
-  outstanding?: number;
   currency?: string;
 }) {
   const ref = useRef<HTMLButtonElement>(null);
-  const status = getPeriodVisualStatus({ is_locked, is_archived, paid_status, isVirtual });
+  const status = getPeriodVisualStatus({
+    period,
+    is_locked,
+    is_archived,
+    paid_status,
+    outstanding,
+    total_owed,
+    isVirtual,
+  });
   const label = monthLabelOnly ? formatMonthOnly(period) : formatPeriodShort(period);
   const hasBalance = outstanding > 0 && currency;
   const tooltip = [
@@ -180,61 +190,23 @@ function MonthPill({
     .join(" · ");
 
   useEffect(() => {
-    if (isSelected && !bulkMode) {
+    if (isSelected) {
       ref.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
-  }, [isSelected, bulkMode]);
+  }, [isSelected]);
 
   const Icon =
     status === "archived"
       ? Archive
       : status === "paid"
         ? CheckCircle2
-        : status === "locked"
+        : status === "locked" || status === "closed"
           ? Lock
           : status === "draft"
             ? CalendarPlus
             : Unlock;
 
   const statusStyle = PAID_STATUS_STYLES[status];
-
-  if (bulkMode) {
-    return (
-      <button
-        ref={ref}
-        type="button"
-        onClick={onBulkToggle}
-        className={cn(
-          "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-medium transition-all",
-          isChecked
-            ? cn(statusStyle, "ring-primary/50 shadow-sm ring-2")
-            : cn(statusStyle, "hover:opacity-80")
-        )}
-      >
-        {/* Checkbox */}
-        <div
-          className={cn(
-            "flex h-3 w-3 shrink-0 items-center justify-center rounded border transition-colors",
-            isChecked ? "bg-primary border-primary" : "border-current opacity-60"
-          )}
-        >
-          {isChecked && (
-            <svg viewBox="0 0 10 8" className="h-2 w-2 text-white" fill="currentColor">
-              <path
-                d="M1 4l2.5 2.5L9 1"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          )}
-        </div>
-        {label}
-      </button>
-    );
-  }
 
   return (
     <button
@@ -243,17 +215,14 @@ function MonthPill({
       onClick={onClick}
       title={tooltip || undefined}
       className={cn(
-        "inline-flex flex-col items-center rounded-full border px-2.5 py-1.5 text-xs font-medium transition-all",
+        "inline-flex min-h-9 touch-manipulation flex-col items-center rounded-full border px-2.5 py-1.5 text-xs font-medium transition-all sm:min-h-0",
         statusStyle,
-        isSelected ? "ring-primary/50 shadow-sm ring-2" : "hover:opacity-80"
+        isSelected ? "ring-primary/50 shadow-sm ring-2" : "hover:opacity-80 active:scale-[0.98]"
       )}
     >
       <span className="inline-flex items-center gap-1">
         <Icon className="h-3 w-3 shrink-0" />
         {label}
-        {hasBalance && !monthLabelOnly && (
-          <span className="bg-foreground/10 h-1.5 w-1.5 shrink-0 rounded-full" />
-        )}
       </span>
       {hasBalance && monthLabelOnly && (
         <span className="mt-0.5 text-[9px] font-semibold tabular-nums opacity-90">
@@ -302,9 +271,12 @@ function YearProgressBar({
         }
 
         const status = getPeriodVisualStatus({
+          period: period.period,
           is_locked: period.is_locked,
           is_archived: period.is_archived,
           paid_status: period.paid_status,
+          outstanding: period.outstanding,
+          total_owed: period.total_owed,
           isVirtual: period.id === "__virtual__",
         });
         const isSelected = period.period === selectedPeriod;
@@ -317,11 +289,11 @@ function YearProgressBar({
             type="button"
             onClick={() => onSelect(period.period)}
             title={`${formatPeriodLabel(period.period)}${balanceNote}`}
-            className="flex flex-col items-center gap-0.5"
+            className="active:bg-muted/30 flex min-h-11 min-w-0 touch-manipulation flex-col items-center justify-end gap-0.5 rounded-md px-0.5 sm:min-h-0"
           >
             <div
               className={cn(
-                "h-2 w-full rounded-sm transition-all",
+                "h-2.5 w-full rounded-sm transition-all sm:h-2",
                 PERIOD_STATUS_SEGMENT[status],
                 isSelected && "ring-primary/70 ring-offset-background ring-1 ring-offset-1"
               )}
@@ -402,18 +374,18 @@ function ItemRow({
   if (effectiveMode === "edit") {
     return (
       <div className="space-y-2 px-4 py-3">
-        <div className="flex items-center gap-2">
-          <input
-            autoFocus
-            value={editDesc}
-            onChange={(e) => setEditDesc(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleSave();
-              if (e.key === "Escape") handleCancelEdit();
-            }}
-            className="border-border/60 bg-muted/50 focus:border-primary/60 min-w-0 flex-1 rounded-lg border px-3 py-1.5 text-sm outline-none"
-          />
+        <input
+          autoFocus
+          value={editDesc}
+          onChange={(e) => setEditDesc(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") handleSave();
+            if (e.key === "Escape") handleCancelEdit();
+          }}
+          className="border-border/60 bg-muted/50 focus:border-primary/60 w-full rounded-lg border px-3 py-2.5 text-base outline-none sm:text-sm"
+        />
 
+        <div className="flex items-center gap-2">
           <input
             type="number"
             step="0.01"
@@ -424,14 +396,14 @@ function ItemRow({
               if (e.key === "Enter") handleSave();
               if (e.key === "Escape") handleCancelEdit();
             }}
-            className="border-border/60 bg-muted/50 focus:border-primary/60 w-24 shrink-0 rounded-lg border px-3 py-1.5 text-sm outline-none"
+            className="border-border/60 bg-muted/50 focus:border-primary/60 min-w-0 flex-1 rounded-lg border px-3 py-2.5 text-base outline-none sm:w-24 sm:flex-none sm:text-sm"
           />
 
           <button
             type="button"
             onClick={() => setEditSplit((v) => !v)}
             className={cn(
-              "shrink-0 rounded-lg border px-2 py-1.5 text-xs font-semibold transition-colors",
+              "flex h-11 min-w-11 shrink-0 touch-manipulation items-center justify-center rounded-lg border px-2.5 text-xs font-semibold transition-colors sm:h-auto sm:min-w-0 sm:py-1.5",
               editSplit
                 ? "border-primary/40 bg-primary/10 text-primary"
                 : "border-border/60 text-muted-foreground hover:text-foreground"
@@ -443,7 +415,8 @@ function ItemRow({
           <button
             type="button"
             onClick={handleSave}
-            className="shrink-0 text-emerald-400 transition-colors hover:text-emerald-300"
+            aria-label="Save changes"
+            className="flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center text-emerald-400 transition-colors hover:text-emerald-300 active:scale-95"
           >
             <Check className="h-4 w-4" />
           </button>
@@ -451,7 +424,8 @@ function ItemRow({
           <button
             type="button"
             onClick={handleCancelEdit}
-            className="text-muted-foreground hover:text-foreground shrink-0 transition-colors"
+            aria-label="Cancel edit"
+            className="text-muted-foreground hover:text-foreground flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center transition-colors active:scale-95"
           >
             <X className="h-4 w-4" />
           </button>
@@ -461,7 +435,7 @@ function ItemRow({
   }
 
   return (
-    <div className="group flex items-center gap-3 px-4 py-2.5">
+    <div className="group flex items-center gap-2 px-4 py-3 sm:gap-3 sm:py-2.5">
       <div className="min-w-0 flex-1">
         <p className="text-foreground truncate text-sm">{item.description}</p>
         <p className="text-muted-foreground text-[10px]">
@@ -474,21 +448,23 @@ function ItemRow({
       </span>
 
       {isAdmin && !isLocked && (
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
           <button
             type="button"
             onClick={handleStartEdit}
-            className="text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Edit item"
+            className="text-muted-foreground hover:text-foreground active:bg-muted/50 flex h-10 w-10 touch-manipulation items-center justify-center rounded-lg transition-colors sm:h-auto sm:w-auto sm:p-0"
           >
-            <Pencil className="h-3.5 w-3.5" />
+            <Pencil className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
           </button>
 
           <button
             type="button"
             onClick={handleOpenDelete}
-            className="text-muted-foreground transition-colors hover:text-rose-400"
+            aria-label="Delete item"
+            className="text-muted-foreground active:bg-muted/50 flex h-10 w-10 touch-manipulation items-center justify-center rounded-lg transition-colors hover:text-rose-400 sm:h-auto sm:w-auto sm:p-0"
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            <Trash2 className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
           </button>
         </div>
       )}
@@ -529,7 +505,7 @@ function PaymentRow({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   return (
-    <div className="flex items-center gap-3 px-4 py-2.5">
+    <div className="flex items-center gap-2 px-4 py-3 sm:gap-3 sm:py-2.5">
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-emerald-400">Payment received</p>
         <p className="text-muted-foreground text-[10px]">
@@ -544,9 +520,10 @@ function PaymentRow({
         <button
           type="button"
           onClick={() => setShowDeleteDialog(true)}
-          className="text-muted-foreground shrink-0 transition-colors hover:text-rose-400"
+          aria-label="Delete payment"
+          className="text-muted-foreground active:bg-muted/50 flex h-10 w-10 shrink-0 touch-manipulation items-center justify-center rounded-lg transition-colors hover:text-rose-400 sm:h-auto sm:w-auto"
         >
-          <Trash2 className="h-3.5 w-3.5" />
+          <Trash2 className="h-4 w-4 sm:h-3.5 sm:w-3.5" />
         </button>
       )}
       <ConfirmDialog
@@ -596,10 +573,10 @@ function RecordPaymentModal({
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
+      <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
         <motion.div
-          className="bg-card border-border/60 relative z-10 w-full max-w-sm overflow-hidden rounded-2xl border shadow-2xl"
+          className="bg-card border-border/60 relative z-10 max-h-[90dvh] w-full max-w-sm overflow-y-auto rounded-t-2xl border shadow-2xl sm:rounded-2xl"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 20 }}
@@ -636,7 +613,7 @@ function RecordPaymentModal({
                 max={outstanding}
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                className="border-border/60 bg-background focus:border-primary/60 w-full rounded-lg border px-3 py-2 text-sm outline-none"
+                className="border-border/60 bg-background focus:border-primary/60 w-full rounded-lg border px-3 py-2.5 text-base outline-none sm:text-sm"
               />
             </div>
             <div className="space-y-1.5">
@@ -645,7 +622,7 @@ function RecordPaymentModal({
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="border-border/60 bg-background focus:border-primary/60 w-full rounded-lg border px-3 py-2 text-sm outline-none"
+                className="border-border/60 bg-background focus:border-primary/60 w-full rounded-lg border px-3 py-2.5 text-base outline-none sm:text-sm"
               />
             </div>
             <div className="space-y-1.5">
@@ -654,14 +631,14 @@ function RecordPaymentModal({
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Cash, bank transfer…"
-                className="border-border/60 bg-background focus:border-primary/60 w-full rounded-lg border px-3 py-2 text-sm outline-none"
+                className="border-border/60 bg-background focus:border-primary/60 w-full rounded-lg border px-3 py-2.5 text-base outline-none sm:text-sm"
               />
             </div>
-            <div className="flex gap-2 pt-1">
+            <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row">
               <button
                 type="button"
                 onClick={onClose}
-                className="border-border/60 text-muted-foreground flex-1 rounded-lg border py-2 text-sm"
+                className="border-border/60 text-muted-foreground flex min-h-11 flex-1 touch-manipulation items-center justify-center rounded-lg border py-2.5 text-sm sm:min-h-0"
               >
                 Cancel
               </button>
@@ -669,7 +646,7 @@ function RecordPaymentModal({
                 type="button"
                 disabled={isPending || !canSubmit}
                 onClick={handleReview}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-500 disabled:opacity-60"
+                className="flex min-h-11 flex-1 touch-manipulation items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2.5 text-sm font-medium text-white transition-colors hover:bg-emerald-500 active:scale-[0.98] disabled:opacity-60 sm:min-h-0"
               >
                 Review payment
               </button>
@@ -822,8 +799,8 @@ function QuickAddBar({
 
   if (closedMessage) {
     return (
-      <div className="border-border/60 bg-background/95 border-t px-4 py-3">
-        <p className="text-muted-foreground text-center text-xs">{closedMessage}</p>
+      <div className="border-border/60 bg-background/95 pb-safe border-t px-4 py-3">
+        <p className="text-muted-foreground text-center text-xs leading-relaxed">{closedMessage}</p>
       </div>
     );
   }
@@ -831,47 +808,49 @@ function QuickAddBar({
   return (
     <form
       onSubmit={(e) => void handleAdd(e)}
-      className="border-border/60 bg-background/95 flex items-center gap-2 border-t px-4 py-3 backdrop-blur-sm"
+      className="border-border/60 bg-background/95 pb-safe space-y-2 border-t px-4 py-3 shadow-[0_-4px_24px_-8px_rgba(0,0,0,0.25)] backdrop-blur-md sm:flex sm:flex-row sm:items-center sm:gap-2 sm:space-y-0 sm:shadow-none"
     >
       <input
         ref={descRef}
         value={description}
         onChange={(e) => setDescription(e.target.value)}
         placeholder="Item name…"
-        className="border-border/60 bg-muted/50 focus:border-primary/60 min-w-0 flex-1 rounded-lg border px-3 py-2 text-sm transition-colors outline-none"
+        className="border-border/60 bg-muted/50 focus:border-primary/60 w-full min-w-0 flex-1 rounded-lg border px-3 py-2.5 text-base transition-colors outline-none sm:py-2 sm:text-sm"
         disabled={isPending}
       />
-      <input
-        type="number"
-        step="0.01"
-        min="0.01"
-        value={amount}
-        onChange={(e) => setAmount(e.target.value)}
-        placeholder="0.00"
-        className="border-border/60 bg-muted/50 focus:border-primary/60 w-24 shrink-0 rounded-lg border px-3 py-2 text-sm transition-colors outline-none"
-        disabled={isPending}
-      />
-      {/* Split toggle */}
-      <button
-        type="button"
-        onClick={() => setIsAlreadySplit((v) => !v)}
-        className={cn(
-          "shrink-0 rounded-lg border px-2.5 py-2 text-xs font-semibold transition-colors",
-          isAlreadySplit
-            ? "border-primary/40 bg-primary/10 text-primary"
-            : "border-border/60 text-muted-foreground hover:text-foreground"
-        )}
-        title={isAlreadySplit ? "Already his share" : "Split 50/50"}
-      >
-        {isAlreadySplit ? "his" : "÷2"}
-      </button>
-      <button
-        type="submit"
-        disabled={isPending || !description.trim() || !amount}
-        className="bg-primary text-primary-foreground flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-opacity hover:opacity-90 disabled:opacity-50"
-      >
-        {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-      </button>
+      <div className="flex items-center gap-2">
+        <input
+          type="number"
+          step="0.01"
+          min="0.01"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          placeholder="0.00"
+          className="border-border/60 bg-muted/50 focus:border-primary/60 min-w-0 flex-1 rounded-lg border px-3 py-2.5 text-base transition-colors outline-none sm:w-24 sm:flex-none sm:py-2 sm:text-sm"
+          disabled={isPending}
+        />
+        <button
+          type="button"
+          onClick={() => setIsAlreadySplit((v) => !v)}
+          className={cn(
+            "flex h-11 min-w-11 shrink-0 touch-manipulation items-center justify-center rounded-lg border px-2.5 text-xs font-semibold transition-colors active:scale-95 sm:h-9 sm:min-w-0 sm:py-2",
+            isAlreadySplit
+              ? "border-primary/40 bg-primary/10 text-primary"
+              : "border-border/60 text-muted-foreground hover:text-foreground"
+          )}
+          title={isAlreadySplit ? "Already his share" : "Split 50/50"}
+        >
+          {isAlreadySplit ? "his" : "÷2"}
+        </button>
+        <button
+          type="submit"
+          disabled={isPending || !description.trim() || !amount}
+          aria-label="Add item"
+          className="bg-primary text-primary-foreground flex h-11 w-11 shrink-0 touch-manipulation items-center justify-center rounded-lg transition-opacity hover:opacity-90 active:scale-95 disabled:opacity-50 sm:h-9 sm:w-9"
+        >
+          {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
+        </button>
+      </div>
     </form>
   );
 }
@@ -896,7 +875,6 @@ export default function ExpenseTabDetailPage() {
   const deleteYear = useDeleteExpenseYear(id!);
   const archivePeriod = useArchivePeriod(id!);
   const archiveYear = useArchiveYear(id!);
-  const bulkToggleLock = useBulkTogglePeriodLock(id!);
 
   const [showDeletePeriod, setShowDeletePeriod] = useState(false);
   const [showArchivePeriod, setShowArchivePeriod] = useState(false);
@@ -907,13 +885,6 @@ export default function ExpenseTabDetailPage() {
     lockTo: boolean;
     label: string;
   } | null>(null);
-  const [showBulkLockConfirm, setShowBulkLockConfirm] = useState<{
-    year: string;
-    lockTo: boolean;
-    count: number;
-  } | null>(null);
-  const [bulkLockYear, setBulkLockYear] = useState<string | null>(null);
-  const [selectedPeriodIds, setSelectedPeriodIds] = useState<Set<string>>(new Set());
 
   const currentYear = String(new Date().getFullYear());
   const [expandedYears, setExpandedYears] = useState<Set<string>>(() => new Set([currentYear]));
@@ -976,7 +947,7 @@ export default function ExpenseTabDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-2xl space-y-4 p-6">
+      <div className="mx-auto max-w-2xl space-y-4 px-4 py-6 sm:px-6">
         <div className="bg-muted h-8 w-32 animate-pulse rounded" />
         <div className="bg-muted h-20 w-full animate-pulse rounded-xl" />
         <div className="bg-muted h-64 w-full animate-pulse rounded-xl" />
@@ -986,7 +957,7 @@ export default function ExpenseTabDetailPage() {
 
   if (error || !tab) {
     return (
-      <div className="mx-auto max-w-2xl p-6">
+      <div className="mx-auto max-w-2xl px-4 py-6 sm:px-6">
         <div className="flex items-center gap-2 rounded-lg border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-400">
           <AlertCircle className="h-4 w-4 shrink-0" />
           Failed to load expense tab.
@@ -1028,68 +999,31 @@ export default function ExpenseTabDetailPage() {
     const real = periods.filter((p) => p.id !== "__virtual__");
     const monthCount = periods.length;
     const outstanding = real.reduce((s, p) => s + p.outstanding, 0);
-    const ongoingCount = periods.filter(
-      (p) => p.id === "__virtual__" || (!p.is_archived && p.paid_status !== "paid" && !p.is_locked)
-    ).length;
+    const openCount = periods.filter((p) => {
+      if (p.is_archived) return false;
+      const closure = {
+        period: p.period,
+        is_locked: p.is_locked,
+        is_archived: p.is_archived,
+        paid_status: p.paid_status,
+        outstanding: p.outstanding,
+        total_owed: p.total_owed,
+      };
+      if (isPeriodSettled(closure)) return false;
+      if (isPastMonth(p.period)) return false;
+      return true;
+    }).length;
 
     const parts: string[] = [`${monthCount} month${monthCount !== 1 ? "s" : ""}`];
     if (outstanding > 0) {
       parts.push(`${fmt(outstanding, tabCurrency)} outstanding`);
-    } else if (real.length > 0 && real.every((p) => p.paid_status === "paid")) {
+    } else if (real.length > 0 && real.every((p) => isPeriodSettled(p))) {
       parts.push("all paid");
     }
-    if (ongoingCount > 0) {
-      parts.push(`${ongoingCount} ongoing`);
+    if (openCount > 0) {
+      parts.push(`${openCount} open`);
     }
     return parts.join(" · ");
-  }
-
-  function exitBulkLockMode() {
-    setBulkLockYear(null);
-    setSelectedPeriodIds(new Set());
-  }
-
-  function enterBulkLockMode(year: string) {
-    setBulkLockYear(year);
-    setSelectedPeriodIds(new Set());
-  }
-
-  function togglePeriodSelection(periodId: string) {
-    setSelectedPeriodIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(periodId)) next.delete(periodId);
-      else next.add(periodId);
-      return next;
-    });
-  }
-
-  function handleBulkAction(lockTo: boolean, yearPeriods: ExpensePeriod[]) {
-    const yearReal = yearPeriods.filter((p) => p.id !== "__virtual__");
-    const targets: BulkLockTarget[] = yearReal
-      .filter((p) => selectedPeriodIds.has(p.id) && p.is_locked !== lockTo)
-      .map((p) => ({ id: p.id, lockTo }));
-    if (targets.length === 0) return;
-    bulkToggleLock.mutate(targets, {
-      onSuccess: () => {
-        exitBulkLockMode();
-        setShowBulkLockConfirm(null);
-      },
-    });
-  }
-
-  function requestBulkLock(year: string, lockTo: boolean, yearPeriods: ExpensePeriod[]) {
-    const count = yearPeriods.filter(
-      (p) => p.id !== "__virtual__" && selectedPeriodIds.has(p.id) && p.is_locked !== lockTo
-    ).length;
-    if (count === 0) return;
-    setShowBulkLockConfirm({ year, lockTo, count });
-  }
-
-  function confirmBulkLock() {
-    if (!showBulkLockConfirm) return;
-    const group = yearGroups.find((g) => g.year === showBulkLockConfirm.year);
-    if (!group) return;
-    handleBulkAction(showBulkLockConfirm.lockTo, group.periods);
   }
 
   function handleConfirmDeletePeriod() {
@@ -1143,12 +1077,6 @@ export default function ExpenseTabDetailPage() {
   const deleteYearPaymentCount =
     deleteYearGroup?.periods.reduce((s, p) => s + p.payments.length, 0) ?? 0;
 
-  function toggleAllInYear(yearPeriods: ExpensePeriod[]) {
-    const yearReal = yearPeriods.filter((p) => p.id !== "__virtual__");
-    const allSelected = yearReal.length > 0 && yearReal.every((p) => selectedPeriodIds.has(p.id));
-    setSelectedPeriodIds(allSelected ? new Set() : new Set(yearReal.map((p) => p.id)));
-  }
-
   const activePeriod =
     selectedPeriod !== null
       ? (virtualPeriods.find((p) => p.period === selectedPeriod) ?? null)
@@ -1162,12 +1090,21 @@ export default function ExpenseTabDetailPage() {
           is_locked: activePeriod.is_locked,
           is_archived: activePeriod.is_archived,
           paid_status: activePeriod.paid_status,
+          outstanding: activePeriod.outstanding,
+          total_owed: activePeriod.total_owed,
         }
       : null;
+  const activePeriodItemsClosed =
+    activePeriodClosure !== null && isPeriodClosedForItems(activePeriodClosure);
+  const activePeriodPaymentsClosed =
+    activePeriodClosure !== null && isPeriodClosedForPayments(activePeriodClosure);
   const activePeriodClosedMessage = activePeriodClosure
     ? getPeriodClosedMessage(activePeriodClosure) || null
     : null;
-  const activePeriodClosed = activePeriodClosedMessage !== null;
+  const activePeriodCanLock =
+    activePeriodClosure !== null && canTogglePeriodLock(activePeriodClosure.period);
+  const activePeriodIsPast =
+    activePeriodClosure !== null && isPastMonth(activePeriodClosure.period);
 
   const activePeriodEmpty =
     activePeriod &&
@@ -1186,7 +1123,7 @@ export default function ExpenseTabDetailPage() {
   }
 
   async function handleAddItem(desc: string, amount: number, isSplit: boolean) {
-    if (!selectedPeriod || activePeriodClosed) return;
+    if (!selectedPeriod || activePeriodItemsClosed) return;
     const [year, month] = selectedPeriod.split("-").map(Number);
     await addItem.mutateAsync({
       period: new Date(year, month - 1, 1),
@@ -1208,37 +1145,37 @@ export default function ExpenseTabDetailPage() {
   }
 
   return (
-    <div className="mx-auto flex h-full max-w-2xl flex-col">
+    <div className="mx-auto flex max-w-2xl flex-col max-md:min-h-[calc(100dvh-7rem)] md:h-full">
       {/* ── Header ──────────────────────────────────────────────── */}
-      <div className="shrink-0 space-y-4 p-6 pb-0">
+      <div className="shrink-0 space-y-4 px-4 pt-4 pb-0 sm:px-6 sm:pt-6">
         {/* Back + export actions */}
-        <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center justify-between gap-2">
           <button
             type="button"
             onClick={() => void navigate("/tabs")}
-            className="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-sm transition-colors"
+            className="text-muted-foreground hover:text-foreground flex min-h-10 touch-manipulation items-center gap-1.5 py-1 text-sm transition-colors active:opacity-70"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <ArrowLeft className="h-4 w-4 shrink-0" />
             Tabs
           </button>
 
           {tab.periods.length > 0 && (
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
               <button
                 type="button"
                 onClick={() => exportExpenseTabCSV(tab)}
-                className="border-border/60 text-muted-foreground hover:text-foreground flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-colors"
+                className="border-border/60 text-muted-foreground hover:text-foreground active:bg-muted/50 flex min-h-10 touch-manipulation items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs transition-colors sm:gap-1.5"
               >
                 <TableProperties className="h-3.5 w-3.5" />
-                CSV
+                <span className="hidden sm:inline">CSV</span>
               </button>
               <button
                 type="button"
                 onClick={() => printExpenseTabPDF(tab)}
-                className="bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors"
+                className="bg-primary text-primary-foreground hover:bg-primary/90 flex min-h-10 touch-manipulation items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors active:scale-[0.98] sm:gap-1.5"
               >
                 <Download className="h-3.5 w-3.5" />
-                PDF
+                <span className="hidden sm:inline">PDF</span>
               </button>
             </div>
           )}
@@ -1246,22 +1183,24 @@ export default function ExpenseTabDetailPage() {
 
         {/* Totals */}
         <div className="bg-card border-border/60 rounded-2xl border p-4">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-muted-foreground text-xs tracking-widest uppercase">
+          <div className="grid grid-cols-2 gap-4 sm:flex sm:items-start sm:justify-between">
+            <div className="col-span-2 sm:col-span-1">
+              <p className="text-muted-foreground text-[10px] tracking-widest uppercase sm:text-xs">
                 {tab.borrower.full_name}
               </p>
-              <p className="text-foreground mt-1 text-2xl font-bold tabular-nums">
+              <p className="text-foreground mt-1 text-2xl font-bold tabular-nums sm:text-3xl">
                 {fmt(tab.outstanding, tab.currency)}
               </p>
               <p className="text-muted-foreground text-xs">outstanding</p>
             </div>
-            <div className="text-right">
+            <div className="text-left sm:text-right">
               <p className="text-sm font-semibold text-emerald-400 tabular-nums">
                 {fmt(tab.total_paid, tab.currency)}
               </p>
               <p className="text-muted-foreground text-[10px]">paid</p>
-              <p className="text-muted-foreground mt-1.5 text-sm tabular-nums">
+            </div>
+            <div className="text-left sm:text-right">
+              <p className="text-muted-foreground text-sm tabular-nums">
                 {fmt(tab.total_owed, tab.currency)}
               </p>
               <p className="text-muted-foreground text-[10px]">total charged</p>
@@ -1281,17 +1220,18 @@ export default function ExpenseTabDetailPage() {
 
           {/* Status legend + jump to unpaid */}
           {yearGroups.length > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
               <PeriodStatusLegend />
               {firstUnpaidPeriod && (
                 <button
                   type="button"
                   onClick={handleJumpToUnpaid}
-                  className="border-border/60 text-muted-foreground hover:text-foreground flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors"
+                  className="border-border/60 text-muted-foreground hover:text-foreground active:bg-muted/40 flex min-h-10 w-full touch-manipulation items-center justify-center gap-1.5 rounded-lg border px-2.5 py-2 text-xs font-medium transition-colors sm:w-auto sm:justify-start sm:py-1"
                 >
-                  <SkipForward className="h-3 w-3" />
-                  Jump to unpaid
-                  <span className="text-muted-foreground/70">
+                  <SkipForward className="h-3 w-3 shrink-0" />
+                  <span className="sm:hidden">Unpaid</span>
+                  <span className="hidden sm:inline">Jump to unpaid</span>
+                  <span className="text-muted-foreground/70 tabular-nums">
                     ({formatPeriodShort(firstUnpaidPeriod.period)})
                   </span>
                 </button>
@@ -1300,19 +1240,14 @@ export default function ExpenseTabDetailPage() {
           )}
 
           {yearGroups.map(({ year, periods: yearPeriods }) => {
-            const isCurrentYear = year === currentYear;
             const isExpanded = expandedYears.has(year);
-            const isBulkActive = bulkLockYear === year;
 
             const realPeriods = yearPeriods.filter((p) => p.id !== "__virtual__");
-            const allPaid =
-              realPeriods.length > 0 && realPeriods.every((p) => p.paid_status === "paid");
+            const allPaid = realPeriods.length > 0 && realPeriods.every((p) => isPeriodSettled(p));
             const allArchived = realPeriods.length > 0 && realPeriods.every((p) => p.is_archived);
             const canArchiveYear =
-              isAdmin && !isCurrentYear && allPaid && !allArchived && realPeriods.length > 0;
+              isAdmin && year !== currentYear && allPaid && !allArchived && realPeriods.length > 0;
             const yearSummary = getYearSummary(yearPeriods);
-            const yearAllSelected =
-              realPeriods.length > 0 && realPeriods.every((p) => selectedPeriodIds.has(p.id));
 
             return (
               <div key={year} className="bg-muted/20 border-border/40 rounded-xl border p-3">
@@ -1342,7 +1277,7 @@ export default function ExpenseTabDetailPage() {
                           Archived
                         </span>
                       )}
-                      {isAdmin && isExpanded && !isBulkActive && (
+                      {isAdmin && isExpanded && (
                         <MonthPickerPopover
                           existingPeriods={allPeriodStrs}
                           onSelect={handleAddMonth}
@@ -1353,110 +1288,29 @@ export default function ExpenseTabDetailPage() {
                     <p className="text-muted-foreground mt-1 pl-5 text-[10px]">{yearSummary}</p>
                   </div>
 
-                  <div className="flex shrink-0 items-center gap-1.5">
-                    {isAdmin && realPeriods.length >= 2 && !isBulkActive && (
-                      <button
-                        type="button"
-                        onClick={() => enterBulkLockMode(year)}
-                        className="border-border/60 text-muted-foreground hover:text-foreground flex items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-medium transition-colors"
-                      >
-                        <CheckSquare className="h-3 w-3" />
-                        Bulk
-                      </button>
-                    )}
-                    {canArchiveYear && !isBulkActive && (
+                  <div className="flex shrink-0 items-center gap-1 sm:gap-1.5">
+                    {canArchiveYear && (
                       <button
                         type="button"
                         onClick={() => setShowArchiveYear(year)}
-                        className="text-muted-foreground flex items-center gap-1 text-[10px] font-medium transition-colors hover:text-violet-400"
+                        className="text-muted-foreground active:bg-muted/40 flex h-9 min-w-9 touch-manipulation items-center justify-center gap-1 rounded-lg px-1.5 text-[10px] font-medium transition-colors hover:text-violet-400 sm:min-w-0 sm:px-0"
                       >
-                        <Archive className="h-3 w-3" />
-                        Archive
+                        <Archive className="h-3 w-3 shrink-0" />
+                        <span className="hidden sm:inline">Archive</span>
                       </button>
                     )}
-                    {isAdmin && yearPeriods.length > 0 && !isBulkActive && (
+                    {isAdmin && yearPeriods.length > 0 && (
                       <button
                         type="button"
                         onClick={() => setShowDeleteYear(year)}
-                        className="text-muted-foreground flex items-center gap-1 text-[10px] font-medium transition-colors hover:text-rose-400"
+                        className="text-muted-foreground active:bg-muted/40 flex h-9 min-w-9 touch-manipulation items-center justify-center gap-1 rounded-lg px-1.5 text-[10px] font-medium transition-colors hover:text-rose-400 sm:min-w-0 sm:px-0"
                       >
-                        <Trash2 className="h-3 w-3" />
-                        Delete
+                        <Trash2 className="h-3 w-3 shrink-0" />
+                        <span className="hidden sm:inline">Delete</span>
                       </button>
                     )}
                   </div>
                 </div>
-
-                {/* Per-year bulk controls */}
-                {isAdmin && isBulkActive && (
-                  <div className="mt-2 flex flex-wrap items-center gap-2 pl-5">
-                    <button
-                      type="button"
-                      onClick={() => toggleAllInYear(yearPeriods)}
-                      className="flex cursor-pointer items-center gap-1.5"
-                    >
-                      <div
-                        className={cn(
-                          "flex h-3.5 w-3.5 items-center justify-center rounded border transition-colors",
-                          yearAllSelected ? "bg-primary border-primary" : "border-border/60"
-                        )}
-                      >
-                        {yearAllSelected && (
-                          <svg
-                            viewBox="0 0 10 8"
-                            className="h-2 w-2 text-white"
-                            fill="currentColor"
-                          >
-                            <path
-                              d="M1 4l2.5 2.5L9 1"
-                              stroke="currentColor"
-                              strokeWidth="1.5"
-                              fill="none"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </svg>
-                        )}
-                      </div>
-                      <span className="text-foreground text-[10px] font-semibold">
-                        {selectedPeriodIds.size > 0
-                          ? `${selectedPeriodIds.size} selected`
-                          : "Select all"}
-                      </span>
-                    </button>
-                    {selectedPeriodIds.size > 0 &&
-                      realPeriods.some((p) => selectedPeriodIds.has(p.id) && !p.is_locked) && (
-                        <button
-                          type="button"
-                          disabled={bulkToggleLock.isPending}
-                          onClick={() => requestBulkLock(year, true, yearPeriods)}
-                          className="flex items-center gap-1 rounded-lg border border-orange-500/30 bg-orange-500/10 px-2 py-0.5 text-[10px] font-medium text-orange-400"
-                        >
-                          <Lock className="h-2.5 w-2.5" />
-                          Lock
-                        </button>
-                      )}
-                    {selectedPeriodIds.size > 0 &&
-                      realPeriods.some((p) => selectedPeriodIds.has(p.id) && p.is_locked) && (
-                        <button
-                          type="button"
-                          disabled={bulkToggleLock.isPending}
-                          onClick={() => requestBulkLock(year, false, yearPeriods)}
-                          className="flex items-center gap-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-400"
-                        >
-                          <Unlock className="h-2.5 w-2.5" />
-                          Unlock
-                        </button>
-                      )}
-                    <button
-                      type="button"
-                      onClick={exitBulkLockMode}
-                      className="text-muted-foreground text-[10px] font-medium hover:underline"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                )}
 
                 {/* Year progress bar — always visible */}
                 <div className="mt-2 pl-5">
@@ -1479,16 +1333,12 @@ export default function ExpenseTabDetailPage() {
                         is_locked={p.is_locked}
                         is_archived={p.is_archived}
                         paid_status={p.paid_status}
+                        outstanding={p.outstanding}
+                        total_owed={p.total_owed}
                         isVirtual={p.id === "__virtual__"}
                         isSelected={p.period === selectedPeriod}
                         onClick={() => handlePeriodSelect(p.period)}
-                        bulkMode={isBulkActive && p.id !== "__virtual__"}
-                        isChecked={selectedPeriodIds.has(p.id)}
-                        onBulkToggle={
-                          p.id !== "__virtual__" ? () => togglePeriodSelection(p.id) : undefined
-                        }
                         monthLabelOnly
-                        outstanding={p.outstanding}
                         currency={tab.currency}
                       />
                     ))}
@@ -1501,9 +1351,9 @@ export default function ExpenseTabDetailPage() {
       </div>
 
       {/* ── Month content — scrollable ───────────────────────────── */}
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 sm:px-6">
         {selectedPeriod === null ? (
-          <div className="p-6 pt-4">
+          <div className="pt-4 pb-6">
             <div className="bg-card border-border/60 rounded-xl border px-4 py-16 text-center">
               <CalendarPlus className="text-muted-foreground mx-auto mb-3 h-8 w-8" />
               <p className="text-foreground text-sm font-medium">No months yet</p>
@@ -1522,12 +1372,12 @@ export default function ExpenseTabDetailPage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.15 }}
-              className="p-6 pt-4"
+              className="pt-4 pb-6 sm:pb-4"
             >
               {/* Month header */}
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <h2 className="text-foreground truncate text-base font-semibold">
+              <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-2">
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-foreground text-base font-semibold sm:truncate sm:text-lg">
                     {formatPeriodLabel(selectedPeriod)}
                   </h2>
                   {isVirtual ? (
@@ -1535,10 +1385,14 @@ export default function ExpenseTabDetailPage() {
                   ) : (
                     activePeriod && (
                       <p className="text-muted-foreground text-xs">
-                        {activePeriod.paid_status === "paid"
-                          ? "Fully paid"
-                          : activePeriod.paid_status === "partial"
-                            ? `${fmt(activePeriod.outstanding, tab.currency)} remaining`
+                        {isPeriodSettled(activePeriod)
+                          ? activePeriodIsPast
+                            ? "Fully paid — closed"
+                            : "Fully paid"
+                          : activePeriod.outstanding > 0
+                            ? activePeriodIsPast
+                              ? `${fmt(activePeriod.outstanding, tab.currency)} remaining — payments only`
+                              : `${fmt(activePeriod.outstanding, tab.currency)} remaining`
                             : activePeriod.total_owed > 0
                               ? "Unpaid"
                               : "No items yet"}
@@ -1548,13 +1402,13 @@ export default function ExpenseTabDetailPage() {
                 </div>
 
                 {isAdmin && activePeriod && (
-                  <div className="flex shrink-0 items-center gap-1.5">
+                  <div className="-mx-1 flex shrink-0 items-center gap-1 overflow-x-auto px-1 pb-0.5 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
                     {/* Delete month — empty real months or unsaved draft months */}
                     {!activePeriod.is_archived && (isVirtual || activePeriodEmpty) && (
                       <button
                         type="button"
                         onClick={() => setShowDeletePeriod(true)}
-                        className="border-border/60 text-muted-foreground flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors hover:border-rose-500/30 hover:text-rose-400 sm:px-3"
+                        className="border-border/60 text-muted-foreground active:bg-muted/40 flex h-10 min-w-10 shrink-0 touch-manipulation items-center justify-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors hover:border-rose-500/30 hover:text-rose-400 sm:min-w-0 sm:px-3"
                         title={isVirtual ? "Remove this draft month" : "Delete this month"}
                       >
                         <Trash2 className="h-3 w-3 shrink-0" />
@@ -1571,7 +1425,7 @@ export default function ExpenseTabDetailPage() {
                             <button
                               type="button"
                               disabled
-                              className="border-border/60 text-muted-foreground flex cursor-not-allowed items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-medium opacity-40 sm:px-3"
+                              className="border-border/60 text-muted-foreground flex h-10 min-w-10 shrink-0 cursor-not-allowed touch-manipulation items-center justify-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium opacity-40 sm:min-w-0 sm:px-3"
                               title="Remove all items and payments before deleting this month"
                             >
                               <Trash2 className="h-3 w-3 shrink-0" />
@@ -1581,12 +1435,12 @@ export default function ExpenseTabDetailPage() {
 
                         {/* Archive month — fully-paid, non-archived, has content */}
                         {!activePeriod.is_archived &&
-                          activePeriod.paid_status === "paid" &&
+                          isPeriodSettled(activePeriod) &&
                           activePeriod.items.length > 0 && (
                             <button
                               type="button"
                               onClick={() => setShowArchivePeriod(true)}
-                              className="flex items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 px-2 py-1.5 text-xs font-medium text-violet-400 transition-colors hover:bg-violet-500/20 sm:px-3"
+                              className="flex h-10 min-w-10 shrink-0 touch-manipulation items-center justify-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 px-2.5 text-xs font-medium text-violet-400 transition-colors hover:bg-violet-500/20 active:scale-[0.98] sm:min-w-0 sm:px-3"
                             >
                               <Archive className="h-3 w-3 shrink-0" />
                               <span className="hidden sm:inline">Archive</span>
@@ -1595,14 +1449,14 @@ export default function ExpenseTabDetailPage() {
 
                         {/* Archived badge — static, no button */}
                         {activePeriod.is_archived && (
-                          <div className="flex items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 px-2 py-1.5 text-xs font-medium text-violet-400 sm:px-3">
+                          <div className="flex h-10 min-w-10 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 px-2.5 text-xs font-medium text-violet-400 sm:min-w-0 sm:px-3">
                             <Archive className="h-3 w-3 shrink-0" />
                             <span className="hidden sm:inline">Archived</span>
                           </div>
                         )}
 
-                        {/* Lock/Unlock */}
-                        {!activePeriod.is_archived && (
+                        {/* Lock/Unlock — current month only */}
+                        {activePeriodCanLock && !activePeriod.is_archived && (
                           <button
                             type="button"
                             disabled={toggleLock.isPending}
@@ -1614,7 +1468,7 @@ export default function ExpenseTabDetailPage() {
                               })
                             }
                             className={cn(
-                              "flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors sm:px-3",
+                              "flex h-10 min-w-10 shrink-0 touch-manipulation items-center justify-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors active:scale-[0.98] sm:min-w-0 sm:px-3",
                               activePeriod.is_locked
                                 ? "border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20"
                                 : "border-border/60 text-muted-foreground hover:text-foreground"
@@ -1634,17 +1488,27 @@ export default function ExpenseTabDetailPage() {
                           </button>
                         )}
 
-                        {/* Record Payment */}
-                        {activePeriod.outstanding > 0 && !activePeriod.is_archived && (
-                          <button
-                            type="button"
-                            onClick={() => setShowPaymentModal(true)}
-                            className="flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-1.5 text-xs font-medium text-emerald-400 transition-colors hover:bg-emerald-500/20 sm:px-3"
-                          >
-                            <CheckCircle2 className="h-3 w-3 shrink-0" />
-                            <span className="hidden sm:inline">Payment</span>
-                          </button>
+                        {/* Past months are auto-closed for items */}
+                        {activePeriodIsPast && !activePeriod.is_archived && (
+                          <div className="border-border/60 text-muted-foreground flex h-10 min-w-10 shrink-0 items-center justify-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium sm:min-w-0 sm:px-3">
+                            <Lock className="h-3 w-3 shrink-0" />
+                            <span className="hidden sm:inline">Closed</span>
+                          </div>
                         )}
+
+                        {/* Record Payment */}
+                        {activePeriod.outstanding > 0 &&
+                          !activePeriod.is_archived &&
+                          !activePeriodPaymentsClosed && (
+                            <button
+                              type="button"
+                              onClick={() => setShowPaymentModal(true)}
+                              className="flex h-10 min-w-10 shrink-0 touch-manipulation items-center justify-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2.5 text-xs font-medium text-emerald-400 transition-colors hover:bg-emerald-500/20 active:scale-[0.98] sm:min-w-0 sm:px-3"
+                            >
+                              <CheckCircle2 className="h-3 w-3 shrink-0" />
+                              <span className="hidden sm:inline">Payment</span>
+                            </button>
+                          )}
                       </>
                     )}
                   </div>
@@ -1672,7 +1536,7 @@ export default function ExpenseTabDetailPage() {
                         item={item}
                         currency={tab.currency}
                         isAdmin={isAdmin}
-                        isLocked={activePeriodClosed}
+                        isLocked={activePeriodItemsClosed}
                         onDelete={(iid) => deleteItem.mutate(iid)}
                         onEdit={(iid, desc, amt, split) =>
                           updateItem.mutate({
@@ -1690,7 +1554,7 @@ export default function ExpenseTabDetailPage() {
                         payment={payment}
                         currency={tab.currency}
                         isAdmin={isAdmin}
-                        isLocked={activePeriodClosed}
+                        isLocked={activePeriodPaymentsClosed}
                         onDelete={(pid) => deletePayment.mutate(pid)}
                       />
                     ))}
@@ -1735,11 +1599,11 @@ export default function ExpenseTabDetailPage() {
 
       {/* ── Quick-add bar — sticky bottom (admin only) ─────────── */}
       {isAdmin && selectedPeriod !== null && (
-        <div className="shrink-0">
+        <div className="sticky bottom-0 z-10 shrink-0 md:static">
           <QuickAddBar
             onAdd={handleAddItem}
             isPending={addItem.isPending}
-            closedMessage={activePeriodClosedMessage}
+            closedMessage={activePeriodItemsClosed ? activePeriodClosedMessage : null}
           />
         </div>
       )}
@@ -1782,8 +1646,8 @@ export default function ExpenseTabDetailPage() {
         }
         description={
           showLockConfirm?.lockTo
-            ? "Items and payments cannot be added or edited while this month is locked."
-            : "This month will be open for adding and editing items again."
+            ? "Items and payments cannot be added or edited while the current month is locked."
+            : "The current month will be open for adding and editing items again."
         }
         confirmLabel={showLockConfirm?.lockTo ? "Lock month" : "Unlock month"}
         variant="warning"
@@ -1796,25 +1660,6 @@ export default function ExpenseTabDetailPage() {
           );
         }}
         onCancel={() => setShowLockConfirm(null)}
-      />
-
-      <ConfirmDialog
-        open={showBulkLockConfirm !== null}
-        title={
-          showBulkLockConfirm?.lockTo
-            ? `Lock ${showBulkLockConfirm.count} month${showBulkLockConfirm.count !== 1 ? "s" : ""}?`
-            : `Unlock ${showBulkLockConfirm?.count ?? 0} month${showBulkLockConfirm?.count !== 1 ? "s" : ""}?`
-        }
-        description={
-          showBulkLockConfirm?.lockTo
-            ? "Selected months will be locked. Items and payments cannot be changed until unlocked."
-            : "Selected months will be unlocked for editing again."
-        }
-        confirmLabel={showBulkLockConfirm?.lockTo ? "Lock selected" : "Unlock selected"}
-        variant="warning"
-        isPending={bulkToggleLock.isPending}
-        onConfirm={confirmBulkLock}
-        onCancel={() => setShowBulkLockConfirm(null)}
       />
 
       <ConfirmDialog

@@ -27,7 +27,10 @@ export default function DashboardLayout() {
         <GlobalLoadingBar />
 
         {/* Page content */}
-        <main ref={mainRef} className="flex-1 overflow-y-auto pb-16 md:pb-0">
+        <main
+          ref={mainRef}
+          className="flex-1 overflow-y-auto max-md:pb-[calc(4rem+env(safe-area-inset-bottom,0px))] md:pb-0"
+        >
           <Outlet />
         </main>
       </div>

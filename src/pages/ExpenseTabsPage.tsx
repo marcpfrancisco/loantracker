@@ -52,6 +52,7 @@ function PeriodPill({
   is_archived,
   paid_status,
   outstanding = 0,
+  total_owed = 0,
   currency,
 }: {
   period: string;
@@ -59,9 +60,17 @@ function PeriodPill({
   is_archived: boolean;
   paid_status: "unpaid" | "partial" | "paid";
   outstanding?: number;
+  total_owed?: number;
   currency?: string;
 }) {
-  const status = getPeriodVisualStatus({ is_locked, is_archived, paid_status });
+  const status = getPeriodVisualStatus({
+    period,
+    is_locked,
+    is_archived,
+    paid_status,
+    outstanding,
+    total_owed,
+  });
   const hasBalance = outstanding > 0 && currency;
 
   const Icon =
@@ -69,7 +78,7 @@ function PeriodPill({
       ? Archive
       : status === "paid"
         ? CheckCircle2
-        : status === "locked"
+        : status === "locked" || status === "closed"
           ? Lock
           : Unlock;
 
@@ -77,7 +86,7 @@ function PeriodPill({
     <span
       title={hasBalance ? `${fmt(outstanding, currency)} outstanding` : undefined}
       className={cn(
-        "inline-flex flex-col items-center rounded-full border px-2 py-0.5 text-[10px] font-medium",
+        "inline-flex min-h-8 touch-manipulation flex-col items-center rounded-full border px-2 py-0.5 text-[10px] font-medium",
         PERIOD_STATUS_STYLES[status]
       )}
     >
@@ -110,7 +119,7 @@ function TabCard({ tab, isAdmin }: { tab: ExpenseTabSummary; isAdmin: boolean })
       <button
         type="button"
         onClick={() => void navigate(`/tabs/${tab.id}`)}
-        className="hover:bg-muted/20 w-full rounded-2xl p-4 pr-10 text-left transition-colors"
+        className="hover:bg-muted/20 active:bg-muted/30 w-full touch-manipulation rounded-2xl p-4 pr-12 text-left transition-colors sm:pr-10"
       >
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
@@ -141,6 +150,7 @@ function TabCard({ tab, isAdmin }: { tab: ExpenseTabSummary; isAdmin: boolean })
                       is_archived={p.is_archived}
                       paid_status={p.paid_status}
                       outstanding={p.outstanding}
+                      total_owed={p.total_owed}
                       currency={tab.currency}
                     />
                   ))}
@@ -166,8 +176,8 @@ function TabCard({ tab, isAdmin }: { tab: ExpenseTabSummary; isAdmin: boolean })
             e.stopPropagation();
             setShowConfirm(true);
           }}
-          className="text-muted-foreground absolute top-3.5 right-3 rounded p-1 transition-colors hover:text-rose-400"
-          title="Delete this expense tab"
+          className="text-muted-foreground active:bg-muted/40 absolute top-3 right-3 flex h-10 w-10 touch-manipulation items-center justify-center rounded-lg transition-colors hover:text-rose-400"
+          aria-label="Delete this expense tab"
         >
           <Trash2 className="h-3.5 w-3.5" />
         </button>
@@ -233,7 +243,7 @@ export default function ExpenseTabsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-5 p-6">
+    <div className="mx-auto max-w-2xl space-y-5 px-4 py-6 sm:px-6">
       {/* Header */}
       <div>
         <h1 className="text-foreground text-xl font-semibold tracking-tight">Expense Tabs</h1>

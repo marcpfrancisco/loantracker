@@ -18,6 +18,7 @@ export interface ExpenseTabSummary {
     is_locked: boolean;
     is_archived: boolean;
     paid_status: "unpaid" | "partial" | "paid";
+    outstanding: number;
   }>;
 }
 
@@ -62,6 +63,7 @@ async function fetchExpenseTabs(): Promise<ExpenseTabSummary[]> {
           is_locked: p.is_locked,
           is_archived: p.is_archived ?? false,
           paid_status,
+          outstanding,
         };
       })
       .sort((a, b) => a.period.localeCompare(b.period));
@@ -126,6 +128,7 @@ async function fetchMyExpenseTab(): Promise<ExpenseTabSummary | null> {
         is_locked: p.is_locked,
         is_archived: p.is_archived ?? false,
         paid_status,
+        outstanding,
       };
     })
     .sort((a, b) => a.period.localeCompare(b.period));

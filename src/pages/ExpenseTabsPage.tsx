@@ -3,6 +3,11 @@ import { useNavigate } from "react-router";
 import { motion } from "framer-motion";
 import { Receipt, AlertCircle, Lock, Unlock, CheckCircle2, Archive, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  getPeriodVisualStatus,
+  groupPeriodsByYear,
+  PERIOD_STATUS_STYLES,
+} from "@/lib/expensePeriodStyles";
 import { cardVariants } from "@/lib/animations";
 import { useAuth } from "@/hooks/useAuth";
 import { useExpenseTabsAdmin, useMyExpenseTab } from "@/hooks/useExpenseTabs";
@@ -29,47 +34,62 @@ function formatPeriod(period: string) {
 
 // ── Month pill ────────────────────────────────────────────────────────────────
 
+function fmtCompact(amount: number, currency: string) {
+  if (amount >= 1000) {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency,
+      notation: "compact",
+      maximumFractionDigits: 1,
+    }).format(amount);
+  }
+  return fmt(amount, currency);
+}
+
 function PeriodPill({
   period,
   is_locked,
   is_archived,
   paid_status,
+  outstanding = 0,
+  currency,
 }: {
   period: string;
   is_locked: boolean;
   is_archived: boolean;
   paid_status: "unpaid" | "partial" | "paid";
+  outstanding?: number;
+  currency?: string;
 }) {
-  const styles = {
-    paid: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
-    partial: "bg-amber-500/15 text-amber-400 border-amber-500/30",
-    unpaid: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30",
-    locked: "bg-orange-500/15 text-orange-400 border-orange-500/30",
-    archived: "bg-violet-500/15 text-violet-400 border-violet-500/30",
-  };
+  const status = getPeriodVisualStatus({ is_locked, is_archived, paid_status });
+  const hasBalance = outstanding > 0 && currency;
 
-  const Icon = is_archived
-    ? Archive
-    : paid_status === "paid"
-      ? CheckCircle2
-      : is_locked
-        ? Lock
-        : Unlock;
-  const styleKey = is_archived
-    ? "archived"
-    : is_locked && paid_status !== "paid"
-      ? "locked"
-      : paid_status;
+  const Icon =
+    status === "archived"
+      ? Archive
+      : status === "paid"
+        ? CheckCircle2
+        : status === "locked"
+          ? Lock
+          : Unlock;
 
   return (
     <span
+      title={hasBalance ? `${fmt(outstanding, currency)} outstanding` : undefined}
       className={cn(
-        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium",
-        styles[styleKey]
+        "inline-flex flex-col items-center rounded-full border px-2 py-0.5 text-[10px] font-medium",
+        PERIOD_STATUS_STYLES[status]
       )}
     >
-      <Icon className="h-2.5 w-2.5" />
-      {formatPeriod(period)}
+      <span className="inline-flex items-center gap-1">
+        <Icon className="h-2.5 w-2.5" />
+        {formatPeriod(period)}
+      </span>
+      {hasBalance && (
+        <span className="mt-0.5 text-[8px] font-semibold tabular-nums opacity-90">
+          {fmtCompact(outstanding, currency)}
+        </span>
+      )}
     </span>
   );
 }
@@ -106,15 +126,26 @@ function TabCard({ tab, isAdmin }: { tab: ExpenseTabSummary; isAdmin: boolean })
         </div>
 
         {tab.periodSummaries.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {tab.periodSummaries.map((p) => (
-              <PeriodPill
-                key={p.period}
-                period={p.period}
-                is_locked={p.is_locked}
-                is_archived={p.is_archived}
-                paid_status={p.paid_status}
-              />
+          <div className="mt-3 space-y-2">
+            {groupPeriodsByYear(tab.periodSummaries).map(({ year, periods }) => (
+              <div key={year}>
+                <p className="text-muted-foreground mb-1 text-[10px] font-semibold tracking-wide">
+                  {year}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {periods.map((p) => (
+                    <PeriodPill
+                      key={p.period}
+                      period={p.period}
+                      is_locked={p.is_locked}
+                      is_archived={p.is_archived}
+                      paid_status={p.paid_status}
+                      outstanding={p.outstanding}
+                      currency={tab.currency}
+                    />
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         )}

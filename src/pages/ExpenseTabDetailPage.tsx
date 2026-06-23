@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import {
@@ -20,8 +20,18 @@ import {
   Check,
   Archive,
   CheckSquare,
+  SkipForward,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  getPeriodVisualStatus,
+  groupPeriodsByYear,
+  MONTH_INITIALS,
+  PERIOD_STATUS_EMPTY_SEGMENT,
+  PERIOD_STATUS_LEGEND,
+  PERIOD_STATUS_SEGMENT,
+  PERIOD_STATUS_STYLES,
+} from "@/lib/expensePeriodStyles";
 import { useAuth } from "@/hooks/useAuth";
 import { useExpenseTab } from "@/hooks/useExpenseTab";
 import type { ExpensePeriod, ExpenseItem, ExpensePayment } from "@/hooks/useExpenseTab";
@@ -52,6 +62,18 @@ function fmt(amount: number, currency: string) {
   }).format(amount);
 }
 
+function fmtCompact(amount: number, currency: string) {
+  if (amount >= 1000) {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency,
+      notation: "compact",
+      maximumFractionDigits: 1,
+    }).format(amount);
+  }
+  return fmt(amount, currency);
+}
+
 function fmtDate(dateStr: string) {
   return new Date(dateStr + "T12:00:00").toLocaleDateString("en-US", {
     month: "short",
@@ -74,17 +96,44 @@ function formatPeriodShort(period: string) {
   });
 }
 
-function currentMonthStr() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+function formatMonthOnly(period: string) {
+  return new Date(period + "T12:00:00").toLocaleDateString("en-US", { month: "short" });
 }
 
-const PAID_STATUS_STYLES = {
-  paid: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
-  partial: "bg-amber-500/15 text-amber-400 border-amber-500/30",
-  unpaid: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30",
-  locked: "bg-orange-500/15 text-orange-400 border-orange-500/30",
-};
+const MONTH_LABELS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+const PAID_STATUS_STYLES = PERIOD_STATUS_STYLES;
+
+function PeriodStatusLegend() {
+  return (
+    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+      {PERIOD_STATUS_LEGEND.map(({ status, label }) => (
+        <span
+          key={status}
+          className={cn(
+            "inline-flex items-center rounded-full border px-1.5 py-0.5 text-[10px] font-medium",
+            PERIOD_STATUS_STYLES[status]
+          )}
+        >
+          {label}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 // ── Month pills ───────────────────────────────────────────────────────────────
 
@@ -93,37 +142,59 @@ function MonthPill({
   is_locked,
   is_archived,
   paid_status,
+  isVirtual,
   isSelected,
   onClick,
   bulkMode,
   isChecked,
   onBulkToggle,
+  monthLabelOnly = false,
+  outstanding = 0,
+  currency,
 }: {
   period: string;
   is_locked: boolean;
   is_archived: boolean;
   paid_status: "unpaid" | "partial" | "paid";
+  isVirtual?: boolean;
   isSelected: boolean;
   onClick: () => void;
   bulkMode?: boolean;
   isChecked?: boolean;
   onBulkToggle?: () => void;
+  monthLabelOnly?: boolean;
+  outstanding?: number;
+  currency?: string;
 }) {
   const ref = useRef<HTMLButtonElement>(null);
+  const status = getPeriodVisualStatus({ is_locked, is_archived, paid_status, isVirtual });
+  const label = monthLabelOnly ? formatMonthOnly(period) : formatPeriodShort(period);
+  const hasBalance = outstanding > 0 && currency;
+  const tooltip = [
+    monthLabelOnly ? formatPeriodLabel(period) : undefined,
+    hasBalance ? `${fmt(outstanding, currency)} outstanding` : undefined,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   useEffect(() => {
     if (isSelected && !bulkMode) {
-      ref.current?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+      ref.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
   }, [isSelected, bulkMode]);
 
-  const Icon = is_archived
-    ? Archive
-    : paid_status === "paid"
-      ? CheckCircle2
-      : is_locked
-        ? Lock
-        : Unlock;
+  const Icon =
+    status === "archived"
+      ? Archive
+      : status === "paid"
+        ? CheckCircle2
+        : status === "locked"
+          ? Lock
+          : status === "draft"
+            ? CalendarPlus
+            : Unlock;
+
+  const statusStyle = PAID_STATUS_STYLES[status];
 
   if (bulkMode) {
     return (
@@ -132,15 +203,10 @@ function MonthPill({
         type="button"
         onClick={onBulkToggle}
         className={cn(
-          "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
+          "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1.5 text-xs font-medium transition-all",
           isChecked
-            ? "bg-primary/15 border-primary/40 text-primary ring-2 ring-primary/40 shadow-sm"
-            : cn(
-                is_locked && paid_status !== "paid"
-                  ? PAID_STATUS_STYLES.locked
-                  : PAID_STATUS_STYLES[paid_status],
-                "hover:opacity-80"
-              )
+            ? cn(statusStyle, "ring-primary/50 shadow-sm ring-2")
+            : cn(statusStyle, "hover:opacity-80")
         )}
       >
         {/* Checkbox */}
@@ -163,7 +229,7 @@ function MonthPill({
             </svg>
           )}
         </div>
-        {formatPeriodShort(period)}
+        {label}
       </button>
     );
   }
@@ -173,21 +239,103 @@ function MonthPill({
       ref={ref}
       type="button"
       onClick={onClick}
+      title={tooltip || undefined}
       className={cn(
-        "flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all",
-        isSelected
-          ? "bg-primary/15 border-primary/40 text-primary shadow-sm"
-          : cn(
-              is_locked && paid_status !== "paid"
-                ? PAID_STATUS_STYLES.locked
-                : PAID_STATUS_STYLES[paid_status],
-              "hover:opacity-80"
-            )
+        "inline-flex flex-col items-center rounded-full border px-2.5 py-1.5 text-xs font-medium transition-all",
+        statusStyle,
+        isSelected ? "ring-primary/50 shadow-sm ring-2" : "hover:opacity-80"
       )}
     >
-      <Icon className="h-3 w-3" />
-      {formatPeriodShort(period)}
+      <span className="inline-flex items-center gap-1">
+        <Icon className="h-3 w-3 shrink-0" />
+        {label}
+        {hasBalance && !monthLabelOnly && (
+          <span className="bg-foreground/10 h-1.5 w-1.5 shrink-0 rounded-full" />
+        )}
+      </span>
+      {hasBalance && monthLabelOnly && (
+        <span className="mt-0.5 text-[9px] font-semibold tabular-nums opacity-90">
+          {fmtCompact(outstanding, currency)}
+        </span>
+      )}
     </button>
+  );
+}
+
+// ── Year progress bar ─────────────────────────────────────────────────────────
+
+function YearProgressBar({
+  year,
+  periods,
+  selectedPeriod,
+  currency,
+  onSelect,
+}: {
+  year: string;
+  periods: ExpensePeriod[];
+  selectedPeriod: string | null;
+  currency: string;
+  onSelect: (period: string) => void;
+}) {
+  const periodByMonth = new Map<number, ExpensePeriod>();
+  for (const p of periods) {
+    const monthIdx = Number.parseInt(p.period.slice(5, 7), 10) - 1;
+    periodByMonth.set(monthIdx, p);
+  }
+
+  return (
+    <div className="grid grid-cols-12 gap-0.5">
+      {MONTH_INITIALS.map((initial, idx) => {
+        const period = periodByMonth.get(idx);
+        if (!period) {
+          return (
+            <div key={initial + idx} className="flex flex-col items-center gap-0.5">
+              <div
+                className={cn("h-2 w-full rounded-sm", PERIOD_STATUS_EMPTY_SEGMENT)}
+                title={`No data for ${MONTH_LABELS[idx]} ${year}`}
+              />
+              <span className="text-muted-foreground/35 text-[8px] leading-none">{initial}</span>
+            </div>
+          );
+        }
+
+        const status = getPeriodVisualStatus({
+          is_locked: period.is_locked,
+          is_archived: period.is_archived,
+          paid_status: period.paid_status,
+          isVirtual: period.id === "__virtual__",
+        });
+        const isSelected = period.period === selectedPeriod;
+        const balanceNote =
+          period.outstanding > 0 ? ` · ${fmt(period.outstanding, currency)} outstanding` : "";
+
+        return (
+          <button
+            key={period.period}
+            type="button"
+            onClick={() => onSelect(period.period)}
+            title={`${formatPeriodLabel(period.period)}${balanceNote}`}
+            className="flex flex-col items-center gap-0.5"
+          >
+            <div
+              className={cn(
+                "h-2 w-full rounded-sm transition-all",
+                PERIOD_STATUS_SEGMENT[status],
+                isSelected && "ring-primary/70 ring-offset-background ring-1 ring-offset-1"
+              )}
+            />
+            <span
+              className={cn(
+                "text-[8px] leading-none",
+                isSelected ? "text-foreground font-bold" : "text-muted-foreground/60"
+              )}
+            >
+              {initial}
+            </span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -523,33 +671,27 @@ function RecordPaymentModal({
 
 // ── Month picker popover ──────────────────────────────────────────────────────
 
-const MONTH_LABELS = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
-
 function MonthPickerPopover({
   existingPeriods,
   onSelect,
+  defaultYear,
 }: {
   existingPeriods: string[]; // "YYYY-MM-DD"
   onSelect: (period: string) => void;
+  defaultYear?: number;
 }) {
   const [open, setOpen] = useState(false);
   const now = new Date();
-  const [viewYear, setViewYear] = useState(now.getFullYear());
+  const [viewYear, setViewYear] = useState(defaultYear ?? now.getFullYear());
   const currentYear = now.getFullYear();
   const currentMonthIdx = now.getMonth(); // 0-indexed
+
+  function handleOpenChange(next: boolean) {
+    setOpen(next);
+    if (next && defaultYear !== undefined) {
+      setViewYear(defaultYear);
+    }
+  }
 
   function isFuture(monthIdx: number) {
     return viewYear > currentYear || (viewYear === currentYear && monthIdx > currentMonthIdx);
@@ -567,10 +709,10 @@ function MonthPickerPopover({
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger
         className="border-border/60 text-muted-foreground hover:text-foreground hover:border-primary/40 flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1.5 text-xs transition-colors"
-        aria-label="Open a past month"
+        aria-label="Add a month"
       >
         <CalendarPlus className="h-3 w-3" />
       </PopoverTrigger>
@@ -732,7 +874,7 @@ export default function ExpenseTabDetailPage() {
   const [showDeletePeriod, setShowDeletePeriod] = useState(false);
   const [showArchivePeriod, setShowArchivePeriod] = useState(false);
   const [showArchiveYear, setShowArchiveYear] = useState<string | null>(null);
-  const [bulkLockMode, setBulkLockMode] = useState(false);
+  const [bulkLockYear, setBulkLockYear] = useState<string | null>(null);
   const [selectedPeriodIds, setSelectedPeriodIds] = useState<Set<string>>(new Set());
 
   const currentYear = String(new Date().getFullYear());
@@ -750,38 +892,43 @@ export default function ExpenseTabDetailPage() {
     });
   }
 
-  const thisMonth = currentMonthStr();
-
-  // Default selected period: current month if it exists, else latest period
-  const [selectedPeriod, setSelectedPeriod] = useState<string>(thisMonth);
+  // null = auto-select latest month once tab data is available
+  const [userSelectedPeriod, setUserSelectedPeriod] = useState<string | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  // Admin-added virtual months for past periods not yet in DB
-  const [extraVirtualMonths, setExtraVirtualMonths] = useState<string[]>([]);
+  // Admin-added months not yet persisted (no items added)
+  const [pendingMonths, setPendingMonths] = useState<string[]>([]);
 
-  // Once data loads, ensure selectedPeriod is valid.
-  // Must also allow extraVirtualMonths and the current-month virtual period.
-  useEffect(() => {
-    if (!tab) return;
-    const inDb = tab.periods.some((p) => p.period === selectedPeriod);
-    const isVirtualAllowed =
-      selectedPeriod === thisMonth || extraVirtualMonths.includes(selectedPeriod);
-    if (!inDb && !isVirtualAllowed && tab.periods.length > 0) {
-      const hasCurrent = tab.periods.some((p) => p.period === thisMonth);
-      setSelectedPeriod(hasCurrent ? thisMonth : tab.periods[tab.periods.length - 1].period);
-    }
-  }, [tab, selectedPeriod, thisMonth, extraVirtualMonths]);
+  const selectedPeriod = useMemo(() => {
+    if (!tab) return null;
 
-  function handleAddPastMonth(period: string) {
-    // period is already "YYYY-MM-DD" from MonthPickerPopover
-    if (!extraVirtualMonths.includes(period)) {
-      setExtraVirtualMonths((prev) => [...prev, period]);
+    const fallback =
+      tab.periods.length > 0
+        ? tab.periods[tab.periods.length - 1].period
+        : pendingMonths.length > 0
+          ? pendingMonths[pendingMonths.length - 1]
+          : null;
+
+    if (userSelectedPeriod === null) return fallback;
+
+    const inDb = tab.periods.some((p) => p.period === userSelectedPeriod);
+    const isPending = pendingMonths.includes(userSelectedPeriod);
+    if (!inDb && !isPending) return fallback;
+
+    return userSelectedPeriod;
+  }, [tab, userSelectedPeriod, pendingMonths]);
+
+  function handleAddMonth(period: string) {
+    if (!pendingMonths.includes(period)) {
+      setPendingMonths((prev) => [...prev, period]);
     }
-    setSelectedPeriod(period);
+    setUserSelectedPeriod(period);
     setShowDeletePeriod(false);
+    const year = period.slice(0, 4);
+    setExpandedYears((prev) => (prev.has(year) ? prev : new Set([...prev, year])));
   }
 
   function handlePeriodSelect(period: string) {
-    setSelectedPeriod(period);
+    setUserSelectedPeriod(period);
     setShowDeletePeriod(false);
     setShowArchivePeriod(false);
     // Ensure the year of the selected period is expanded
@@ -810,15 +957,15 @@ export default function ExpenseTabDetailPage() {
     );
   }
 
-  // Build period list: existing periods + current month + any admin-added past months
+  // Build period list: existing periods + admin-added pending months only
   const allPeriods = [...tab.periods];
   const existingPeriodStrs = new Set(allPeriods.map((p) => p.period));
 
-  const virtualMonths = new Set([...extraVirtualMonths, thisMonth]);
+  const pendingPeriodStrs = new Set(pendingMonths);
 
   const virtualPeriods: ExpensePeriod[] = [
     ...allPeriods,
-    ...[...virtualMonths]
+    ...[...pendingPeriodStrs]
       .filter((m) => !existingPeriodStrs.has(m))
       .map((m) => ({
         id: "__virtual__",
@@ -834,14 +981,38 @@ export default function ExpenseTabDetailPage() {
       })),
   ];
 
-  // Sorted newest-first for pills display
-  const sortedPeriods = [...virtualPeriods].sort((a, b) => b.period.localeCompare(a.period));
+  // Group by year (newest year first), months Jan → Dec within each year
+  const yearGroups = groupPeriodsByYear(virtualPeriods);
+  const allPeriodStrs = virtualPeriods.map((p) => p.period);
+  const tabCurrency = tab.currency;
 
-  // Real (non-virtual) periods only — used for bulk lock/unlock
-  const allRealPeriods = sortedPeriods.filter((p) => p.id !== "__virtual__");
+  function getYearSummary(periods: ExpensePeriod[]) {
+    const real = periods.filter((p) => p.id !== "__virtual__");
+    const monthCount = periods.length;
+    const outstanding = real.reduce((s, p) => s + p.outstanding, 0);
+    const ongoingCount = periods.filter(
+      (p) => p.id === "__virtual__" || (!p.is_archived && p.paid_status !== "paid" && !p.is_locked)
+    ).length;
+
+    const parts: string[] = [`${monthCount} month${monthCount !== 1 ? "s" : ""}`];
+    if (outstanding > 0) {
+      parts.push(`${fmt(outstanding, tabCurrency)} outstanding`);
+    } else if (real.length > 0 && real.every((p) => p.paid_status === "paid")) {
+      parts.push("all paid");
+    }
+    if (ongoingCount > 0) {
+      parts.push(`${ongoingCount} ongoing`);
+    }
+    return parts.join(" · ");
+  }
 
   function exitBulkLockMode() {
-    setBulkLockMode(false);
+    setBulkLockYear(null);
+    setSelectedPeriodIds(new Set());
+  }
+
+  function enterBulkLockMode(year: string) {
+    setBulkLockYear(year);
     setSelectedPeriodIds(new Set());
   }
 
@@ -854,26 +1025,39 @@ export default function ExpenseTabDetailPage() {
     });
   }
 
-  function handleBulkAction(lockTo: boolean) {
-    const targets: BulkLockTarget[] = allRealPeriods
+  function handleBulkAction(lockTo: boolean, yearPeriods: ExpensePeriod[]) {
+    const yearReal = yearPeriods.filter((p) => p.id !== "__virtual__");
+    const targets: BulkLockTarget[] = yearReal
       .filter((p) => selectedPeriodIds.has(p.id) && p.is_locked !== lockTo)
       .map((p) => ({ id: p.id, lockTo }));
     if (targets.length === 0) return;
     bulkToggleLock.mutate(targets, { onSuccess: exitBulkLockMode });
   }
 
-  // Group by year (newest year first)
-  const periodsByYear = sortedPeriods.reduce<Record<string, typeof sortedPeriods>>((acc, p) => {
-    const year = p.period.slice(0, 4);
-    (acc[year] ??= []).push(p);
-    return acc;
-  }, {});
-  const years = Object.keys(periodsByYear).sort((a, b) => b.localeCompare(a));
+  function toggleAllInYear(yearPeriods: ExpensePeriod[]) {
+    const yearReal = yearPeriods.filter((p) => p.id !== "__virtual__");
+    const allSelected = yearReal.length > 0 && yearReal.every((p) => selectedPeriodIds.has(p.id));
+    setSelectedPeriodIds(allSelected ? new Set() : new Set(yearReal.map((p) => p.id)));
+  }
 
-  const activePeriod = virtualPeriods.find((p) => p.period === selectedPeriod) ?? null;
+  const activePeriod =
+    selectedPeriod !== null
+      ? (virtualPeriods.find((p) => p.period === selectedPeriod) ?? null)
+      : null;
   const isVirtual = activePeriod?.id === "__virtual__";
 
+  const unpaidPeriods = virtualPeriods
+    .filter((p) => p.id !== "__virtual__" && p.outstanding > 0)
+    .sort((a, b) => a.period.localeCompare(b.period));
+  const firstUnpaidPeriod = unpaidPeriods[0] ?? null;
+
+  function handleJumpToUnpaid() {
+    if (!firstUnpaidPeriod) return;
+    handlePeriodSelect(firstUnpaidPeriod.period);
+  }
+
   async function handleAddItem(desc: string, amount: number, isSplit: boolean) {
+    if (!selectedPeriod) return;
     const [year, month] = selectedPeriod.split("-").map(Number);
     await addItem.mutateAsync({
       period: new Date(year, month - 1, 1),
@@ -957,39 +1141,131 @@ export default function ExpenseTabDetailPage() {
         </div>
 
         {/* Month navigation — grouped by year */}
-        <div className="space-y-2">
-          {/* Bulk lock/unlock header */}
-          {isAdmin && allRealPeriods.length >= 2 && (
-            <div className="flex items-center justify-between gap-2 pb-1">
-              {bulkLockMode ? (
-                <>
-                  {/* Select-all + count */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const allSelected =
-                        allRealPeriods.length > 0 &&
-                        allRealPeriods.every((p) => selectedPeriodIds.has(p.id));
-                      setSelectedPeriodIds(
-                        allSelected ? new Set() : new Set(allRealPeriods.map((p) => p.id))
-                      );
-                    }}
-                    className="flex cursor-pointer items-center gap-2"
-                  >
-                    <div
-                      className={cn(
-                        "flex h-4 w-4 items-center justify-center rounded border transition-colors",
-                        allRealPeriods.length > 0 &&
-                          allRealPeriods.every((p) => selectedPeriodIds.has(p.id))
-                          ? "bg-primary border-primary"
-                          : "border-border/60"
+        <div className="space-y-3">
+          {/* Add month — only when no years exist yet */}
+          {isAdmin && yearGroups.length === 0 && (
+            <div className="flex items-center gap-2 pb-1">
+              <span className="text-muted-foreground text-xs">Add month</span>
+              <MonthPickerPopover existingPeriods={[]} onSelect={handleAddMonth} />
+            </div>
+          )}
+
+          {/* Status legend + jump to unpaid */}
+          {yearGroups.length > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <PeriodStatusLegend />
+              {firstUnpaidPeriod && (
+                <button
+                  type="button"
+                  onClick={handleJumpToUnpaid}
+                  className="border-border/60 text-muted-foreground hover:text-foreground flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors"
+                >
+                  <SkipForward className="h-3 w-3" />
+                  Jump to unpaid
+                  <span className="text-muted-foreground/70">
+                    ({formatPeriodShort(firstUnpaidPeriod.period)})
+                  </span>
+                </button>
+              )}
+            </div>
+          )}
+
+          {yearGroups.map(({ year, periods: yearPeriods }) => {
+            const isCurrentYear = year === currentYear;
+            const isExpanded = expandedYears.has(year);
+            const isBulkActive = bulkLockYear === year;
+
+            const realPeriods = yearPeriods.filter((p) => p.id !== "__virtual__");
+            const allPaid =
+              realPeriods.length > 0 && realPeriods.every((p) => p.paid_status === "paid");
+            const allArchived = realPeriods.length > 0 && realPeriods.every((p) => p.is_archived);
+            const canArchiveYear =
+              isAdmin && !isCurrentYear && allPaid && !allArchived && realPeriods.length > 0;
+            const yearSummary = getYearSummary(yearPeriods);
+            const yearAllSelected =
+              realPeriods.length > 0 && realPeriods.every((p) => selectedPeriodIds.has(p.id));
+
+            return (
+              <div key={year} className="bg-muted/20 border-border/40 rounded-xl border p-3">
+                {/* Year header row */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleYear(year)}
+                        className="text-muted-foreground hover:text-foreground flex shrink-0 items-center gap-1.5 transition-colors"
+                        aria-expanded={isExpanded}
+                      >
+                        <ChevronRight
+                          className={cn(
+                            "h-3.5 w-3.5 transition-transform duration-200",
+                            isExpanded && "rotate-90"
+                          )}
+                        />
+                        <span className="text-foreground text-xs font-semibold tracking-wide">
+                          {year}
+                        </span>
+                      </button>
+                      {allArchived && (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[10px] font-medium text-violet-400">
+                          <Archive className="h-2.5 w-2.5" />
+                          Archived
+                        </span>
                       )}
+                      {isAdmin && isExpanded && !isBulkActive && (
+                        <MonthPickerPopover
+                          existingPeriods={allPeriodStrs}
+                          onSelect={handleAddMonth}
+                          defaultYear={Number(year)}
+                        />
+                      )}
+                    </div>
+                    <p className="text-muted-foreground mt-1 pl-5 text-[10px]">{yearSummary}</p>
+                  </div>
+
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {isAdmin && realPeriods.length >= 2 && !isBulkActive && (
+                      <button
+                        type="button"
+                        onClick={() => enterBulkLockMode(year)}
+                        className="border-border/60 text-muted-foreground hover:text-foreground flex items-center gap-1 rounded-lg border px-2 py-1 text-[10px] font-medium transition-colors"
+                      >
+                        <CheckSquare className="h-3 w-3" />
+                        Bulk
+                      </button>
+                    )}
+                    {canArchiveYear && !isBulkActive && (
+                      <button
+                        type="button"
+                        onClick={() => setShowArchiveYear(year)}
+                        className="text-muted-foreground flex items-center gap-1 text-[10px] font-medium transition-colors hover:text-violet-400"
+                      >
+                        <Archive className="h-3 w-3" />
+                        Archive
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Per-year bulk controls */}
+                {isAdmin && isBulkActive && (
+                  <div className="mt-2 flex flex-wrap items-center gap-2 pl-5">
+                    <button
+                      type="button"
+                      onClick={() => toggleAllInYear(yearPeriods)}
+                      className="flex cursor-pointer items-center gap-1.5"
                     >
-                      {allRealPeriods.length > 0 &&
-                        allRealPeriods.every((p) => selectedPeriodIds.has(p.id)) && (
+                      <div
+                        className={cn(
+                          "flex h-3.5 w-3.5 items-center justify-center rounded border transition-colors",
+                          yearAllSelected ? "bg-primary border-primary" : "border-border/60"
+                        )}
+                      >
+                        {yearAllSelected && (
                           <svg
                             viewBox="0 0 10 8"
-                            className="h-2.5 w-2.5 text-white"
+                            className="h-2 w-2 text-white"
                             fill="currentColor"
                           >
                             <path
@@ -1002,145 +1278,61 @@ export default function ExpenseTabDetailPage() {
                             />
                           </svg>
                         )}
-                    </div>
-                    <span className="text-foreground text-xs font-semibold">
-                      {selectedPeriodIds.size > 0
-                        ? `${selectedPeriodIds.size} selected`
-                        : "Select all"}
-                    </span>
-                  </button>
-
-                  {/* Bulk actions */}
-                  <div className="flex items-center gap-2">
+                      </div>
+                      <span className="text-foreground text-[10px] font-semibold">
+                        {selectedPeriodIds.size > 0
+                          ? `${selectedPeriodIds.size} selected`
+                          : "Select all"}
+                      </span>
+                    </button>
                     {selectedPeriodIds.size > 0 &&
-                      allRealPeriods.some(
-                        (p) => selectedPeriodIds.has(p.id) && !p.is_locked
-                      ) && (
+                      realPeriods.some((p) => selectedPeriodIds.has(p.id) && !p.is_locked) && (
                         <button
                           type="button"
                           disabled={bulkToggleLock.isPending}
-                          onClick={() => handleBulkAction(true)}
-                          className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-orange-500/30 bg-orange-500/10 px-2.5 py-1 text-xs font-medium text-orange-400 transition-colors hover:bg-orange-500/20 disabled:opacity-50"
+                          onClick={() => handleBulkAction(true, yearPeriods)}
+                          className="flex items-center gap-1 rounded-lg border border-orange-500/30 bg-orange-500/10 px-2 py-0.5 text-[10px] font-medium text-orange-400"
                         >
-                          {bulkToggleLock.isPending ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <Lock className="h-3 w-3" />
-                          )}
+                          <Lock className="h-2.5 w-2.5" />
                           Lock
                         </button>
                       )}
                     {selectedPeriodIds.size > 0 &&
-                      allRealPeriods.some(
-                        (p) => selectedPeriodIds.has(p.id) && p.is_locked
-                      ) && (
+                      realPeriods.some((p) => selectedPeriodIds.has(p.id) && p.is_locked) && (
                         <button
                           type="button"
                           disabled={bulkToggleLock.isPending}
-                          onClick={() => handleBulkAction(false)}
-                          className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-400 transition-colors hover:bg-amber-500/20 disabled:opacity-50"
+                          onClick={() => handleBulkAction(false, yearPeriods)}
+                          className="flex items-center gap-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-400"
                         >
-                          {bulkToggleLock.isPending ? (
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                          ) : (
-                            <Unlock className="h-3 w-3" />
-                          )}
+                          <Unlock className="h-2.5 w-2.5" />
                           Unlock
                         </button>
                       )}
                     <button
                       type="button"
                       onClick={exitBulkLockMode}
-                      className="border-border/60 text-muted-foreground hover:text-foreground cursor-pointer rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors"
+                      className="text-muted-foreground text-[10px] font-medium hover:underline"
                     >
                       Cancel
                     </button>
                   </div>
-                </>
-              ) : (
-                <div className="ml-auto">
-                  <button
-                    type="button"
-                    onClick={() => setBulkLockMode(true)}
-                    className="border-border/60 text-muted-foreground hover:text-foreground flex cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors"
-                  >
-                    <CheckSquare className="h-3 w-3" />
-                    Bulk
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+                )}
 
-          {years.map((year) => {
-            const yearPeriods = periodsByYear[year];
-            const isCurrentYear = year === currentYear;
-            const isExpanded = isCurrentYear || expandedYears.has(year);
-
-            // Real (non-virtual) periods only for archive logic
-            const realPeriods = yearPeriods.filter((p) => p.id !== "__virtual__");
-            const allPaid =
-              realPeriods.length > 0 && realPeriods.every((p) => p.paid_status === "paid");
-            const allArchived = realPeriods.length > 0 && realPeriods.every((p) => p.is_archived);
-            const canArchiveYear =
-              isAdmin && !isCurrentYear && allPaid && !allArchived && realPeriods.length > 0;
-
-            const yearTotalOwed = realPeriods.reduce((s, p) => s + p.total_owed, 0);
-
-            return (
-              <div key={year}>
-                {/* Year header row */}
-                <div className="flex items-center justify-between gap-2 pb-1.5">
-                  <div className="flex items-center gap-2">
-                    {!isCurrentYear && (
-                      <button
-                        type="button"
-                        onClick={() => toggleYear(year)}
-                        className="text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        <ChevronRight
-                          className={cn(
-                            "h-3.5 w-3.5 transition-transform duration-200",
-                            isExpanded && "rotate-90"
-                          )}
-                        />
-                      </button>
-                    )}
-                    <span className="text-muted-foreground text-[11px] font-semibold tracking-wider uppercase">
-                      {year}
-                    </span>
-                    {allArchived && (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-violet-500/30 bg-violet-500/10 px-2 py-0.5 text-[10px] font-medium text-violet-400">
-                        <Archive className="h-2.5 w-2.5" />
-                        Archived
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Archive Year button */}
-                  {canArchiveYear && (
-                    <button
-                      type="button"
-                      onClick={() => setShowArchiveYear(year)}
-                      className="text-muted-foreground flex items-center gap-1 text-[10px] font-medium transition-colors hover:text-violet-400"
-                    >
-                      <Archive className="h-3 w-3" />
-                      Archive {year}
-                    </button>
-                  )}
-
-                  {/* Collapsed summary for non-current past years */}
-                  {!isCurrentYear && !isExpanded && realPeriods.length > 0 && (
-                    <span className="text-muted-foreground text-[10px]">
-                      {realPeriods.length} month{realPeriods.length !== 1 ? "s" : ""}
-                      {yearTotalOwed > 0 ? ` · ${fmt(yearTotalOwed, tab.currency)}` : ""}
-                    </span>
-                  )}
+                {/* Year progress bar — always visible */}
+                <div className="mt-2 pl-5">
+                  <YearProgressBar
+                    year={year}
+                    periods={yearPeriods}
+                    selectedPeriod={selectedPeriod}
+                    currency={tab.currency}
+                    onSelect={handlePeriodSelect}
+                  />
                 </div>
 
-                {/* Month pills row (shown when expanded) */}
+                {/* Month pills — wrap grid, Jan → Dec */}
                 {isExpanded && (
-                  <div className="scrollbar-none -mx-6 flex items-center gap-2 overflow-x-auto px-6 pb-2">
+                  <div className="mt-2.5 flex flex-wrap gap-1.5 pl-5">
                     {yearPeriods.map((p) => (
                       <MonthPill
                         key={p.period}
@@ -1148,238 +1340,247 @@ export default function ExpenseTabDetailPage() {
                         is_locked={p.is_locked}
                         is_archived={p.is_archived}
                         paid_status={p.paid_status}
+                        isVirtual={p.id === "__virtual__"}
                         isSelected={p.period === selectedPeriod}
                         onClick={() => handlePeriodSelect(p.period)}
-                        bulkMode={bulkLockMode && p.id !== "__virtual__"}
+                        bulkMode={isBulkActive && p.id !== "__virtual__"}
                         isChecked={selectedPeriodIds.has(p.id)}
                         onBulkToggle={
-                          p.id !== "__virtual__"
-                            ? () => togglePeriodSelection(p.id)
-                            : undefined
+                          p.id !== "__virtual__" ? () => togglePeriodSelection(p.id) : undefined
                         }
+                        monthLabelOnly
+                        outstanding={p.outstanding}
+                        currency={tab.currency}
                       />
                     ))}
-
-                    {/* Add past month — only in the current year section */}
-                    {isCurrentYear && isAdmin && (
-                      <MonthPickerPopover
-                        existingPeriods={sortedPeriods.map((p) => p.period)}
-                        onSelect={handleAddPastMonth}
-                      />
-                    )}
                   </div>
                 )}
               </div>
             );
           })}
-
-          {/* If no periods exist yet, show add past month button standalone */}
-          {years.length === 0 && isAdmin && (
-            <div className="flex items-center gap-2 pb-2">
-              <MonthPickerPopover existingPeriods={[]} onSelect={handleAddPastMonth} />
-            </div>
-          )}
         </div>
       </div>
 
       {/* ── Month content — scrollable ───────────────────────────── */}
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={selectedPeriod}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.15 }}
-            className="p-6 pt-4"
-          >
-            {/* Month header */}
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <h2 className="text-foreground truncate text-base font-semibold">
-                  {formatPeriodLabel(selectedPeriod)}
-                </h2>
-                {!isVirtual && activePeriod && (
-                  <p className="text-muted-foreground text-xs">
-                    {activePeriod.paid_status === "paid"
-                      ? "Fully paid"
-                      : activePeriod.paid_status === "partial"
-                        ? `${fmt(activePeriod.outstanding, tab.currency)} remaining`
-                        : activePeriod.total_owed > 0
-                          ? "Unpaid"
-                          : "No items yet"}
-                  </p>
-                )}
-              </div>
-
-              {isAdmin && !isVirtual && activePeriod && (
-                <div className="flex shrink-0 items-center gap-1.5">
-                  {/* Delete month — only enabled when empty */}
-                  {!activePeriod.is_archived && (
-                    <button
-                      type="button"
-                      disabled={activePeriod.items.length > 0 || activePeriod.payments.length > 0}
-                      onClick={() => setShowDeletePeriod(true)}
-                      className="border-border/60 text-muted-foreground flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors hover:border-rose-500/30 hover:text-rose-400 disabled:cursor-not-allowed disabled:opacity-40 sm:px-3"
-                      title={
-                        activePeriod.items.length > 0 || activePeriod.payments.length > 0
-                          ? "Remove all items and payments before deleting this month"
-                          : "Delete this month"
-                      }
-                    >
-                      <Trash2 className="h-3 w-3 shrink-0" />
-                      <span className="hidden sm:inline">Delete</span>
-                    </button>
+        {selectedPeriod === null ? (
+          <div className="p-6 pt-4">
+            <div className="bg-card border-border/60 rounded-xl border px-4 py-16 text-center">
+              <CalendarPlus className="text-muted-foreground mx-auto mb-3 h-8 w-8" />
+              <p className="text-foreground text-sm font-medium">No months yet</p>
+              <p className="text-muted-foreground mt-1 text-xs">
+                {isAdmin
+                  ? "Use Add month above to open a new expense period."
+                  : "Your lender hasn't opened any months yet."}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={selectedPeriod}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.15 }}
+              className="p-6 pt-4"
+            >
+              {/* Month header */}
+              <div className="mb-3 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <h2 className="text-foreground truncate text-base font-semibold">
+                    {formatPeriodLabel(selectedPeriod)}
+                  </h2>
+                  {isVirtual ? (
+                    <p className="text-muted-foreground text-xs">New month — add items to open</p>
+                  ) : (
+                    activePeriod && (
+                      <p className="text-muted-foreground text-xs">
+                        {activePeriod.paid_status === "paid"
+                          ? "Fully paid"
+                          : activePeriod.paid_status === "partial"
+                            ? `${fmt(activePeriod.outstanding, tab.currency)} remaining`
+                            : activePeriod.total_owed > 0
+                              ? "Unpaid"
+                              : "No items yet"}
+                      </p>
+                    )
                   )}
+                </div>
 
-                  {/* Archive month — fully-paid, non-archived, has content */}
-                  {!activePeriod.is_archived &&
-                    activePeriod.paid_status === "paid" &&
-                    activePeriod.items.length > 0 && (
+                {isAdmin && !isVirtual && activePeriod && (
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {/* Delete month — only enabled when empty */}
+                    {!activePeriod.is_archived && (
                       <button
                         type="button"
-                        onClick={() => setShowArchivePeriod(true)}
-                        className="flex items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 px-2 py-1.5 text-xs font-medium text-violet-400 transition-colors hover:bg-violet-500/20 sm:px-3"
+                        disabled={activePeriod.items.length > 0 || activePeriod.payments.length > 0}
+                        onClick={() => setShowDeletePeriod(true)}
+                        className="border-border/60 text-muted-foreground flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors hover:border-rose-500/30 hover:text-rose-400 disabled:cursor-not-allowed disabled:opacity-40 sm:px-3"
+                        title={
+                          activePeriod.items.length > 0 || activePeriod.payments.length > 0
+                            ? "Remove all items and payments before deleting this month"
+                            : "Delete this month"
+                        }
                       >
-                        <Archive className="h-3 w-3 shrink-0" />
-                        <span className="hidden sm:inline">Archive</span>
+                        <Trash2 className="h-3 w-3 shrink-0" />
+                        <span className="hidden sm:inline">Delete</span>
                       </button>
                     )}
 
-                  {/* Archived badge — static, no button */}
-                  {activePeriod.is_archived && (
-                    <div className="flex items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 px-2 py-1.5 text-xs font-medium text-violet-400 sm:px-3">
-                      <Archive className="h-3 w-3 shrink-0" />
-                      <span className="hidden sm:inline">Archived</span>
-                    </div>
-                  )}
-
-                  {/* Lock/Unlock */}
-                  {!activePeriod.is_archived && (
-                    <button
-                      type="button"
-                      disabled={toggleLock.isPending}
-                      onClick={() =>
-                        toggleLock.mutate({
-                          periodId: activePeriod.id,
-                          is_locked: !activePeriod.is_locked,
-                        })
-                      }
-                      className={cn(
-                        "flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors sm:px-3",
-                        activePeriod.is_locked
-                          ? "border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20"
-                          : "border-border/60 text-muted-foreground hover:text-foreground"
+                    {/* Archive month — fully-paid, non-archived, has content */}
+                    {!activePeriod.is_archived &&
+                      activePeriod.paid_status === "paid" &&
+                      activePeriod.items.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowArchivePeriod(true)}
+                          className="flex items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 px-2 py-1.5 text-xs font-medium text-violet-400 transition-colors hover:bg-violet-500/20 sm:px-3"
+                        >
+                          <Archive className="h-3 w-3 shrink-0" />
+                          <span className="hidden sm:inline">Archive</span>
+                        </button>
                       )}
-                    >
-                      {activePeriod.is_locked ? (
-                        <>
-                          <Unlock className="h-3 w-3 shrink-0" />
-                          <span className="hidden sm:inline">Unlock</span>
-                        </>
-                      ) : (
-                        <>
-                          <Lock className="h-3 w-3 shrink-0" />
-                          <span className="hidden sm:inline">Lock</span>
-                        </>
-                      )}
-                    </button>
-                  )}
 
-                  {/* Record Payment */}
-                  {activePeriod.outstanding > 0 && !activePeriod.is_archived && (
-                    <button
-                      type="button"
-                      onClick={() => setShowPaymentModal(true)}
-                      className="flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-1.5 text-xs font-medium text-emerald-400 transition-colors hover:bg-emerald-500/20 sm:px-3"
-                    >
-                      <CheckCircle2 className="h-3 w-3 shrink-0" />
-                      <span className="hidden sm:inline">Payment</span>
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
+                    {/* Archived badge — static, no button */}
+                    {activePeriod.is_archived && (
+                      <div className="flex items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 px-2 py-1.5 text-xs font-medium text-violet-400 sm:px-3">
+                        <Archive className="h-3 w-3 shrink-0" />
+                        <span className="hidden sm:inline">Archived</span>
+                      </div>
+                    )}
 
-            {/* Items + payments list */}
-            <div className="bg-card border-border/60 overflow-hidden rounded-xl border">
-              {isVirtual ||
-              (activePeriod?.items.length === 0 && activePeriod?.payments.length === 0) ? (
-                <div className="px-4 py-10 text-center">
-                  <p className="text-muted-foreground text-sm">
-                    {isAdmin ? "Add the first item below." : "No items this month yet."}
-                  </p>
-                </div>
-              ) : (
-                <div className="divide-border/30 divide-y">
-                  {activePeriod?.items.map((item) => (
-                    <ItemRow
-                      key={item.id}
-                      item={item}
-                      currency={tab.currency}
-                      isAdmin={isAdmin}
-                      isLocked={activePeriod.is_locked}
-                      onDelete={(iid) => deleteItem.mutate(iid)}
-                      onEdit={(iid, desc, amt, split) =>
-                        updateItem.mutate({
-                          id: iid,
-                          description: desc,
-                          amount: amt,
-                          is_already_split: split,
-                        })
-                      }
-                    />
-                  ))}
-                  {activePeriod?.payments.map((payment) => (
-                    <PaymentRow
-                      key={payment.id}
-                      payment={payment}
-                      currency={tab.currency}
-                      isAdmin={isAdmin}
-                      isLocked={activePeriod.is_locked}
-                      onDelete={(pid) => deletePayment.mutate(pid)}
-                    />
-                  ))}
-                </div>
-              )}
+                    {/* Lock/Unlock */}
+                    {!activePeriod.is_archived && (
+                      <button
+                        type="button"
+                        disabled={toggleLock.isPending}
+                        onClick={() =>
+                          toggleLock.mutate({
+                            periodId: activePeriod.id,
+                            is_locked: !activePeriod.is_locked,
+                          })
+                        }
+                        className={cn(
+                          "flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors sm:px-3",
+                          activePeriod.is_locked
+                            ? "border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20"
+                            : "border-border/60 text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        {activePeriod.is_locked ? (
+                          <>
+                            <Unlock className="h-3 w-3 shrink-0" />
+                            <span className="hidden sm:inline">Unlock</span>
+                          </>
+                        ) : (
+                          <>
+                            <Lock className="h-3 w-3 shrink-0" />
+                            <span className="hidden sm:inline">Lock</span>
+                          </>
+                        )}
+                      </button>
+                    )}
 
-              {/* Month totals footer */}
-              {!isVirtual && activePeriod && activePeriod.total_owed > 0 && (
-                <div className="border-border/60 bg-muted/20 space-y-1 border-t px-4 py-3">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-muted-foreground">Charged</span>
-                    <span className="text-foreground font-medium tabular-nums">
-                      {fmt(activePeriod.total_owed, tab.currency)}
-                    </span>
+                    {/* Record Payment */}
+                    {activePeriod.outstanding > 0 && !activePeriod.is_archived && (
+                      <button
+                        type="button"
+                        onClick={() => setShowPaymentModal(true)}
+                        className="flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-1.5 text-xs font-medium text-emerald-400 transition-colors hover:bg-emerald-500/20 sm:px-3"
+                      >
+                        <CheckCircle2 className="h-3 w-3 shrink-0" />
+                        <span className="hidden sm:inline">Payment</span>
+                      </button>
+                    )}
                   </div>
-                  {activePeriod.total_paid > 0 && (
+                )}
+              </div>
+
+              {/* Items + payments list */}
+              <div className="bg-card border-border/60 overflow-hidden rounded-xl border">
+                {isVirtual ||
+                (activePeriod?.items.length === 0 && activePeriod?.payments.length === 0) ? (
+                  <div className="px-4 py-10 text-center">
+                    <p className="text-muted-foreground text-sm">
+                      {isAdmin
+                        ? isVirtual
+                          ? "Add the first item to create this month."
+                          : "Add the first item below."
+                        : "No items this month yet."}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="divide-border/30 divide-y">
+                    {activePeriod?.items.map((item) => (
+                      <ItemRow
+                        key={item.id}
+                        item={item}
+                        currency={tab.currency}
+                        isAdmin={isAdmin}
+                        isLocked={activePeriod.is_locked}
+                        onDelete={(iid) => deleteItem.mutate(iid)}
+                        onEdit={(iid, desc, amt, split) =>
+                          updateItem.mutate({
+                            id: iid,
+                            description: desc,
+                            amount: amt,
+                            is_already_split: split,
+                          })
+                        }
+                      />
+                    ))}
+                    {activePeriod?.payments.map((payment) => (
+                      <PaymentRow
+                        key={payment.id}
+                        payment={payment}
+                        currency={tab.currency}
+                        isAdmin={isAdmin}
+                        isLocked={activePeriod.is_locked}
+                        onDelete={(pid) => deletePayment.mutate(pid)}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Month totals footer */}
+                {!isVirtual && activePeriod && activePeriod.total_owed > 0 && (
+                  <div className="border-border/60 bg-muted/20 space-y-1 border-t px-4 py-3">
                     <div className="flex justify-between text-xs">
-                      <span className="text-muted-foreground">Paid</span>
-                      <span className="font-medium text-emerald-400 tabular-nums">
-                        -{fmt(activePeriod.total_paid, tab.currency)}
+                      <span className="text-muted-foreground">Charged</span>
+                      <span className="text-foreground font-medium tabular-nums">
+                        {fmt(activePeriod.total_owed, tab.currency)}
                       </span>
                     </div>
-                  )}
-                  <div className="flex justify-between text-sm">
-                    <span className="text-foreground font-semibold">Outstanding</span>
-                    <span
-                      className={cn(
-                        "font-bold tabular-nums",
-                        activePeriod.outstanding <= 0 ? "text-emerald-400" : "text-foreground"
-                      )}
-                    >
-                      {fmt(activePeriod.outstanding, tab.currency)}
-                    </span>
+                    {activePeriod.total_paid > 0 && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted-foreground">Paid</span>
+                        <span className="font-medium text-emerald-400 tabular-nums">
+                          -{fmt(activePeriod.total_paid, tab.currency)}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-sm">
+                      <span className="text-foreground font-semibold">Outstanding</span>
+                      <span
+                        className={cn(
+                          "font-bold tabular-nums",
+                          activePeriod.outstanding <= 0 ? "text-emerald-400" : "text-foreground"
+                        )}
+                      >
+                        {fmt(activePeriod.outstanding, tab.currency)}
+                      </span>
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-          </motion.div>
-        </AnimatePresence>
+                )}
+              </div>
+            </motion.div>
+          </AnimatePresence>
+        )}
       </div>
 
       {/* ── Quick-add bar — sticky bottom (admin only) ─────────── */}
-      {isAdmin && (
+      {isAdmin && selectedPeriod !== null && (
         <div className="shrink-0">
           <QuickAddBar
             onAdd={handleAddItem}
@@ -1440,9 +1641,8 @@ export default function ExpenseTabDetailPage() {
         isPending={archiveYear.isPending}
         onConfirm={() => {
           if (!showArchiveYear) return;
-          const ids = (periodsByYear[showArchiveYear] ?? [])
-            .filter((p) => p.id !== "__virtual__")
-            .map((p) => p.id);
+          const group = yearGroups.find((g) => g.year === showArchiveYear);
+          const ids = (group?.periods ?? []).filter((p) => p.id !== "__virtual__").map((p) => p.id);
           archiveYear.mutate(ids, { onSuccess: () => setShowArchiveYear(null) });
         }}
         onCancel={() => setShowArchiveYear(null)}

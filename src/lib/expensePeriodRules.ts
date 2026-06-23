@@ -22,6 +22,9 @@ export function hasOutstandingBalance(outstanding: number): boolean {
   return roundMoney(outstanding) > 0;
 }
 
+// Fixed string comparison from supabase
+// Supabase return values like: 2026-01-01 00:00:00.000000+00
+// We want to compare the date part only (2026-01-01)
 export function normalizePeriodKey(period: string): string {
   const match = /^(\d{4}-\d{2}-\d{2})/.exec(period);
   return match ? match[1] : period.slice(0, 10);

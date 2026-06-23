@@ -32,6 +32,7 @@ import {
   PERIOD_STATUS_SEGMENT,
   PERIOD_STATUS_STYLES,
 } from "@/lib/expensePeriodStyles";
+import { getPeriodClosedMessage } from "@/lib/expensePeriodRules";
 import { useAuth } from "@/hooks/useAuth";
 import { useExpenseTab } from "@/hooks/useExpenseTab";
 import type { ExpensePeriod, ExpenseItem, ExpensePayment } from "@/hooks/useExpenseTab";
@@ -42,6 +43,7 @@ import {
   useRecordPayment,
   useDeletePayment,
   useDeleteExpensePeriod,
+  useDeleteExpenseYear,
   useUpdateExpenseItem,
   useArchivePeriod,
   useArchiveYear,
@@ -582,90 +584,116 @@ function RecordPaymentModal({
   const [amount, setAmount] = useState(outstanding.toFixed(2));
   const [notes, setNotes] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  const parsedAmount = Number(amount);
+  const canSubmit = parsedAmount > 0 && parsedAmount <= outstanding;
+
+  function handleReview() {
+    if (!canSubmit) return;
+    setShowConfirm(true);
+  }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <motion.div
-        className="bg-card border-border/60 relative z-10 w-full max-w-sm overflow-hidden rounded-2xl border shadow-2xl"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 20 }}
-        transition={{ duration: 0.2 }}
-      >
-        <div className="border-border/60 border-b px-5 py-4">
-          <p className="text-foreground text-sm font-semibold">Record Payment</p>
-          <p className="text-muted-foreground mt-0.5 text-xs">
-            {formatPeriodLabel(period.period)} · Outstanding {fmt(outstanding, currency)}
-          </p>
-        </div>
-        <div className="space-y-4 p-5">
-          {/* Pay in full shortcut */}
-          <button
-            type="button"
-            onClick={() => setAmount(outstanding.toFixed(2))}
-            className={cn(
-              "flex w-full items-center justify-between rounded-xl border px-4 py-3 text-sm transition-colors",
-              amount === outstanding.toFixed(2)
-                ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
-                : "border-border/60 text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <span className="font-medium">Pay in full</span>
-            <span className="font-bold tabular-nums">{fmt(outstanding, currency)}</span>
-          </button>
+    <>
+      <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+        <motion.div
+          className="bg-card border-border/60 relative z-10 w-full max-w-sm overflow-hidden rounded-2xl border shadow-2xl"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 20 }}
+          transition={{ duration: 0.2 }}
+        >
+          <div className="border-border/60 border-b px-5 py-4">
+            <p className="text-foreground text-sm font-semibold">Record Payment</p>
+            <p className="text-muted-foreground mt-0.5 text-xs">
+              {formatPeriodLabel(period.period)} · Outstanding {fmt(outstanding, currency)}
+            </p>
+          </div>
+          <div className="space-y-4 p-5">
+            {/* Pay in full shortcut */}
+            <button
+              type="button"
+              onClick={() => setAmount(outstanding.toFixed(2))}
+              className={cn(
+                "flex w-full items-center justify-between rounded-xl border px-4 py-3 text-sm transition-colors",
+                amount === outstanding.toFixed(2)
+                  ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
+                  : "border-border/60 text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <span className="font-medium">Pay in full</span>
+              <span className="font-bold tabular-nums">{fmt(outstanding, currency)}</span>
+            </button>
 
-          <div className="space-y-1.5">
-            <label className="text-foreground text-xs font-medium">Amount</label>
-            <input
-              type="number"
-              step="0.01"
-              min="0.01"
-              max={outstanding}
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              className="border-border/60 bg-background focus:border-primary/60 w-full rounded-lg border px-3 py-2 text-sm outline-none"
-            />
+            <div className="space-y-1.5">
+              <label className="text-foreground text-xs font-medium">Amount</label>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                max={outstanding}
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="border-border/60 bg-background focus:border-primary/60 w-full rounded-lg border px-3 py-2 text-sm outline-none"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-foreground text-xs font-medium">Date</label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="border-border/60 bg-background focus:border-primary/60 w-full rounded-lg border px-3 py-2 text-sm outline-none"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-foreground text-xs font-medium">Notes (optional)</label>
+              <input
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Cash, bank transfer…"
+                className="border-border/60 bg-background focus:border-primary/60 w-full rounded-lg border px-3 py-2 text-sm outline-none"
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={onClose}
+                className="border-border/60 text-muted-foreground flex-1 rounded-lg border py-2 text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isPending || !canSubmit}
+                onClick={handleReview}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-500 disabled:opacity-60"
+              >
+                Review payment
+              </button>
+            </div>
           </div>
-          <div className="space-y-1.5">
-            <label className="text-foreground text-xs font-medium">Date</label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="border-border/60 bg-background focus:border-primary/60 w-full rounded-lg border px-3 py-2 text-sm outline-none"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-foreground text-xs font-medium">Notes (optional)</label>
-            <input
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Cash, bank transfer…"
-              className="border-border/60 bg-background focus:border-primary/60 w-full rounded-lg border px-3 py-2 text-sm outline-none"
-            />
-          </div>
-          <div className="flex gap-2 pt-1">
-            <button
-              type="button"
-              onClick={onClose}
-              className="border-border/60 text-muted-foreground flex-1 rounded-lg border py-2 text-sm"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              disabled={isPending || !amount || Number(amount) <= 0}
-              onClick={() => onSubmit(Number(amount), notes, date)}
-              className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-emerald-600 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-500 disabled:opacity-60"
-            >
-              {isPending && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              Confirm
-            </button>
-          </div>
-        </div>
-      </motion.div>
-    </div>
+        </motion.div>
+      </div>
+
+      <ConfirmDialog
+        open={showConfirm}
+        title="Record this payment?"
+        description={`${fmt(parsedAmount, currency)} for ${formatPeriodLabel(period.period)}${
+          notes.trim() ? ` · ${notes.trim()}` : ""
+        }`}
+        confirmLabel="Record payment"
+        variant="warning"
+        isPending={isPending}
+        onConfirm={() => {
+          onSubmit(parsedAmount, notes, date);
+          setShowConfirm(false);
+        }}
+        onCancel={() => setShowConfirm(false)}
+      />
+    </>
   );
 }
 
@@ -772,11 +800,11 @@ function MonthPickerPopover({
 function QuickAddBar({
   onAdd,
   isPending,
-  isLocked,
+  closedMessage,
 }: {
   onAdd: (desc: string, amount: number, isSplit: boolean) => Promise<void>;
   isPending: boolean;
-  isLocked: boolean;
+  closedMessage: string | null;
 }) {
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
@@ -792,12 +820,10 @@ function QuickAddBar({
     descRef.current?.focus();
   }
 
-  if (isLocked) {
+  if (closedMessage) {
     return (
       <div className="border-border/60 bg-background/95 border-t px-4 py-3">
-        <p className="text-muted-foreground text-center text-xs">
-          Month is locked — unlock to add items
-        </p>
+        <p className="text-muted-foreground text-center text-xs">{closedMessage}</p>
       </div>
     );
   }
@@ -867,6 +893,7 @@ export default function ExpenseTabDetailPage() {
   const recordPayment = useRecordPayment(id!);
   const deletePayment = useDeletePayment(id!);
   const deletePeriod = useDeleteExpensePeriod(id!);
+  const deleteYear = useDeleteExpenseYear(id!);
   const archivePeriod = useArchivePeriod(id!);
   const archiveYear = useArchiveYear(id!);
   const bulkToggleLock = useBulkTogglePeriodLock(id!);
@@ -874,6 +901,17 @@ export default function ExpenseTabDetailPage() {
   const [showDeletePeriod, setShowDeletePeriod] = useState(false);
   const [showArchivePeriod, setShowArchivePeriod] = useState(false);
   const [showArchiveYear, setShowArchiveYear] = useState<string | null>(null);
+  const [showDeleteYear, setShowDeleteYear] = useState<string | null>(null);
+  const [showLockConfirm, setShowLockConfirm] = useState<{
+    periodId: string;
+    lockTo: boolean;
+    label: string;
+  } | null>(null);
+  const [showBulkLockConfirm, setShowBulkLockConfirm] = useState<{
+    year: string;
+    lockTo: boolean;
+    count: number;
+  } | null>(null);
   const [bulkLockYear, setBulkLockYear] = useState<string | null>(null);
   const [selectedPeriodIds, setSelectedPeriodIds] = useState<Set<string>>(new Set());
 
@@ -1031,8 +1069,79 @@ export default function ExpenseTabDetailPage() {
       .filter((p) => selectedPeriodIds.has(p.id) && p.is_locked !== lockTo)
       .map((p) => ({ id: p.id, lockTo }));
     if (targets.length === 0) return;
-    bulkToggleLock.mutate(targets, { onSuccess: exitBulkLockMode });
+    bulkToggleLock.mutate(targets, {
+      onSuccess: () => {
+        exitBulkLockMode();
+        setShowBulkLockConfirm(null);
+      },
+    });
   }
+
+  function requestBulkLock(year: string, lockTo: boolean, yearPeriods: ExpensePeriod[]) {
+    const count = yearPeriods.filter(
+      (p) => p.id !== "__virtual__" && selectedPeriodIds.has(p.id) && p.is_locked !== lockTo
+    ).length;
+    if (count === 0) return;
+    setShowBulkLockConfirm({ year, lockTo, count });
+  }
+
+  function confirmBulkLock() {
+    if (!showBulkLockConfirm) return;
+    const group = yearGroups.find((g) => g.year === showBulkLockConfirm.year);
+    if (!group) return;
+    handleBulkAction(showBulkLockConfirm.lockTo, group.periods);
+  }
+
+  function handleConfirmDeletePeriod() {
+    if (!activePeriod) return;
+    if (isVirtual) {
+      setPendingMonths((prev) => prev.filter((p) => p !== activePeriod.period));
+      if (userSelectedPeriod === activePeriod.period) setUserSelectedPeriod(null);
+      setShowDeletePeriod(false);
+      return;
+    }
+    deletePeriod.mutate(activePeriod.id, {
+      onSuccess: () => {
+        setShowDeletePeriod(false);
+        setUserSelectedPeriod(null);
+      },
+    });
+  }
+
+  function handleConfirmDeleteYear() {
+    if (!showDeleteYear) return;
+    const group = yearGroups.find((g) => g.year === showDeleteYear);
+    if (!group) return;
+
+    const realIds = group.periods.filter((p) => p.id !== "__virtual__").map((p) => p.id);
+    const pendingInYear = group.periods.filter((p) => p.id === "__virtual__").map((p) => p.period);
+
+    const finish = () => {
+      if (pendingInYear.length > 0) {
+        setPendingMonths((prev) => prev.filter((p) => !pendingInYear.includes(p)));
+      }
+      if (selectedPeriod?.startsWith(showDeleteYear)) {
+        setUserSelectedPeriod(null);
+      }
+      setShowDeleteYear(null);
+    };
+
+    if (realIds.length === 0) {
+      finish();
+      return;
+    }
+
+    deleteYear.mutate(realIds, { onSuccess: finish });
+  }
+
+  const deleteYearGroup = showDeleteYear ? yearGroups.find((g) => g.year === showDeleteYear) : null;
+  const deleteYearRealCount =
+    deleteYearGroup?.periods.filter((p) => p.id !== "__virtual__").length ?? 0;
+  const deleteYearPendingCount =
+    deleteYearGroup?.periods.filter((p) => p.id === "__virtual__").length ?? 0;
+  const deleteYearItemCount = deleteYearGroup?.periods.reduce((s, p) => s + p.items.length, 0) ?? 0;
+  const deleteYearPaymentCount =
+    deleteYearGroup?.periods.reduce((s, p) => s + p.payments.length, 0) ?? 0;
 
   function toggleAllInYear(yearPeriods: ExpensePeriod[]) {
     const yearReal = yearPeriods.filter((p) => p.id !== "__virtual__");
@@ -1046,6 +1155,26 @@ export default function ExpenseTabDetailPage() {
       : null;
   const isVirtual = activePeriod?.id === "__virtual__";
 
+  const activePeriodClosure =
+    activePeriod && !isVirtual
+      ? {
+          period: activePeriod.period,
+          is_locked: activePeriod.is_locked,
+          is_archived: activePeriod.is_archived,
+          paid_status: activePeriod.paid_status,
+        }
+      : null;
+  const activePeriodClosedMessage = activePeriodClosure
+    ? getPeriodClosedMessage(activePeriodClosure) || null
+    : null;
+  const activePeriodClosed = activePeriodClosedMessage !== null;
+
+  const activePeriodEmpty =
+    activePeriod &&
+    !isVirtual &&
+    activePeriod.items.length === 0 &&
+    activePeriod.payments.length === 0;
+
   const unpaidPeriods = virtualPeriods
     .filter((p) => p.id !== "__virtual__" && p.outstanding > 0)
     .sort((a, b) => a.period.localeCompare(b.period));
@@ -1057,7 +1186,7 @@ export default function ExpenseTabDetailPage() {
   }
 
   async function handleAddItem(desc: string, amount: number, isSplit: boolean) {
-    if (!selectedPeriod) return;
+    if (!selectedPeriod || activePeriodClosed) return;
     const [year, month] = selectedPeriod.split("-").map(Number);
     await addItem.mutateAsync({
       period: new Date(year, month - 1, 1),
@@ -1245,6 +1374,16 @@ export default function ExpenseTabDetailPage() {
                         Archive
                       </button>
                     )}
+                    {isAdmin && yearPeriods.length > 0 && !isBulkActive && (
+                      <button
+                        type="button"
+                        onClick={() => setShowDeleteYear(year)}
+                        className="text-muted-foreground flex items-center gap-1 text-[10px] font-medium transition-colors hover:text-rose-400"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                        Delete
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -1290,7 +1429,7 @@ export default function ExpenseTabDetailPage() {
                         <button
                           type="button"
                           disabled={bulkToggleLock.isPending}
-                          onClick={() => handleBulkAction(true, yearPeriods)}
+                          onClick={() => requestBulkLock(year, true, yearPeriods)}
                           className="flex items-center gap-1 rounded-lg border border-orange-500/30 bg-orange-500/10 px-2 py-0.5 text-[10px] font-medium text-orange-400"
                         >
                           <Lock className="h-2.5 w-2.5" />
@@ -1302,7 +1441,7 @@ export default function ExpenseTabDetailPage() {
                         <button
                           type="button"
                           disabled={bulkToggleLock.isPending}
-                          onClick={() => handleBulkAction(false, yearPeriods)}
+                          onClick={() => requestBulkLock(year, false, yearPeriods)}
                           className="flex items-center gap-1 rounded-lg border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-medium text-amber-400"
                         >
                           <Unlock className="h-2.5 w-2.5" />
@@ -1408,90 +1547,105 @@ export default function ExpenseTabDetailPage() {
                   )}
                 </div>
 
-                {isAdmin && !isVirtual && activePeriod && (
+                {isAdmin && activePeriod && (
                   <div className="flex shrink-0 items-center gap-1.5">
-                    {/* Delete month — only enabled when empty */}
-                    {!activePeriod.is_archived && (
+                    {/* Delete month — empty real months or unsaved draft months */}
+                    {!activePeriod.is_archived && (isVirtual || activePeriodEmpty) && (
                       <button
                         type="button"
-                        disabled={activePeriod.items.length > 0 || activePeriod.payments.length > 0}
                         onClick={() => setShowDeletePeriod(true)}
-                        className="border-border/60 text-muted-foreground flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors hover:border-rose-500/30 hover:text-rose-400 disabled:cursor-not-allowed disabled:opacity-40 sm:px-3"
-                        title={
-                          activePeriod.items.length > 0 || activePeriod.payments.length > 0
-                            ? "Remove all items and payments before deleting this month"
-                            : "Delete this month"
-                        }
+                        className="border-border/60 text-muted-foreground flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors hover:border-rose-500/30 hover:text-rose-400 sm:px-3"
+                        title={isVirtual ? "Remove this draft month" : "Delete this month"}
                       >
                         <Trash2 className="h-3 w-3 shrink-0" />
                         <span className="hidden sm:inline">Delete</span>
                       </button>
                     )}
 
-                    {/* Archive month — fully-paid, non-archived, has content */}
-                    {!activePeriod.is_archived &&
-                      activePeriod.paid_status === "paid" &&
-                      activePeriod.items.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setShowArchivePeriod(true)}
-                          className="flex items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 px-2 py-1.5 text-xs font-medium text-violet-400 transition-colors hover:bg-violet-500/20 sm:px-3"
-                        >
-                          <Archive className="h-3 w-3 shrink-0" />
-                          <span className="hidden sm:inline">Archive</span>
-                        </button>
-                      )}
+                    {!isVirtual && (
+                      <>
+                        {/* Delete month hint when not empty */}
+                        {!activePeriod.is_archived &&
+                          !activePeriodEmpty &&
+                          activePeriod.items.length + activePeriod.payments.length > 0 && (
+                            <button
+                              type="button"
+                              disabled
+                              className="border-border/60 text-muted-foreground flex cursor-not-allowed items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-medium opacity-40 sm:px-3"
+                              title="Remove all items and payments before deleting this month"
+                            >
+                              <Trash2 className="h-3 w-3 shrink-0" />
+                              <span className="hidden sm:inline">Delete</span>
+                            </button>
+                          )}
 
-                    {/* Archived badge — static, no button */}
-                    {activePeriod.is_archived && (
-                      <div className="flex items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 px-2 py-1.5 text-xs font-medium text-violet-400 sm:px-3">
-                        <Archive className="h-3 w-3 shrink-0" />
-                        <span className="hidden sm:inline">Archived</span>
-                      </div>
-                    )}
+                        {/* Archive month — fully-paid, non-archived, has content */}
+                        {!activePeriod.is_archived &&
+                          activePeriod.paid_status === "paid" &&
+                          activePeriod.items.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setShowArchivePeriod(true)}
+                              className="flex items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 px-2 py-1.5 text-xs font-medium text-violet-400 transition-colors hover:bg-violet-500/20 sm:px-3"
+                            >
+                              <Archive className="h-3 w-3 shrink-0" />
+                              <span className="hidden sm:inline">Archive</span>
+                            </button>
+                          )}
 
-                    {/* Lock/Unlock */}
-                    {!activePeriod.is_archived && (
-                      <button
-                        type="button"
-                        disabled={toggleLock.isPending}
-                        onClick={() =>
-                          toggleLock.mutate({
-                            periodId: activePeriod.id,
-                            is_locked: !activePeriod.is_locked,
-                          })
-                        }
-                        className={cn(
-                          "flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors sm:px-3",
-                          activePeriod.is_locked
-                            ? "border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20"
-                            : "border-border/60 text-muted-foreground hover:text-foreground"
+                        {/* Archived badge — static, no button */}
+                        {activePeriod.is_archived && (
+                          <div className="flex items-center gap-1.5 rounded-lg border border-violet-500/30 bg-violet-500/10 px-2 py-1.5 text-xs font-medium text-violet-400 sm:px-3">
+                            <Archive className="h-3 w-3 shrink-0" />
+                            <span className="hidden sm:inline">Archived</span>
+                          </div>
                         )}
-                      >
-                        {activePeriod.is_locked ? (
-                          <>
-                            <Unlock className="h-3 w-3 shrink-0" />
-                            <span className="hidden sm:inline">Unlock</span>
-                          </>
-                        ) : (
-                          <>
-                            <Lock className="h-3 w-3 shrink-0" />
-                            <span className="hidden sm:inline">Lock</span>
-                          </>
-                        )}
-                      </button>
-                    )}
 
-                    {/* Record Payment */}
-                    {activePeriod.outstanding > 0 && !activePeriod.is_archived && (
-                      <button
-                        type="button"
-                        onClick={() => setShowPaymentModal(true)}
-                        className="flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-1.5 text-xs font-medium text-emerald-400 transition-colors hover:bg-emerald-500/20 sm:px-3"
-                      >
-                        <CheckCircle2 className="h-3 w-3 shrink-0" />
-                        <span className="hidden sm:inline">Payment</span>
-                      </button>
+                        {/* Lock/Unlock */}
+                        {!activePeriod.is_archived && (
+                          <button
+                            type="button"
+                            disabled={toggleLock.isPending}
+                            onClick={() =>
+                              setShowLockConfirm({
+                                periodId: activePeriod.id,
+                                lockTo: !activePeriod.is_locked,
+                                label: formatPeriodLabel(activePeriod.period),
+                              })
+                            }
+                            className={cn(
+                              "flex items-center gap-1.5 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors sm:px-3",
+                              activePeriod.is_locked
+                                ? "border-amber-500/30 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20"
+                                : "border-border/60 text-muted-foreground hover:text-foreground"
+                            )}
+                          >
+                            {activePeriod.is_locked ? (
+                              <>
+                                <Unlock className="h-3 w-3 shrink-0" />
+                                <span className="hidden sm:inline">Unlock</span>
+                              </>
+                            ) : (
+                              <>
+                                <Lock className="h-3 w-3 shrink-0" />
+                                <span className="hidden sm:inline">Lock</span>
+                              </>
+                            )}
+                          </button>
+                        )}
+
+                        {/* Record Payment */}
+                        {activePeriod.outstanding > 0 && !activePeriod.is_archived && (
+                          <button
+                            type="button"
+                            onClick={() => setShowPaymentModal(true)}
+                            className="flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-2 py-1.5 text-xs font-medium text-emerald-400 transition-colors hover:bg-emerald-500/20 sm:px-3"
+                          >
+                            <CheckCircle2 className="h-3 w-3 shrink-0" />
+                            <span className="hidden sm:inline">Payment</span>
+                          </button>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
@@ -1518,7 +1672,7 @@ export default function ExpenseTabDetailPage() {
                         item={item}
                         currency={tab.currency}
                         isAdmin={isAdmin}
-                        isLocked={activePeriod.is_locked}
+                        isLocked={activePeriodClosed}
                         onDelete={(iid) => deleteItem.mutate(iid)}
                         onEdit={(iid, desc, amt, split) =>
                           updateItem.mutate({
@@ -1536,7 +1690,7 @@ export default function ExpenseTabDetailPage() {
                         payment={payment}
                         currency={tab.currency}
                         isAdmin={isAdmin}
-                        isLocked={activePeriod.is_locked}
+                        isLocked={activePeriodClosed}
                         onDelete={(pid) => deletePayment.mutate(pid)}
                       />
                     ))}
@@ -1585,7 +1739,7 @@ export default function ExpenseTabDetailPage() {
           <QuickAddBar
             onAdd={handleAddItem}
             isPending={addItem.isPending}
-            isLocked={activePeriod?.is_locked ?? false}
+            closedMessage={activePeriodClosedMessage}
           />
         </div>
       )}
@@ -1608,14 +1762,82 @@ export default function ExpenseTabDetailPage() {
       <ConfirmDialog
         open={showDeletePeriod}
         title={`Delete ${activePeriod ? formatPeriodLabel(activePeriod.period) : "this month"}?`}
-        description="This month has no items or payments and will be permanently removed."
+        description={
+          isVirtual
+            ? "This draft month hasn't been saved yet and will be removed."
+            : "This month has no items or payments and will be permanently removed."
+        }
         confirmLabel="Delete month"
         isPending={deletePeriod.isPending}
-        onConfirm={() =>
-          activePeriod &&
-          deletePeriod.mutate(activePeriod.id, { onSuccess: () => setShowDeletePeriod(false) })
-        }
+        onConfirm={handleConfirmDeletePeriod}
         onCancel={() => setShowDeletePeriod(false)}
+      />
+
+      <ConfirmDialog
+        open={showLockConfirm !== null}
+        title={
+          showLockConfirm?.lockTo
+            ? `Lock ${showLockConfirm.label}?`
+            : `Unlock ${showLockConfirm?.label ?? "this month"}?`
+        }
+        description={
+          showLockConfirm?.lockTo
+            ? "Items and payments cannot be added or edited while this month is locked."
+            : "This month will be open for adding and editing items again."
+        }
+        confirmLabel={showLockConfirm?.lockTo ? "Lock month" : "Unlock month"}
+        variant="warning"
+        isPending={toggleLock.isPending}
+        onConfirm={() => {
+          if (!showLockConfirm) return;
+          toggleLock.mutate(
+            { periodId: showLockConfirm.periodId, is_locked: showLockConfirm.lockTo },
+            { onSuccess: () => setShowLockConfirm(null) }
+          );
+        }}
+        onCancel={() => setShowLockConfirm(null)}
+      />
+
+      <ConfirmDialog
+        open={showBulkLockConfirm !== null}
+        title={
+          showBulkLockConfirm?.lockTo
+            ? `Lock ${showBulkLockConfirm.count} month${showBulkLockConfirm.count !== 1 ? "s" : ""}?`
+            : `Unlock ${showBulkLockConfirm?.count ?? 0} month${showBulkLockConfirm?.count !== 1 ? "s" : ""}?`
+        }
+        description={
+          showBulkLockConfirm?.lockTo
+            ? "Selected months will be locked. Items and payments cannot be changed until unlocked."
+            : "Selected months will be unlocked for editing again."
+        }
+        confirmLabel={showBulkLockConfirm?.lockTo ? "Lock selected" : "Unlock selected"}
+        variant="warning"
+        isPending={bulkToggleLock.isPending}
+        onConfirm={confirmBulkLock}
+        onCancel={() => setShowBulkLockConfirm(null)}
+      />
+
+      <ConfirmDialog
+        open={showDeleteYear !== null}
+        title={`Delete all of ${showDeleteYear}?`}
+        description={[
+          deleteYearRealCount > 0
+            ? `${deleteYearRealCount} month${deleteYearRealCount !== 1 ? "s" : ""}`
+            : null,
+          deleteYearPendingCount > 0
+            ? `${deleteYearPendingCount} draft month${deleteYearPendingCount !== 1 ? "s" : ""}`
+            : null,
+          deleteYearItemCount > 0 || deleteYearPaymentCount > 0
+            ? `${deleteYearItemCount} item${deleteYearItemCount !== 1 ? "s" : ""} and ${deleteYearPaymentCount} payment${deleteYearPaymentCount !== 1 ? "s" : ""} will be permanently deleted`
+            : null,
+          "This cannot be undone.",
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+        confirmLabel={`Delete ${showDeleteYear}`}
+        isPending={deleteYear.isPending}
+        onConfirm={handleConfirmDeleteYear}
+        onCancel={() => setShowDeleteYear(null)}
       />
 
       <ConfirmDialog

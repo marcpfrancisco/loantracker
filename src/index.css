@@ -178,3 +178,12 @@ html:not(.dark) {
     border-color: color-mix(in oklch, var(--color-rose-500) 55%, transparent);
   }
 }
+
+/* Mobile safe areas (notch / home indicator) */
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}

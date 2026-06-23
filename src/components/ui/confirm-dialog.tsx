@@ -48,7 +48,7 @@ export function ConfirmDialog({
   return (
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4">
           {/* Backdrop */}
           <motion.div
             className="fixed inset-0 bg-black/60 backdrop-blur-sm"
@@ -58,18 +58,18 @@ export function ConfirmDialog({
             onClick={onCancel}
           />
 
-          {/* Dialog */}
+          {/* Dialog — bottom sheet on mobile, centered on desktop */}
           <motion.div
             role="alertdialog"
             aria-modal="true"
-            className="bg-card border-border/60 relative z-10 w-full max-w-sm overflow-hidden rounded-2xl border shadow-2xl"
-            initial={{ opacity: 0, scale: 0.95, y: 8 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 8 }}
+            className="bg-card border-border/60 relative z-10 max-h-[85dvh] w-full max-w-sm overflow-y-auto rounded-t-2xl border shadow-2xl sm:rounded-2xl"
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 24 }}
             transition={{ duration: 0.15 }}
           >
             {/* Icon + content */}
-            <div className="p-6">
+            <div className="p-5 sm:p-6">
               <div
                 className={cn(
                   "mb-4 flex h-10 w-10 items-center justify-center rounded-full",
@@ -93,14 +93,14 @@ export function ConfirmDialog({
               )}
             </div>
 
-            {/* Actions */}
-            <div className="border-border/60 flex gap-3 border-t px-6 py-4">
+            {/* Actions — stacked on narrow screens for easier tapping */}
+            <div className="border-border/60 pb-safe flex flex-col-reverse gap-2 border-t px-5 py-4 sm:flex-row sm:gap-3 sm:px-6">
               <button
                 ref={cancelRef}
                 type="button"
                 onClick={onCancel}
                 disabled={isPending}
-                className="border-border/60 text-muted-foreground hover:text-foreground flex-1 rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors disabled:opacity-50"
+                className="border-border/60 text-muted-foreground hover:text-foreground active:bg-muted/40 flex min-h-11 flex-1 touch-manipulation items-center justify-center rounded-xl border px-4 py-2.5 text-sm font-medium transition-colors disabled:opacity-50 sm:min-h-0"
               >
                 {cancelLabel}
               </button>
@@ -109,7 +109,7 @@ export function ConfirmDialog({
                 onClick={onConfirm}
                 disabled={isPending}
                 className={cn(
-                  "flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50",
+                  "flex min-h-11 flex-1 touch-manipulation items-center justify-center rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors active:scale-[0.98] disabled:opacity-50 sm:min-h-0",
                   isDanger
                     ? "bg-rose-500 text-white hover:bg-rose-600"
                     : "bg-amber-500 text-white hover:bg-amber-600"

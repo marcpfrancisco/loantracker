@@ -1,10 +1,19 @@
-export type PaidStatus = "unpaid" | "partial" | "paid";
+import {
+  isCurrentMonth,
+  isPastMonth,
+  isPeriodSettled,
+  type PaidStatus,
+  type PeriodClosureInput,
+} from "@/lib/expensePeriodRules";
 
-export type PeriodVisualStatus = "archived" | "paid" | "locked" | "ongoing" | "draft";
+export type { PaidStatus };
+
+export type PeriodVisualStatus = "archived" | "paid" | "locked" | "closed" | "ongoing" | "draft";
 
 export const PERIOD_STATUS_STYLES: Record<PeriodVisualStatus, string> = {
   paid: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30",
   locked: "bg-orange-500/15 text-orange-400 border-orange-500/30",
+  closed: "bg-zinc-500/15 text-zinc-400 border-zinc-500/30",
   ongoing: "bg-sky-500/15 text-sky-400 border-sky-500/30",
   draft: "bg-zinc-500/10 text-zinc-400 border-zinc-500/25 border-dashed",
   archived: "bg-violet-500/15 text-violet-400 border-violet-500/30",
@@ -13,6 +22,7 @@ export const PERIOD_STATUS_STYLES: Record<PeriodVisualStatus, string> = {
 export const PERIOD_STATUS_SEGMENT: Record<PeriodVisualStatus, string> = {
   paid: "bg-emerald-500",
   locked: "bg-orange-500",
+  closed: "bg-zinc-500",
   ongoing: "bg-sky-500",
   draft: "bg-zinc-500/60",
   archived: "bg-violet-500",
@@ -24,21 +34,20 @@ export const MONTH_INITIALS = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O",
 
 export const PERIOD_STATUS_LEGEND: { status: PeriodVisualStatus; label: string }[] = [
   { status: "paid", label: "Paid" },
-  { status: "locked", label: "Locked" },
   { status: "ongoing", label: "Ongoing" },
+  { status: "locked", label: "Locked" },
+  { status: "closed", label: "Closed" },
   { status: "draft", label: "Draft" },
   { status: "archived", label: "Archived" },
 ];
 
-export function getPeriodVisualStatus(opts: {
-  is_locked: boolean;
-  is_archived: boolean;
-  paid_status: PaidStatus;
-  isVirtual?: boolean;
-}): PeriodVisualStatus {
+export function getPeriodVisualStatus(
+  opts: PeriodClosureInput & { isVirtual?: boolean }
+): PeriodVisualStatus {
   if (opts.is_archived) return "archived";
-  if (opts.paid_status === "paid") return "paid";
-  if (opts.is_locked) return "locked";
+  if (isPeriodSettled(opts)) return "paid";
+  if (isPastMonth(opts.period)) return "closed";
+  if (isCurrentMonth(opts.period) && opts.is_locked) return "locked";
   if (opts.isVirtual) return "draft";
   return "ongoing";
 }

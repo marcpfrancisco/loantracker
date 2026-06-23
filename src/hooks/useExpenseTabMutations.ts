@@ -100,6 +100,8 @@ export function useAddExpenseItem(tabId: string) {
         is_locked: periodData.is_locked,
         is_archived: periodData.is_archived ?? false,
         paid_status,
+        outstanding: Math.max(0, totalOwed - totalPaid),
+        total_owed: totalOwed,
       };
 
       if (isPeriodClosedForItems(closure)) {
@@ -146,6 +148,19 @@ export function useTogglePeriodLock(tabId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (params: { periodId: string; is_locked: boolean }) => {
+      const { data: period, error: fetchError } = await supabase
+        .from("expense_periods")
+        .select("period")
+        .eq("id", params.periodId)
+        .single();
+      if (fetchError) throw fetchError;
+
+      const now = new Date();
+      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+      if (period.period !== currentMonth) {
+        throw new Error("Only the current month can be locked or unlocked.");
+      }
+
       const { error } = await supabase
         .from("expense_periods")
         .update({ is_locked: params.is_locked })
@@ -283,53 +298,6 @@ export function useArchiveYear(tabId: string) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["expense-tab", tabId] });
       void qc.invalidateQueries({ queryKey: ["expense-tabs"] });
-    },
-  });
-}
-
-// ── Bulk lock / unlock periods ────────────────────────────────────────────────
-
-export interface BulkLockTarget {
-  id: string;
-  lockTo: boolean;
-}
-
-export function useBulkTogglePeriodLock(tabId: string) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (targets: BulkLockTarget[]) => {
-      const lockIds = targets.filter((t) => t.lockTo).map((t) => t.id);
-      const unlockIds = targets.filter((t) => !t.lockTo).map((t) => t.id);
-
-      if (lockIds.length > 0) {
-        const { error } = await supabase
-          .from("expense_periods")
-          .update({ is_locked: true })
-          .in("id", lockIds);
-        if (error) throw error;
-      }
-      if (unlockIds.length > 0) {
-        const { error } = await supabase
-          .from("expense_periods")
-          .update({ is_locked: false })
-          .in("id", unlockIds);
-        if (error) throw error;
-      }
-    },
-    onSuccess: (_, targets) => {
-      const locked = targets.filter((t) => t.lockTo).length;
-      const unlocked = targets.filter((t) => !t.lockTo).length;
-      if (locked > 0 && unlocked > 0) {
-        toast.success(`${locked} locked, ${unlocked} unlocked.`);
-      } else if (locked > 0) {
-        toast.success(`${locked} period${locked > 1 ? "s" : ""} locked.`);
-      } else {
-        toast.success(`${unlocked} period${unlocked > 1 ? "s" : ""} unlocked.`);
-      }
-      void qc.invalidateQueries({ queryKey: ["expense-tab", tabId] });
-    },
-    onError: () => {
-      toast.error("Failed to update periods. Please try again.");
     },
   });
 }

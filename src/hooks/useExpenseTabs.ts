@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { computePaidStatus } from "@/lib/expensePeriodRules";
 import type { CurrencyType, RegionType } from "@/types/enums";
 
 export interface ExpenseTabSummary {
@@ -19,6 +20,7 @@ export interface ExpenseTabSummary {
     is_archived: boolean;
     paid_status: "unpaid" | "partial" | "paid";
     outstanding: number;
+    total_owed: number;
   }>;
 }
 
@@ -56,14 +58,14 @@ async function fetchExpenseTabs(): Promise<ExpenseTabSummary[]> {
         totalOwed += owed;
         totalPaid += paid;
         const outstanding = Math.max(0, owed - paid);
-        const paid_status: "unpaid" | "partial" | "paid" =
-          paid === 0 ? "unpaid" : outstanding <= 0 ? "paid" : "partial";
+        const paid_status = computePaidStatus(owed, paid);
         return {
           period: p.period,
           is_locked: p.is_locked,
           is_archived: p.is_archived ?? false,
           paid_status,
           outstanding,
+          total_owed: owed,
         };
       })
       .sort((a, b) => a.period.localeCompare(b.period));
@@ -121,14 +123,14 @@ async function fetchMyExpenseTab(): Promise<ExpenseTabSummary | null> {
       totalOwed += owed;
       totalPaid += paid;
       const outstanding = Math.max(0, owed - paid);
-      const paid_status: "unpaid" | "partial" | "paid" =
-        paid === 0 ? "unpaid" : outstanding <= 0 ? "paid" : "partial";
+      const paid_status = computePaidStatus(owed, paid);
       return {
         period: p.period,
         is_locked: p.is_locked,
         is_archived: p.is_archived ?? false,
         paid_status,
         outstanding,
+        total_owed: owed,
       };
     })
     .sort((a, b) => a.period.localeCompare(b.period));

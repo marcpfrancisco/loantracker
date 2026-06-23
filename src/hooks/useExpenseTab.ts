@@ -1,6 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { computePaidStatus, type PaidStatus } from "@/lib/expensePeriodRules";
 import type { CurrencyType, RegionType } from "@/types/enums";
+
+export type { PaidStatus };
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -22,8 +25,6 @@ export interface ExpensePayment {
   created_at: string;
 }
 
-export type PaidStatus = "unpaid" | "partial" | "paid";
-
 export interface ExpensePeriod {
   id: string;
   period: string; // "2026-01-01"
@@ -37,7 +38,6 @@ export interface ExpensePeriod {
   outstanding: number;
   paid_status: PaidStatus;
 }
-
 export interface ExpenseTabDetail {
   id: string;
   borrower_id: string;
@@ -102,8 +102,7 @@ async function fetchExpenseTab(tabId: string): Promise<ExpenseTabDetail> {
       const period_owed = items.reduce((s, i) => s + i.borrower_owes, 0);
       const period_paid = payments.reduce((s, p) => s + p.amount, 0);
       const outstanding = Math.max(0, period_owed - period_paid);
-      const paid_status: PaidStatus =
-        period_paid === 0 ? "unpaid" : outstanding <= 0 ? "paid" : "partial";
+      const paid_status = computePaidStatus(period_owed, period_paid);
 
       totalOwed += period_owed;
       totalPaid += period_paid;

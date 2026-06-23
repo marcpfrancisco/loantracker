@@ -38,6 +38,7 @@ import {
   canTogglePeriodLock,
   isPastMonth,
   isPeriodSettled,
+  hasOutstandingBalance,
 } from "@/lib/expensePeriodRules";
 import { useAuth } from "@/hooks/useAuth";
 import { useExpenseTab } from "@/hooks/useExpenseTab";
@@ -1389,7 +1390,7 @@ export default function ExpenseTabDetailPage() {
                           ? activePeriodIsPast
                             ? "Fully paid — closed"
                             : "Fully paid"
-                          : activePeriod.outstanding > 0
+                          : hasOutstandingBalance(activePeriod.outstanding)
                             ? activePeriodIsPast
                               ? `${fmt(activePeriod.outstanding, tab.currency)} remaining — payments only`
                               : `${fmt(activePeriod.outstanding, tab.currency)} remaining`

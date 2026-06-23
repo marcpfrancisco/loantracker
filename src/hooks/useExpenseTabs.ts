@@ -1,6 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { computePaidStatus } from "@/lib/expensePeriodRules";
+import {
+  computePaidStatus,
+  computeOutstanding,
+  normalizePeriodKey,
+  roundMoney,
+} from "@/lib/expensePeriodRules";
 import type { CurrencyType, RegionType } from "@/types/enums";
 
 export interface ExpenseTabSummary {
@@ -47,20 +52,24 @@ async function fetchExpenseTabs(): Promise<ExpenseTabSummary[]> {
 
     const periodSummaries = periods
       .map((p) => {
-        const owed = (p.expense_items ?? []).reduce(
-          (s: number, i: { borrower_owes: number }) => s + Number(i.borrower_owes),
-          0
+        const owed = roundMoney(
+          (p.expense_items ?? []).reduce(
+            (s: number, i: { borrower_owes: number }) => s + Number(i.borrower_owes),
+            0
+          )
         );
-        const paid = (p.expense_payments ?? []).reduce(
-          (s: number, pay: { amount: number }) => s + Number(pay.amount),
-          0
+        const paid = roundMoney(
+          (p.expense_payments ?? []).reduce(
+            (s: number, pay: { amount: number }) => s + Number(pay.amount),
+            0
+          )
         );
         totalOwed += owed;
         totalPaid += paid;
-        const outstanding = Math.max(0, owed - paid);
+        const outstanding = computeOutstanding(owed, paid);
         const paid_status = computePaidStatus(owed, paid);
         return {
-          period: p.period,
+          period: normalizePeriodKey(p.period),
           is_locked: p.is_locked,
           is_archived: p.is_archived ?? false,
           paid_status,
@@ -83,7 +92,7 @@ async function fetchExpenseTabs(): Promise<ExpenseTabSummary[]> {
       },
       totalOwed,
       totalPaid,
-      outstanding: Math.max(0, totalOwed - totalPaid),
+      outstanding: computeOutstanding(totalOwed, totalPaid),
       periodSummaries,
     };
   });
@@ -112,20 +121,24 @@ async function fetchMyExpenseTab(): Promise<ExpenseTabSummary | null> {
 
   const periodSummaries = periods
     .map((p) => {
-      const owed = (p.expense_items ?? []).reduce(
-        (s: number, i: { borrower_owes: number }) => s + Number(i.borrower_owes),
-        0
+      const owed = roundMoney(
+        (p.expense_items ?? []).reduce(
+          (s: number, i: { borrower_owes: number }) => s + Number(i.borrower_owes),
+          0
+        )
       );
-      const paid = (p.expense_payments ?? []).reduce(
-        (s: number, pay: { amount: number }) => s + Number(pay.amount),
-        0
+      const paid = roundMoney(
+        (p.expense_payments ?? []).reduce(
+          (s: number, pay: { amount: number }) => s + Number(pay.amount),
+          0
+        )
       );
       totalOwed += owed;
       totalPaid += paid;
-      const outstanding = Math.max(0, owed - paid);
+      const outstanding = computeOutstanding(owed, paid);
       const paid_status = computePaidStatus(owed, paid);
       return {
-        period: p.period,
+        period: normalizePeriodKey(p.period),
         is_locked: p.is_locked,
         is_archived: p.is_archived ?? false,
         paid_status,
@@ -148,7 +161,7 @@ async function fetchMyExpenseTab(): Promise<ExpenseTabSummary | null> {
     },
     totalOwed,
     totalPaid,
-    outstanding: Math.max(0, totalOwed - totalPaid),
+    outstanding: computeOutstanding(totalOwed, totalPaid),
     periodSummaries,
   };
 }

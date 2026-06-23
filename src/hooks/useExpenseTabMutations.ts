@@ -3,8 +3,12 @@ import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import {
   computePaidStatus,
+  computeOutstanding,
+  currentMonthStr,
   getPeriodClosedMessage,
   isPeriodClosedForItems,
+  normalizePeriodKey,
+  roundMoney,
 } from "@/lib/expensePeriodRules";
 import type { CurrencyType, RegionType } from "@/types/enums";
 
@@ -86,13 +90,17 @@ export function useAddExpenseItem(tabId: string) {
 
       if (periodError) throw periodError;
 
-      const totalOwed = (periodData.expense_items ?? []).reduce(
-        (s: number, i: { borrower_owes: number }) => s + Number(i.borrower_owes),
-        0
+      const totalOwed = roundMoney(
+        (periodData.expense_items ?? []).reduce(
+          (s: number, i: { borrower_owes: number }) => s + Number(i.borrower_owes),
+          0
+        )
       );
-      const totalPaid = (periodData.expense_payments ?? []).reduce(
-        (s: number, p: { amount: number }) => s + Number(p.amount),
-        0
+      const totalPaid = roundMoney(
+        (periodData.expense_payments ?? []).reduce(
+          (s: number, p: { amount: number }) => s + Number(p.amount),
+          0
+        )
       );
       const paid_status = computePaidStatus(totalOwed, totalPaid);
       const closure = {
@@ -100,7 +108,7 @@ export function useAddExpenseItem(tabId: string) {
         is_locked: periodData.is_locked,
         is_archived: periodData.is_archived ?? false,
         paid_status,
-        outstanding: Math.max(0, totalOwed - totalPaid),
+        outstanding: computeOutstanding(totalOwed, totalPaid),
         total_owed: totalOwed,
       };
 
@@ -155,9 +163,8 @@ export function useTogglePeriodLock(tabId: string) {
         .single();
       if (fetchError) throw fetchError;
 
-      const now = new Date();
-      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-      if (period.period !== currentMonth) {
+      const currentMonth = currentMonthStr();
+      if (normalizePeriodKey(period.period) !== currentMonth) {
         throw new Error("Only the current month can be locked or unlocked.");
       }
 

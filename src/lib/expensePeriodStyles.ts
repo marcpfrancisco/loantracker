@@ -2,6 +2,7 @@ import {
   isCurrentMonth,
   isPastMonth,
   isPeriodSettled,
+  normalizePeriodKey,
   type PaidStatus,
   type PeriodClosureInput,
 } from "@/lib/expensePeriodRules";
@@ -44,10 +45,11 @@ export const PERIOD_STATUS_LEGEND: { status: PeriodVisualStatus; label: string }
 export function getPeriodVisualStatus(
   opts: PeriodClosureInput & { isVirtual?: boolean }
 ): PeriodVisualStatus {
+  const periodKey = normalizePeriodKey(opts.period);
   if (opts.is_archived) return "archived";
   if (isPeriodSettled(opts)) return "paid";
-  if (isPastMonth(opts.period)) return "closed";
-  if (isCurrentMonth(opts.period) && opts.is_locked) return "locked";
+  if (isPastMonth(periodKey)) return "closed";
+  if (isCurrentMonth(periodKey) && opts.is_locked) return "locked";
   if (opts.isVirtual) return "draft";
   return "ongoing";
 }

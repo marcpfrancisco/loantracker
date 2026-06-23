@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabase";
 import {
   computePaidStatus,
   computeOutstanding,
+  normalizePeriodKey,
   roundMoney,
   type PaidStatus,
 } from "@/lib/expensePeriodRules";
@@ -114,7 +115,7 @@ async function fetchExpenseTab(tabId: string): Promise<ExpenseTabDetail> {
 
       return {
         id: p.id,
-        period: p.period,
+        period: normalizePeriodKey(p.period),
         is_locked: p.is_locked,
         is_archived: p.is_archived ?? false,
         items,

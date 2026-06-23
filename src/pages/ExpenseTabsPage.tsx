@@ -8,6 +8,11 @@ import {
   groupPeriodsByYear,
   PERIOD_STATUS_STYLES,
 } from "@/lib/expensePeriodStyles";
+import {
+  hasOutstandingBalance,
+  isPeriodSettled,
+  normalizePeriodKey,
+} from "@/lib/expensePeriodRules";
 import { cardVariants } from "@/lib/animations";
 import { useAuth } from "@/hooks/useAuth";
 import { useExpenseTabsAdmin, useMyExpenseTab } from "@/hooks/useExpenseTabs";
@@ -64,14 +69,15 @@ function PeriodPill({
   currency?: string;
 }) {
   const status = getPeriodVisualStatus({
-    period,
+    period: normalizePeriodKey(period),
     is_locked,
     is_archived,
     paid_status,
     outstanding,
     total_owed,
   });
-  const hasBalance = outstanding > 0 && currency;
+  const hasBalance = hasOutstandingBalance(outstanding) && currency;
+  const settled = isPeriodSettled({ outstanding, total_owed });
 
   const Icon =
     status === "archived"
@@ -99,6 +105,7 @@ function PeriodPill({
           {fmtCompact(outstanding, currency)}
         </span>
       )}
+      {settled && <span className="mt-0.5 text-[8px] font-semibold text-emerald-400/90">Paid</span>}
     </span>
   );
 }

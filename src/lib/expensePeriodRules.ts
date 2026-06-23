@@ -22,17 +22,22 @@ export function hasOutstandingBalance(outstanding: number): boolean {
   return roundMoney(outstanding) > 0;
 }
 
+export function normalizePeriodKey(period: string): string {
+  const match = /^(\d{4}-\d{2}-\d{2})/.exec(period);
+  return match ? match[1] : period.slice(0, 10);
+}
+
 export function currentMonthStr(): string {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
 }
 
 export function isPastMonth(period: string): boolean {
-  return period < currentMonthStr();
+  return normalizePeriodKey(period) < currentMonthStr();
 }
 
 export function isCurrentMonth(period: string): boolean {
-  return period === currentMonthStr();
+  return normalizePeriodKey(period) === currentMonthStr();
 }
 
 export function computePaidStatus(totalOwed: number, totalPaid: number): PaidStatus {
@@ -44,37 +49,40 @@ export function computePaidStatus(totalOwed: number, totalPaid: number): PaidSta
 }
 
 export function isPeriodSettled(
-  input: Pick<PeriodClosureInput, "outstanding" | "total_owed" | "paid_status">
+  input: Pick<PeriodClosureInput, "outstanding" | "total_owed">
 ): boolean {
-  const outstanding = roundMoney(input.outstanding ?? 0);
   const totalOwed = roundMoney(input.total_owed ?? 0);
-  return input.paid_status === "paid" || (totalOwed > 0 && !hasOutstandingBalance(outstanding));
+  if (totalOwed <= 0) return false;
+  return !hasOutstandingBalance(input.outstanding ?? 0);
 }
 
 /** Block adding or editing expense items. */
 export function isPeriodClosedForItems(input: PeriodClosureInput): boolean {
+  const periodKey = normalizePeriodKey(input.period);
   if (input.is_archived) return true;
-  if (isPastMonth(input.period)) return true;
-  if (isCurrentMonth(input.period) && input.is_locked) return true;
+  if (isPastMonth(periodKey)) return true;
+  if (isCurrentMonth(periodKey) && input.is_locked) return true;
   return false;
 }
 
 /** Block recording or deleting payments. */
 export function isPeriodClosedForPayments(input: PeriodClosureInput): boolean {
+  const periodKey = normalizePeriodKey(input.period);
   if (input.is_archived) return true;
-  if (isCurrentMonth(input.period) && input.is_locked) return true;
-  if (isPastMonth(input.period) && isPeriodSettled(input)) return true;
+  if (isCurrentMonth(periodKey) && input.is_locked) return true;
+  if (isPastMonth(periodKey) && isPeriodSettled(input)) return true;
   return false;
 }
 
 export function getPeriodClosedMessage(input: PeriodClosureInput): string {
+  const periodKey = normalizePeriodKey(input.period);
   if (input.is_archived) return "This month is archived — no changes allowed.";
-  if (isPastMonth(input.period)) {
+  if (isPastMonth(periodKey)) {
     return isPeriodSettled(input)
       ? "This past month is fully paid and closed."
       : "Past months are closed — you can record payments but not add new items.";
   }
-  if (isCurrentMonth(input.period) && input.is_locked) {
+  if (isCurrentMonth(periodKey) && input.is_locked) {
     return "This month is locked — unlock to add or edit items.";
   }
   return "";
@@ -82,5 +90,5 @@ export function getPeriodClosedMessage(input: PeriodClosureInput): string {
 
 /** Lock/unlock only applies to the current calendar month. */
 export function canTogglePeriodLock(period: string): boolean {
-  return isCurrentMonth(period);
+  return isCurrentMonth(normalizePeriodKey(period));
 }

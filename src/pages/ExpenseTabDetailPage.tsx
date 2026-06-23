@@ -39,6 +39,7 @@ import {
   isPastMonth,
   isPeriodSettled,
   hasOutstandingBalance,
+  normalizePeriodKey,
 } from "@/lib/expensePeriodRules";
 import { useAuth } from "@/hooks/useAuth";
 import { useExpenseTab } from "@/hooks/useExpenseTab";
@@ -173,7 +174,7 @@ function MonthPill({
 }) {
   const ref = useRef<HTMLButtonElement>(null);
   const status = getPeriodVisualStatus({
-    period,
+    period: normalizePeriodKey(period),
     is_locked,
     is_archived,
     paid_status,
@@ -182,7 +183,8 @@ function MonthPill({
     isVirtual,
   });
   const label = monthLabelOnly ? formatMonthOnly(period) : formatPeriodShort(period);
-  const hasBalance = outstanding > 0 && currency;
+  const settled = isPeriodSettled({ outstanding, total_owed });
+  const hasBalance = hasOutstandingBalance(outstanding) && currency;
   const tooltip = [
     monthLabelOnly ? formatPeriodLabel(period) : undefined,
     hasBalance ? `${fmt(outstanding, currency)} outstanding` : undefined,
@@ -230,6 +232,9 @@ function MonthPill({
           {fmtCompact(outstanding, currency)}
         </span>
       )}
+      {settled && monthLabelOnly && (
+        <span className="mt-0.5 text-[9px] font-semibold text-emerald-400/90">Paid</span>
+      )}
     </button>
   );
 }
@@ -272,7 +277,7 @@ function YearProgressBar({
         }
 
         const status = getPeriodVisualStatus({
-          period: period.period,
+          period: normalizePeriodKey(period.period),
           is_locked: period.is_locked,
           is_archived: period.is_archived,
           paid_status: period.paid_status,
@@ -1087,7 +1092,7 @@ export default function ExpenseTabDetailPage() {
   const activePeriodClosure =
     activePeriod && !isVirtual
       ? {
-          period: activePeriod.period,
+          period: normalizePeriodKey(activePeriod.period),
           is_locked: activePeriod.is_locked,
           is_archived: activePeriod.is_archived,
           paid_status: activePeriod.paid_status,
@@ -1387,9 +1392,7 @@ export default function ExpenseTabDetailPage() {
                     activePeriod && (
                       <p className="text-muted-foreground text-xs">
                         {isPeriodSettled(activePeriod)
-                          ? activePeriodIsPast
-                            ? "Fully paid — closed"
-                            : "Fully paid"
+                          ? "Fully paid"
                           : hasOutstandingBalance(activePeriod.outstanding)
                             ? activePeriodIsPast
                               ? `${fmt(activePeriod.outstanding, tab.currency)} remaining — payments only`
@@ -1580,14 +1583,18 @@ export default function ExpenseTabDetailPage() {
                       </div>
                     )}
                     <div className="flex justify-between text-sm">
-                      <span className="text-foreground font-semibold">Outstanding</span>
+                      <span className="text-foreground font-semibold">
+                        {isPeriodSettled(activePeriod) ? "Status" : "Outstanding"}
+                      </span>
                       <span
                         className={cn(
                           "font-bold tabular-nums",
-                          activePeriod.outstanding <= 0 ? "text-emerald-400" : "text-foreground"
+                          isPeriodSettled(activePeriod) ? "text-emerald-400" : "text-foreground"
                         )}
                       >
-                        {fmt(activePeriod.outstanding, tab.currency)}
+                        {isPeriodSettled(activePeriod)
+                          ? "Fully paid"
+                          : fmt(activePeriod.outstanding, tab.currency)}
                       </span>
                     </div>
                   </div>

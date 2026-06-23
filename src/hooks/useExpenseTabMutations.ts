@@ -4,8 +4,10 @@ import { supabase } from "@/lib/supabase";
 import {
   computePaidStatus,
   computeOutstanding,
+  currentMonthStr,
   getPeriodClosedMessage,
   isPeriodClosedForItems,
+  normalizePeriodKey,
   roundMoney,
 } from "@/lib/expensePeriodRules";
 import type { CurrencyType, RegionType } from "@/types/enums";
@@ -161,9 +163,8 @@ export function useTogglePeriodLock(tabId: string) {
         .single();
       if (fetchError) throw fetchError;
 
-      const now = new Date();
-      const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-      if (period.period !== currentMonth) {
+      const currentMonth = currentMonthStr();
+      if (normalizePeriodKey(period.period) !== currentMonth) {
         throw new Error("Only the current month can be locked or unlocked.");
       }
 

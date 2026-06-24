@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
-import type { CurrencyType, PaymentStatus } from "@/types/enums";
+import type { CurrencyType, LoanType, PaymentStatus } from "@/types/enums";
 
 export interface UpcomingInstallment {
   id: string;
@@ -12,6 +12,7 @@ export interface UpcomingInstallment {
   loan_id: string;
   currency: CurrencyType;
   source_name: string;
+  loan_type: LoanType;
   borrower_name?: string;
 }
 
@@ -24,7 +25,7 @@ async function fetchUpcomingInstallments(
   const { data, error } = await supabase
     .from("installments")
     .select(
-      "id, installment_no, due_date, amount, status, loans!installments_loan_id_fkey(id, currency, borrower_id, credit_sources!loans_source_id_fkey(name), profiles!loans_borrower_id_fkey(full_name))"
+      "id, installment_no, due_date, amount, status, loans!installments_loan_id_fkey(id, currency, loan_type, borrower_id, credit_sources!loans_source_id_fkey(name), profiles!loans_borrower_id_fkey(full_name))"
     )
     .in("status", ["unpaid", "pending"])
     .gte("due_date", today)
@@ -48,6 +49,7 @@ async function fetchUpcomingInstallments(
     loan_id: i.loans?.id ?? "",
     currency: i.loans?.currency ?? "PHP",
     source_name: i.loans?.credit_sources?.name ?? "Unknown",
+    loan_type: i.loans?.loan_type ?? "custom",
     borrower_name: i.loans?.profiles?.full_name ?? undefined,
   }));
 }

@@ -1,42 +1,25 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { CalendarClock, ChevronDown, Clock } from "lucide-react";
+import { CalendarClock, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatCurrency } from "@/lib/formatCurrency";
+import { getLoanDisplayLabel } from "@/lib/loanLabels";
+import { formatDueRelativeLabel, getDueDateUrgency } from "@/lib/dueDateUtils";
+import { DueDateBadge } from "@/components/ui/due-date-badge";
 import type { UpcomingInstallment } from "@/hooks/useUpcomingInstallments";
-
-function formatCurrency(amount: number, currency: string): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
-
-function formatDueDate(dateStr: string): { label: string; urgent: boolean } {
-  const date = new Date(dateStr + "T00:00:00");
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const diffDays = Math.round((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-
-  if (diffDays < 0) return { label: `${Math.abs(diffDays)}d overdue`, urgent: true };
-  if (diffDays === 0) return { label: "Today", urgent: true };
-  if (diffDays === 1) return { label: "Tomorrow", urgent: true };
-  if (diffDays <= 3) return { label: `In ${diffDays} days`, urgent: true };
-  return {
-    label: date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-    urgent: false,
-  };
-}
 
 function SkeletonRow() {
   return (
     <div className="flex items-center gap-3 px-4 py-3">
-      <div className="bg-muted h-8 w-8 animate-pulse rounded-lg" />
+      <div className="bg-muted h-10 w-10 animate-pulse rounded-lg" />
       <div className="flex flex-1 flex-col gap-1.5">
-        <div className="bg-muted h-3.5 w-28 animate-pulse rounded" />
-        <div className="bg-muted h-3 w-20 animate-pulse rounded" />
+        <div className="bg-muted h-3.5 w-36 animate-pulse rounded" />
+        <div className="bg-muted h-3 w-24 animate-pulse rounded" />
       </div>
-      <div className="bg-muted h-3.5 w-16 animate-pulse rounded" />
+      <div className="space-y-1.5 text-right">
+        <div className="bg-muted ml-auto h-3.5 w-16 animate-pulse rounded" />
+        <div className="bg-muted ml-auto h-3 w-12 animate-pulse rounded" />
+      </div>
     </div>
   );
 }
@@ -100,28 +83,18 @@ export function UpcomingPayments({ installments, loading, showBorrower }: Upcomi
             ) : (
               <div className="divide-border/40 divide-y">
                 {installments.map((inst) => {
-                  const { label, urgent } = formatDueDate(inst.due_date);
+                  const { urgency } = getDueDateUrgency(inst.due_date, inst.status);
+                  const relativeLabel = formatDueRelativeLabel(inst.due_date);
+                  const loanLabel = getLoanDisplayLabel(inst.source_name, inst.loan_type);
+                  const isUrgent = urgency === "overdue" || urgency === "urgent";
+
                   return (
                     <div key={inst.id} className="flex items-center gap-3 px-4 py-3">
-                      {/* Icon */}
-                      <div
-                        className={cn(
-                          "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
-                          inst.status === "pending"
-                            ? "bg-amber-500/15 text-amber-400"
-                            : urgent
-                              ? "bg-rose-500/15 text-rose-400"
-                              : "bg-muted text-muted-foreground"
-                        )}
-                      >
-                        <Clock className="h-4 w-4" />
-                      </div>
+                      <DueDateBadge dueDate={inst.due_date} status={inst.status} />
 
                       {/* Info */}
                       <div className="min-w-0 flex-1">
-                        <p className="text-foreground truncate text-sm font-medium">
-                          {inst.source_name}
-                        </p>
+                        <p className="text-foreground truncate text-sm font-medium">{loanLabel}</p>
                         <p className="text-muted-foreground text-xs">
                           {showBorrower && inst.borrower_name ? (
                             <span className="text-foreground/70">{inst.borrower_name} · </span>
@@ -135,16 +108,20 @@ export function UpcomingPayments({ installments, loading, showBorrower }: Upcomi
 
                       {/* Amount + due */}
                       <div className="shrink-0 text-right">
-                        <p className="text-foreground text-sm font-semibold">
+                        <p className="text-foreground text-sm font-semibold tabular-nums">
                           {formatCurrency(inst.amount, inst.currency)}
                         </p>
                         <p
                           className={cn(
-                            "text-xs",
-                            urgent ? "font-medium text-rose-400" : "text-muted-foreground"
+                            "text-xs tabular-nums",
+                            inst.status === "pending"
+                              ? "font-medium text-amber-400"
+                              : isUrgent
+                                ? "font-medium text-rose-400"
+                                : "text-muted-foreground"
                           )}
                         >
-                          {label}
+                          {relativeLabel}
                         </p>
                       </div>
                     </div>

@@ -26,6 +26,7 @@ import { EditLoanDrawer } from "@/components/loans/EditLoanDrawer";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { RegionLabel } from "@/components/ui/region-badge";
 import { getLoanTypeConfig, FALLBACK_LOAN_TYPE } from "@/types/schema";
+import { computeInstallmentAmounts } from "@/lib/installmentStrategies";
 import type { LoanStatus, LoanType, CreditSourceType, PaymentStatus } from "@/types/enums";
 
 // ── Lookup maps ───────────────────────────────────────────────────────────────
@@ -155,11 +156,20 @@ export default function LoanDetailPage() {
   const loanTypeConfig =
     getLoanTypeConfig(loan.credit_source.name, loan.loan_type) ?? FALLBACK_LOAN_TYPE;
 
-  // Derived stats
-  const interest = loan.interest_rate !== null ? loan.principal * (loan.interest_rate / 100) : 0;
-  const totalPayable = loan.principal + interest + loan.service_fee;
+  // Derived stats — use the same loan-type strategies as LoanBreakdownSummary
+  const installmentBreakdown = computeInstallmentAmounts(loan.loan_type, {
+    principal: loan.principal,
+    interest_rate: loan.interest_rate,
+    service_fee: loan.service_fee,
+    installments_total: loan.installments_total,
+  });
+  const scheduledTotal = loan.installments.reduce((sum, i) => sum + i.amount, 0);
+  const totalRepayable = scheduledTotal > 0 ? scheduledTotal : installmentBreakdown.total;
   const paidInstallments = loan.installments.filter((i) => i.status === "paid");
   const paidAmount = paidInstallments.reduce((sum, i) => sum + i.amount, 0);
+  const remaining = loan.installments
+    .filter((i) => i.status !== "paid")
+    .reduce((sum, i) => sum + i.amount, 0);
   const progress =
     loan.installments_total > 0 ? paidInstallments.length / loan.installments_total : 0;
 
@@ -302,9 +312,9 @@ export default function LoanDetailPage() {
             </div>
           )}
           <div>
-            <p className="text-muted-foreground text-[10px]">Total Payable</p>
+            <p className="text-muted-foreground text-[10px]">Total Repayable</p>
             <p className="text-foreground text-xs font-medium">
-              {formatCurrency(totalPayable, loan.currency)}
+              {formatCurrency(totalRepayable, loan.currency)}
             </p>
           </div>
           <div>
@@ -316,7 +326,7 @@ export default function LoanDetailPage() {
           <div>
             <p className="text-muted-foreground text-[10px]">Remaining</p>
             <p className="text-foreground text-xs font-medium">
-              {formatCurrency(totalPayable - paidAmount, loan.currency)}
+              {formatCurrency(remaining, loan.currency)}
             </p>
           </div>
         </div>

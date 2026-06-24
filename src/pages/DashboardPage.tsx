@@ -42,6 +42,7 @@ function formatCurrency(amount: number, currency: string): string {
 
 export default function DashboardPage() {
   const { profile } = useAuth();
+  const isAdmin = profile?.role === "admin";
   const navigate = useNavigate();
   const {
     data: loans = [],
@@ -198,7 +199,11 @@ export default function DashboardPage() {
 
       {/* Upcoming payments */}
       <section>
-        <UpcomingPayments installments={upcoming} loading={upcomingLoading} />
+        <UpcomingPayments
+          installments={upcoming}
+          loading={upcomingLoading}
+          showBorrower={isAdmin}
+        />
       </section>
 
       {/* Past loans */}

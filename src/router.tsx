@@ -1,21 +1,35 @@
+import { lazy, Suspense, type ComponentType } from "react";
 import { createBrowserRouter, redirect, type LoaderFunctionArgs } from "react-router";
 import { requireAuth, requireAdmin, requireGuest } from "@/lib/loaders";
 import DashboardLayout from "@/components/layout/DashboardLayout";
-import LoginPage from "@/pages/LoginPage";
-import ForgotPasswordPage from "@/pages/ForgotPasswordPage";
-import ResetPasswordPage from "@/pages/ResetPasswordPage";
-import DashboardPage from "@/pages/DashboardPage";
-import LoansPage from "@/pages/LoansPage";
-import LoanDetailPage from "@/pages/LoanDetailPage";
-import AdminPage from "@/pages/AdminPage";
-import ProfilePage from "@/pages/ProfilePage";
-import BorrowerDetailPage from "@/pages/BorrowerDetailPage";
-import ExpenseTabsPage from "@/pages/ExpenseTabsPage";
-import ExpenseTabDetailPage from "@/pages/ExpenseTabDetailPage";
+import { RouteFallback } from "@/components/layout/RouteFallback";
 import { RouteErrorPage } from "@/components/ErrorBoundary";
-import SignupPage from "@/pages/SignupPage";
-import OrgPickerPage from "@/pages/OrgPickerPage";
-import OrgSettingsPage from "@/pages/OrgSettingsPage";
+
+function lazyPage(factory: () => Promise<{ default: ComponentType<object> }>) {
+  const LazyComponent = lazy(factory);
+  return function LazyPage() {
+    return (
+      <Suspense fallback={<RouteFallback />}>
+        <LazyComponent />
+      </Suspense>
+    );
+  };
+}
+
+const LoginPage = lazyPage(() => import("@/pages/LoginPage"));
+const SignupPage = lazyPage(() => import("@/pages/SignupPage"));
+const ForgotPasswordPage = lazyPage(() => import("@/pages/ForgotPasswordPage"));
+const ResetPasswordPage = lazyPage(() => import("@/pages/ResetPasswordPage"));
+const OrgPickerPage = lazyPage(() => import("@/pages/OrgPickerPage"));
+const DashboardPage = lazyPage(() => import("@/pages/DashboardPage"));
+const LoansPage = lazyPage(() => import("@/pages/LoansPage"));
+const LoanDetailPage = lazyPage(() => import("@/pages/LoanDetailPage"));
+const AdminPage = lazyPage(() => import("@/pages/AdminPage"));
+const ProfilePage = lazyPage(() => import("@/pages/ProfilePage"));
+const BorrowerDetailPage = lazyPage(() => import("@/pages/BorrowerDetailPage"));
+const ExpenseTabsPage = lazyPage(() => import("@/pages/ExpenseTabsPage"));
+const ExpenseTabDetailPage = lazyPage(() => import("@/pages/ExpenseTabDetailPage"));
+const OrgSettingsPage = lazyPage(() => import("@/pages/OrgSettingsPage"));
 
 export const router = createBrowserRouter([
   // ── Root redirect ──────────────────────────────────────────────────────────

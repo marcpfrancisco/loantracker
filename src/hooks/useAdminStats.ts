@@ -65,9 +65,7 @@ async function fetchAdminStats(): Promise<AdminStats> {
   for (const loan of activeLoans) {
     const currency = loan.currency ?? "";
     disbursedByCurrency[currency] =
-      (disbursedByCurrency[currency] ?? 0) +
-      Number(loan.principal) +
-      Number(loan.service_fee);
+      (disbursedByCurrency[currency] ?? 0) + Number(loan.principal) + Number(loan.service_fee);
   }
 
   const paidRows = (paidRes.data ?? []).filter((i) => i.loans?.status === "active");

@@ -65,9 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Single-org: always upsert to keep context fresh on every sign-in
       orgId = memberships[0].org_id;
       role = memberships[0].role as UserRole;
-      await supabase
-        .from("user_org_context")
-        .upsert({ user_id: userId, org_id: orgId });
+      await supabase.from("user_org_context").upsert({ user_id: userId, org_id: orgId });
     } else {
       // Multi-org: honour their last chosen context; only seed when missing
       const { data: ctx } = await supabase
@@ -82,9 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // No context row yet — seed with first membership
         // (LoginPage will redirect them to OrgPickerPage to make a real choice)
         orgId = memberships[0].org_id;
-        await supabase
-          .from("user_org_context")
-          .upsert({ user_id: userId, org_id: orgId });
+        await supabase.from("user_org_context").upsert({ user_id: userId, org_id: orgId });
       }
 
       // Role is already in memory — no extra DB round-trip needed
@@ -110,9 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const userId = session?.user?.id;
     if (!userId) return;
 
-    await supabase
-      .from("user_org_context")
-      .upsert({ user_id: userId, org_id: orgId });
+    await supabase.from("user_org_context").upsert({ user_id: userId, org_id: orgId });
 
     const { data: member } = await supabase
       .from("org_members")
@@ -143,10 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // TOKEN_REFRESHED fires on tab focus every hour — user identity hasn't changed.
         // Only re-fetch when the user actually signs in or the session is first resolved.
         if (event !== "TOKEN_REFRESHED") {
-          void Promise.all([
-            fetchProfile(next.user.id),
-            fetchOrgContext(next.user.id),
-          ]);
+          void Promise.all([fetchProfile(next.user.id), fetchOrgContext(next.user.id)]);
         }
       } else {
         setProfile(null);
@@ -180,7 +171,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ session, profile, loading, activeOrgId, activeRole, activePlan, activeRegions, switchOrg, signOut, refreshProfile }}
+      value={{
+        session,
+        profile,
+        loading,
+        activeOrgId,
+        activeRole,
+        activePlan,
+        activeRegions,
+        switchOrg,
+        signOut,
+        refreshProfile,
+      }}
     >
       {children}
     </AuthContext.Provider>

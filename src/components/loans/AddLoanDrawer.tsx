@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { X, Loader2, CalendarDays } from "lucide-react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Resolver } from "react-hook-form";
@@ -123,7 +123,7 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     reset,
     formState: { errors },
@@ -143,14 +143,30 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
     },
   });
 
-  const watchedBorrowerId = watch("borrower_id");
-  const watchedSourceId = watch("source_id");
-  const watchedLoanType = watch("loan_type");
-  const watchedInstallments = watch("installments_total");
-  const watchedDueDay = watch("due_day_of_month");
-  const watchedPrincipal = watch("principal");
-  const watchedInterestRate = watch("interest_rate");
-  const watchedServiceFee = watch("service_fee");
+  const [
+    watchedBorrowerId,
+    watchedSourceId,
+    watchedLoanType,
+    watchedInstallments,
+    watchedDueDay,
+    watchedPrincipal,
+    watchedInterestRate,
+    watchedServiceFee,
+    watchedStartedAt,
+  ] = useWatch({
+    control,
+    name: [
+      "borrower_id",
+      "source_id",
+      "loan_type",
+      "installments_total",
+      "due_day_of_month",
+      "principal",
+      "interest_rate",
+      "service_fee",
+      "started_at",
+    ],
+  });
 
   const selectedBorrower = borrowers.find((b) => b.id === watchedBorrowerId) ?? null;
   const borrowerRegion = selectedBorrower?.region ?? null;
@@ -226,8 +242,8 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
     // Base values from schema.ts
     const schemaInstallments = config?.installments_total ?? 1;
     const schemaInterestRate = config?.interest_rate ?? null;
-    const schemaDueDay       = config?.due_day_of_month ?? null;
-    const schemaServiceFee   = config?.service_fee ?? 0;
+    const schemaDueDay = config?.due_day_of_month ?? null;
+    const schemaServiceFee = config?.service_fee ?? 0;
 
     // 1. Per-loan-type DB override (highest priority)
     const ltDefault = loanTypeDefaults.find(
@@ -239,7 +255,7 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
     const finalInstallments =
       ltDefault?.installments != null
         ? ltDefault.installments
-        : selectedSource.default_installments ?? schemaInstallments;
+        : (selectedSource.default_installments ?? schemaInstallments);
 
     const finalInterestRate =
       ltDefault?.interest_rate != null
@@ -251,7 +267,7 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
     const finalDueDay =
       ltDefault?.due_day != null
         ? ltDefault.due_day
-        : selectedSource.default_due_day ?? schemaDueDay;
+        : (selectedSource.default_due_day ?? schemaDueDay);
 
     setValue("installments_total", finalInstallments, { shouldValidate: false });
     setValue("interest_rate", finalInterestRate, { shouldValidate: false });
@@ -259,8 +275,6 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
     setValue("due_day_of_month", finalDueDay, { shouldValidate: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedLoanType, watchedSourceId, setValue]);
-
-  const watchedStartedAt = watch("started_at");
 
   const isTabby = watchedLoanType === "tabby";
 
@@ -381,7 +395,8 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
                 <h2 className="text-foreground font-semibold">Add Loan</h2>
                 {selectedRegion && (
                   <p className="text-muted-foreground mt-0.5 text-xs">
-                    {getFlagEmoji(selectedRegion)} {getCountryName(selectedRegion)} · {getDefaultCurrency(selectedRegion)}
+                    {getFlagEmoji(selectedRegion)} {getCountryName(selectedRegion)} ·{" "}
+                    {getDefaultCurrency(selectedRegion)}
                   </p>
                 )}
               </div>
@@ -468,8 +483,10 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
                       ))}
                     </div>
                     {selectedRegion !== borrowerRegion && borrowerRegion && (
-                      <p className="text-amber-400 text-xs">
-                        Borrower's default region is {getFlagEmoji(borrowerRegion)} {getDefaultCurrency(borrowerRegion)}. Recording this loan in a different currency.
+                      <p className="text-xs text-amber-400">
+                        Borrower's default region is {getFlagEmoji(borrowerRegion)}{" "}
+                        {getDefaultCurrency(borrowerRegion)}. Recording this loan in a different
+                        currency.
                       </p>
                     )}
                   </section>
@@ -683,7 +700,7 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
                       </span>
                     </div>
 
-                    <div className="border-border/60 rounded-lg border p-3 space-y-2">
+                    <div className="border-border/60 space-y-2 rounded-lg border p-3">
                       {tabbyAmounts.map((amt, i) => (
                         <div key={i} className="flex items-center gap-3">
                           <span className="text-muted-foreground w-24 shrink-0 text-xs">
@@ -711,9 +728,9 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
                         const diff = Math.round((sum - principal) * 100) / 100;
                         if (diff === 0) return null;
                         return (
-                          <p className="text-xs text-rose-400 pt-1">
-                            Sum ({sum.toFixed(2)}) {diff > 0 ? "exceeds" : "is less than"} principal by{" "}
-                            {Math.abs(diff).toFixed(2)}
+                          <p className="pt-1 text-xs text-rose-400">
+                            Sum ({sum.toFixed(2)}) {diff > 0 ? "exceeds" : "is less than"} principal
+                            by {Math.abs(diff).toFixed(2)}
                           </p>
                         );
                       })()}

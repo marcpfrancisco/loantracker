@@ -30,11 +30,8 @@ import { CreditSourcesDrawer } from "@/components/admin/CreditSourcesDrawer";
 import { UpcomingPayments } from "@/components/dashboard/UpcomingPayments";
 import { RefreshButton } from "@/components/ui/refresh-button";
 import { cardVariants } from "@/lib/animations";
-import {
-  BorrowerLoanGroup,
-  BorrowerLoanGroupSkeleton,
-  groupLoansByBorrower,
-} from "@/components/loans/BorrowerLoanGroup";
+import { BorrowerLoanGroup, BorrowerLoanGroupSkeleton } from "@/components/loans/BorrowerLoanGroup";
+import { groupLoansByBorrower } from "@/lib/groupLoansByBorrower";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -217,7 +214,11 @@ export default function AdminPage() {
                     icon={CreditCard}
                     label={`Active · ${region}`}
                     value={info.count}
-                    sub={info.totalPrincipal ? formatCurrency(info.totalPrincipal, info.currency) : undefined}
+                    sub={
+                      info.totalPrincipal
+                        ? formatCurrency(info.totalPrincipal, info.currency)
+                        : undefined
+                    }
                     loading={false}
                     accent={i % 2 === 0 ? "blue" : "amber"}
                   />
@@ -408,7 +409,8 @@ export default function AdminPage() {
             Active Loans
             {!loansLoading && activeLoans.length > 0 && (
               <span className="text-muted-foreground ml-2 font-normal">
-                {activeGroups.length} borrower{activeGroups.length !== 1 ? "s" : ""} · {activeLoans.length}
+                {activeGroups.length} borrower{activeGroups.length !== 1 ? "s" : ""} ·{" "}
+                {activeLoans.length}
               </span>
             )}
           </h2>

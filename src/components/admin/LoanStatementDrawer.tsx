@@ -364,45 +364,49 @@ export function LoanStatementDrawer({
                         Summary
                       </p>
                       <div className="bg-card border-border/60 overflow-hidden rounded-xl border">
-                        {activeCurrencies.flatMap(([cur, s]) => [
-                          {
-                            key: `${cur}-principal`,
-                            label: `Total Principal (${cur})`,
-                            value: fmt(s.principal, cur),
-                            bold: false,
-                            color: undefined as string | undefined,
-                          },
-                          {
-                            key: `${cur}-paid`,
-                            label: `Total Paid (${cur})`,
-                            value: fmt(s.paid, cur),
-                            bold: false,
-                            color: "text-emerald-400" as string | undefined,
-                          },
-                          {
-                            key: `${cur}-outstanding`,
-                            label: `Outstanding (${cur})`,
-                            value: fmt(s.outstanding, cur),
-                            bold: true,
-                            color: (s.outstanding > 0 ? "text-amber-400" : "text-emerald-400") as string | undefined,
-                          },
-                        ]).map((row) => (
-                          <div
-                            key={row.key}
-                            className="border-border/40 flex items-center justify-between border-b px-5 py-3 last:border-0"
-                          >
-                            <span className="text-muted-foreground text-sm">{row.label}</span>
-                            <span
-                              className={cn(
-                                "text-sm tabular-nums",
-                                row.bold ? "font-bold" : "font-medium",
-                                row.color ?? "text-foreground"
-                              )}
+                        {activeCurrencies
+                          .flatMap(([cur, s]) => [
+                            {
+                              key: `${cur}-principal`,
+                              label: `Total Principal (${cur})`,
+                              value: fmt(s.principal, cur),
+                              bold: false,
+                              color: undefined as string | undefined,
+                            },
+                            {
+                              key: `${cur}-paid`,
+                              label: `Total Paid (${cur})`,
+                              value: fmt(s.paid, cur),
+                              bold: false,
+                              color: "text-emerald-400" as string | undefined,
+                            },
+                            {
+                              key: `${cur}-outstanding`,
+                              label: `Outstanding (${cur})`,
+                              value: fmt(s.outstanding, cur),
+                              bold: true,
+                              color: (s.outstanding > 0 ? "text-amber-400" : "text-emerald-400") as
+                                | string
+                                | undefined,
+                            },
+                          ])
+                          .map((row) => (
+                            <div
+                              key={row.key}
+                              className="border-border/40 flex items-center justify-between border-b px-5 py-3 last:border-0"
                             >
-                              {row.value}
-                            </span>
-                          </div>
-                        ))}
+                              <span className="text-muted-foreground text-sm">{row.label}</span>
+                              <span
+                                className={cn(
+                                  "text-sm tabular-nums",
+                                  row.bold ? "font-bold" : "font-medium",
+                                  row.color ?? "text-foreground"
+                                )}
+                              >
+                                {row.value}
+                              </span>
+                            </div>
+                          ))}
                       </div>
                     </div>
                   )}

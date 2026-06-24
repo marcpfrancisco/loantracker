@@ -191,7 +191,11 @@ function computeLazCredit(params: InstallmentParams): InstallmentBreakdown {
  */
 function computeTabby(params: InstallmentParams): InstallmentBreakdown {
   const { principal, installments_total } = params;
-  return { total: principal, feeExcludedFromTotal: false, ...splitEvenly(principal, installments_total) };
+  return {
+    total: principal,
+    feeExcludedFromTotal: false,
+    ...splitEvenly(principal, installments_total),
+  };
 }
 
 /**

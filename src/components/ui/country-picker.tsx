@@ -5,7 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { filterCountries, getCountryOptions } from "@/lib/countries";
 
 interface CountryPickerProps {
-  value: string;             // ISO 3166-1 alpha-2 country code
+  value: string; // ISO 3166-1 alpha-2 country code
   onChange: (code: string) => void;
   placeholder?: string;
   className?: string;
@@ -53,7 +53,7 @@ export function CountryPicker({
       <PopoverTrigger
         disabled={disabled}
         className={cn(
-          "bg-muted/50 border-border/60 focus:border-primary/60 flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm outline-none transition-colors",
+          "bg-muted/50 border-border/60 focus:border-primary/60 flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border px-3 py-2 text-sm transition-colors outline-none",
           "disabled:cursor-not-allowed disabled:opacity-50",
           className
         )}
@@ -72,11 +72,7 @@ export function CountryPicker({
         <ChevronDown className="text-muted-foreground h-4 w-4 shrink-0" />
       </PopoverTrigger>
 
-      <PopoverContent
-        className="w-[var(--anchor-width)] p-0"
-        align="start"
-        sideOffset={4}
-      >
+      <PopoverContent className="w-[var(--anchor-width)] p-0" align="start" sideOffset={4}>
         {/* Search */}
         <div className="border-border/60 flex items-center gap-2 border-b px-3 py-2">
           <Search className="text-muted-foreground h-3.5 w-3.5 shrink-0" />
@@ -85,7 +81,7 @@ export function CountryPicker({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search country or currency…"
-            className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground/60"
+            className="placeholder:text-muted-foreground/60 w-full bg-transparent text-sm outline-none"
           />
         </div>
 
@@ -114,9 +110,7 @@ export function CountryPicker({
                 {showCurrency && (
                   <span className="text-muted-foreground shrink-0 text-xs">{opt.currency}</span>
                 )}
-                {opt.code === value && (
-                  <Check className="text-primary h-3.5 w-3.5 shrink-0" />
-                )}
+                {opt.code === value && <Check className="text-primary h-3.5 w-3.5 shrink-0" />}
               </button>
             ))
           )}

@@ -31,9 +31,7 @@ async function fetchOrgOptions(userId: string): Promise<OrgOption[]> {
   if (error) throw error;
 
   return (data ?? []).map((row) => {
-    const org = Array.isArray(row.organizations)
-      ? row.organizations[0]
-      : row.organizations;
+    const org = Array.isArray(row.organizations) ? row.organizations[0] : row.organizations;
 
     return {
       orgId: row.org_id,
@@ -54,8 +52,8 @@ function RoleBadge({ role }: { role: UserRole }) {
       className={[
         "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
         isAdmin
-          ? "bg-violet-500/15 text-violet-400 border border-violet-500/25"
-          : "bg-sky-500/15 text-sky-400 border border-sky-500/25",
+          ? "border border-violet-500/25 bg-violet-500/15 text-violet-400"
+          : "border border-sky-500/25 bg-sky-500/15 text-sky-400",
       ].join(" ")}
     >
       {isAdmin ? <ShieldCheck className="h-3 w-3" /> : <User className="h-3 w-3" />}
@@ -63,7 +61,6 @@ function RoleBadge({ role }: { role: UserRole }) {
     </span>
   );
 }
-
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -159,7 +156,7 @@ export default function OrgPickerPage() {
         <AnimatePresence>
           {loadError && (
             <motion.p
-              className="bg-destructive/10 border-destructive/30 text-destructive mb-4 rounded-md border px-3 py-2 text-sm text-center"
+              className="bg-destructive/10 border-destructive/30 text-destructive mb-4 rounded-md border px-3 py-2 text-center text-sm"
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}

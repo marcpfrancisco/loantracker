@@ -17,17 +17,17 @@ interface RegisterPayload {
 // a lender may have borrowers in both PH and UAE.
 const CREDIT_SOURCE_SEEDS = [
   // Philippines
-  { name: "Seabank",    type: "e_wallet",    region: "PH" },
-  { name: "GCash",      type: "e_wallet",    region: "PH" },
-  { name: "SPayLater",  type: "bnpl",        region: "PH" },
-  { name: "Lazada",     type: "bnpl",        region: "PH" },
-  { name: "BPI",        type: "credit_card", region: "PH" },
-  { name: "Metrobank",  type: "credit_card", region: "PH" },
+  { name: "Seabank", type: "e_wallet", region: "PH" },
+  { name: "GCash", type: "e_wallet", region: "PH" },
+  { name: "SPayLater", type: "bnpl", region: "PH" },
+  { name: "Lazada", type: "bnpl", region: "PH" },
+  { name: "BPI", type: "credit_card", region: "PH" },
+  { name: "Metrobank", type: "credit_card", region: "PH" },
   // UAE
-  { name: "Tabby",        type: "bnpl",        region: "AE" },
+  { name: "Tabby", type: "bnpl", region: "AE" },
   { name: "Emirates NBD", type: "credit_card", region: "AE" },
-  { name: "Mashreq",      type: "credit_card", region: "AE" },
-  { name: "ADCB",         type: "credit_card", region: "AE" },
+  { name: "Mashreq", type: "credit_card", region: "AE" },
+  { name: "ADCB", type: "credit_card", region: "AE" },
 ];
 
 function toSlug(name: string): string {
@@ -66,7 +66,10 @@ Deno.serve(async (req: Request) => {
     // Validate ISO 3166-1 alpha-2 format (2 uppercase letters)
     if (!/^[A-Z]{2}$/.test(region.trim().toUpperCase())) {
       return Response.json(
-        { error: "Invalid region. Must be a valid ISO 3166-1 alpha-2 country code (e.g. PH, AE, US)." },
+        {
+          error:
+            "Invalid region. Must be a valid ISO 3166-1 alpha-2 country code (e.g. PH, AE, US).",
+        },
         { status: 400, headers: corsHeaders }
       );
     }
@@ -101,9 +104,8 @@ Deno.serve(async (req: Request) => {
     // The application owner gets unlimited plan with no billing restrictions.
     // Set OWNER_EMAIL as a Supabase Edge Function secret (same project settings).
     const ownerEmail = Deno.env.get("OWNER_EMAIL") ?? "";
-    const plan = ownerEmail && email.trim().toLowerCase() === ownerEmail.toLowerCase()
-      ? "owner"
-      : "free";
+    const plan =
+      ownerEmail && email.trim().toLowerCase() === ownerEmail.toLowerCase() ? "owner" : "free";
 
     const { data: org, error: orgError } = await supabaseAdmin
       .from("organizations")
@@ -182,12 +184,9 @@ Deno.serve(async (req: Request) => {
       console.error("[register-lender] credit_sources seed failed:", seedError.message);
     }
 
-    console.log(
-      `[register-lender] ✓ org="${orgName}" org_id=${orgId} user_id=${userId}`
-    );
+    console.log(`[register-lender] ✓ org="${orgName}" org_id=${orgId} user_id=${userId}`);
 
     return Response.json({ success: true }, { headers: corsHeaders });
-
   } catch (err) {
     console.error("[register-lender] unexpected error:", err);
 

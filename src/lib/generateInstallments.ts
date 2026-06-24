@@ -23,7 +23,9 @@ export interface InstallmentScheduleEntry {
 }
 
 /** Build the full installment schedule for a loan (amounts + due dates). */
-export function buildInstallmentSchedule(params: InstallmentScheduleParams): InstallmentScheduleEntry[] {
+export function buildInstallmentSchedule(
+  params: InstallmentScheduleParams
+): InstallmentScheduleEntry[] {
   const {
     principal,
     interest_rate,

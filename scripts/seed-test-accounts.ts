@@ -29,9 +29,9 @@ const SERVICE_ROLE_KEY = process.env["SUPABASE_SERVICE_ROLE_KEY"];
 if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
   console.error(
     "❌  Missing env vars.\n" +
-    "    VITE_SUPABASE_URL     → from your Supabase project settings\n" +
-    "    SUPABASE_SERVICE_ROLE_KEY → Settings → API → service_role key\n" +
-    "    Add both to your .env file and retry."
+      "    VITE_SUPABASE_URL     → from your Supabase project settings\n" +
+      "    SUPABASE_SERVICE_ROLE_KEY → Settings → API → service_role key\n" +
+      "    Add both to your .env file and retry."
   );
   process.exit(1);
 }
@@ -75,8 +75,7 @@ function buildCreditSourceSeeds(region: string, orgId: string) {
       name: c.name,
       type: c.type,
       region: c.region,
-      default_interest_rate:
-        primary?.interest_rate != null ? primary.interest_rate / 100 : null,
+      default_interest_rate: primary?.interest_rate != null ? primary.interest_rate / 100 : null,
       default_installments: primary?.installments_total ?? null,
       default_due_day: primary?.due_day_of_month ?? null,
     };
@@ -126,7 +125,12 @@ async function seedLender(): Promise<string> {
   // 1a. Create org
   const { data: org, error: orgErr } = await admin
     .from("organizations")
-    .insert({ name: LENDER.full_name, slug: toSlug(LENDER.full_name), region: LENDER.region, plan: "free" })
+    .insert({
+      name: LENDER.full_name,
+      slug: toSlug(LENDER.full_name),
+      region: LENDER.region,
+      plan: "free",
+    })
     .select("id")
     .single();
 
@@ -138,26 +142,28 @@ async function seedLender(): Promise<string> {
   console.log(`  ✓  Organization created  (${orgId})`);
 
   // 1b. Create auth user (trigger auto-creates profile row)
-  const userId = existingId ?? await (async () => {
-    const { data: userData, error: userErr } = await admin.auth.admin.createUser({
-      email: LENDER.email,
-      password: LENDER.password,
-      email_confirm: true,
-      user_metadata: {
-        full_name: LENDER.full_name,
-        region: LENDER.region,
-        role: "admin",
-      },
-    });
-    if (userErr || !userData.user) {
-      // Roll back org
-      await admin.from("organizations").delete().eq("id", orgId);
-      console.error("  ❌  Failed to create auth user:", userErr?.message);
-      process.exit(1);
-    }
-    console.log(`  ✓  Auth user created     (${userData.user.id})`);
-    return userData.user.id;
-  })();
+  const userId =
+    existingId ??
+    (await (async () => {
+      const { data: userData, error: userErr } = await admin.auth.admin.createUser({
+        email: LENDER.email,
+        password: LENDER.password,
+        email_confirm: true,
+        user_metadata: {
+          full_name: LENDER.full_name,
+          region: LENDER.region,
+          role: "admin",
+        },
+      });
+      if (userErr || !userData.user) {
+        // Roll back org
+        await admin.from("organizations").delete().eq("id", orgId);
+        console.error("  ❌  Failed to create auth user:", userErr?.message);
+        process.exit(1);
+      }
+      console.log(`  ✓  Auth user created     (${userData.user.id})`);
+      return userData.user.id;
+    })());
 
   // 1c. org_members
   const { error: memberErr } = await admin
@@ -178,7 +184,10 @@ async function seedLender(): Promise<string> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { error: seedErr } = await admin.from("credit_sources").insert(regionSeeds as any);
   if (seedErr) console.warn("  ⚠  credit_sources seed:", seedErr.message);
-  else console.log(`  ✓  ${regionSeeds.length} credit sources seeded from schema.ts (${LENDER.region} only)`);
+  else
+    console.log(
+      `  ✓  ${regionSeeds.length} credit sources seeded from schema.ts (${LENDER.region} only)`
+    );
 
   return orgId;
 }
@@ -206,24 +215,26 @@ async function seedBorrower(lenderOrgId: string): Promise<void> {
   }
 
   // 2a. Create auth user (trigger auto-creates profile row)
-  const userId = existingId ?? await (async () => {
-    const { data: userData, error: userErr } = await admin.auth.admin.createUser({
-      email: BORROWER.email,
-      password: BORROWER.password,
-      email_confirm: true,
-      user_metadata: {
-        full_name: BORROWER.full_name,
-        region: BORROWER.region,
-        role: "borrower",
-      },
-    });
-    if (userErr || !userData.user) {
-      console.error("  ❌  Failed to create auth user:", userErr?.message);
-      process.exit(1);
-    }
-    console.log(`  ✓  Auth user created     (${userData.user.id})`);
-    return userData.user.id;
-  })();
+  const userId =
+    existingId ??
+    (await (async () => {
+      const { data: userData, error: userErr } = await admin.auth.admin.createUser({
+        email: BORROWER.email,
+        password: BORROWER.password,
+        email_confirm: true,
+        user_metadata: {
+          full_name: BORROWER.full_name,
+          region: BORROWER.region,
+          role: "borrower",
+        },
+      });
+      if (userErr || !userData.user) {
+        console.error("  ❌  Failed to create auth user:", userErr?.message);
+        process.exit(1);
+      }
+      console.log(`  ✓  Auth user created     (${userData.user.id})`);
+      return userData.user.id;
+    })());
 
   // 2b. org_members — borrow role under lender's org
   const { error: memberErr } = await admin

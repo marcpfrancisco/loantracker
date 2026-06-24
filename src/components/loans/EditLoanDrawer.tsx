@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { X, Loader2, CalendarDays, AlertTriangle } from "lucide-react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { Resolver } from "react-hook-form";
@@ -122,7 +122,7 @@ export function EditLoanDrawer({ open, onClose, loan }: EditLoanDrawerProps) {
   const {
     register,
     handleSubmit,
-    watch,
+    control,
     setValue,
     reset,
     formState: { errors },
@@ -153,12 +153,24 @@ export function EditLoanDrawer({ open, onClose, loan }: EditLoanDrawerProps) {
     }
   }, [open, loan, reset]);
 
-  const watchedPrincipal = watch("principal");
-  const watchedInterestRate = watch("interest_rate");
-  const watchedServiceFee = watch("service_fee");
-  const watchedDueDay = watch("due_day_of_month");
-  const watchedStartedAt = watch("started_at");
-  const watchedInstallments = watch("installments_total");
+  const [
+    watchedPrincipal,
+    watchedInterestRate,
+    watchedServiceFee,
+    watchedDueDay,
+    watchedStartedAt,
+    watchedInstallments,
+  ] = useWatch({
+    control,
+    name: [
+      "principal",
+      "interest_rate",
+      "service_fee",
+      "due_day_of_month",
+      "started_at",
+      "installments_total",
+    ],
+  });
 
   const feeFieldLabel =
     loanTypeConfig.feeDisplayMode?.kind === "upfront_deduction"
@@ -219,10 +231,9 @@ export function EditLoanDrawer({ open, onClose, loan }: EditLoanDrawerProps) {
     handleClose();
   }
 
-  const scheduleHint =
-    hasPayments
-      ? `${paidCount} paid installment(s) are kept as-is. Unpaid installments will be recalculated.`
-      : "Changing start date, term, or amounts will regenerate the full payment schedule.";
+  const scheduleHint = hasPayments
+    ? `${paidCount} paid installment(s) are kept as-is. Unpaid installments will be recalculated.`
+    : "Changing start date, term, or amounts will regenerate the full payment schedule.";
 
   return (
     <AnimatePresence>
@@ -369,10 +380,7 @@ export function EditLoanDrawer({ open, onClose, loan }: EditLoanDrawerProps) {
                       </select>
                     </FieldWrapper>
 
-                    <FieldWrapper
-                      label="Due Day of Month"
-                      error={errors.due_day_of_month?.message}
-                    >
+                    <FieldWrapper label="Due Day of Month" error={errors.due_day_of_month?.message}>
                       <input type="hidden" {...register("due_day_of_month")} />
                       <Popover open={dueDateOpen} onOpenChange={setDueDateOpen}>
                         <PopoverTrigger
@@ -465,9 +473,7 @@ export function EditLoanDrawer({ open, onClose, loan }: EditLoanDrawerProps) {
                   </FieldWrapper>
                 </section>
 
-                {!hasPayments && (
-                  <p className="text-muted-foreground text-xs">{scheduleHint}</p>
-                )}
+                {!hasPayments && <p className="text-muted-foreground text-xs">{scheduleHint}</p>}
 
                 <LoanBreakdownSummary
                   loanTypeConfig={loanTypeConfig}

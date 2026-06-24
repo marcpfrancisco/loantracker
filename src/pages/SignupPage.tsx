@@ -105,9 +105,9 @@ export default function SignupPage() {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
         >
-          <Card className="border-border/60 bg-card/80 shadow-2xl shadow-black/30 backdrop-blur-md text-center">
+          <Card className="border-border/60 bg-card/80 text-center shadow-2xl shadow-black/30 backdrop-blur-md">
             <CardHeader className="pb-2">
-              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/15 border border-emerald-500/30">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/15">
                 <CheckCircle2 className="h-6 w-6 text-emerald-400" />
               </div>
               <CardTitle className="text-xl">Account Created</CardTitle>
@@ -159,9 +159,7 @@ export default function SignupPage() {
         <Card className="border-border/60 bg-card/80 shadow-2xl shadow-black/30 backdrop-blur-md">
           <CardHeader className="pb-4">
             <CardTitle className="text-xl">Create a lender account</CardTitle>
-            <CardDescription>
-              Set up your workspace and start tracking loans
-            </CardDescription>
+            <CardDescription>Set up your workspace and start tracking loans</CardDescription>
           </CardHeader>
 
           <CardContent>
@@ -194,9 +192,7 @@ export default function SignupPage() {
                   aria-invalid={!!errors.email}
                   {...register("email")}
                 />
-                {errors.email && (
-                  <p className="text-destructive text-xs">{errors.email.message}</p>
-                )}
+                {errors.email && <p className="text-destructive text-xs">{errors.email.message}</p>}
               </div>
 
               {/* Country */}
@@ -206,10 +202,7 @@ export default function SignupPage() {
                   name="region"
                   control={control}
                   render={({ field }) => (
-                    <CountryPicker
-                      value={field.value}
-                      onChange={field.onChange}
-                    />
+                    <CountryPicker value={field.value} onChange={field.onChange} />
                   )}
                 />
                 {errors.region && (
@@ -277,7 +270,7 @@ export default function SignupPage() {
         {/* Link back to login */}
         <p className="text-muted-foreground mt-4 text-center text-sm">
           Already have an account?{" "}
-          <Link to="/login" className="text-foreground hover:underline font-medium">
+          <Link to="/login" className="text-foreground font-medium hover:underline">
             Sign in
           </Link>
         </p>

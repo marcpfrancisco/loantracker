@@ -7,14 +7,14 @@ interface PlanBadgeProps {
 
 const PLAN_STYLES: Record<string, string> = {
   owner: "bg-amber-500/20 text-amber-300 border border-amber-400/40",
-  pro:   "bg-violet-500/15 text-violet-400 border border-violet-500/25",
-  free:  "bg-zinc-500/15 text-zinc-400 border border-zinc-500/25",
+  pro: "bg-violet-500/15 text-violet-400 border border-violet-500/25",
+  free: "bg-zinc-500/15 text-zinc-400 border border-zinc-500/25",
 };
 
 const PLAN_LABELS: Record<string, string> = {
   owner: "Unlimited",
-  pro:   "Pro",
-  free:  "Free",
+  pro: "Pro",
+  free: "Free",
 };
 
 export function PlanBadge({ plan, className = "" }: PlanBadgeProps) {

@@ -43,10 +43,7 @@ export function useUpdateProfile() {
 
       // For lenders (admin), org name mirrors their full name — keep them in sync.
       if (activeRole === "admin" && activeOrgId) {
-        await supabase
-          .from("organizations")
-          .update({ name: fullName })
-          .eq("id", activeOrgId);
+        await supabase.from("organizations").update({ name: fullName }).eq("id", activeOrgId);
       }
     },
     onSuccess: async () => {

@@ -1,27 +1,35 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
-import { computeInstallmentAmounts } from "@/lib/installmentStrategies";
+import { buildInstallmentSchedule } from "@/lib/generateInstallments";
 import type { LoanType } from "@/types/enums";
+import type { FirstDueStrategy } from "@/types/schema";
 import type { InstallmentDetail } from "@/hooks/useLoanDetail";
 
 export interface UpdateLoanPayload {
   loanId: string;
-  // Editable fields
   principal: number;
   interest_rate: number | null;
   service_fee: number;
   due_day_of_month: number | null;
   notes: string | null;
-  // Needed for installment recomputation
-  loan_type: LoanType;
+  started_at: string;
   installments_total: number;
-  originalDueDay: number | null;
+  loan_type: LoanType;
+  first_due_strategy: FirstDueStrategy;
   installments: InstallmentDetail[];
 }
 
 async function updateLoan(payload: UpdateLoanPayload): Promise<void> {
-  // 1. Update the loan row
+  const paid = payload.installments.filter((i) => i.status === "paid");
+  const paidCount = paid.length;
+
+  if (payload.installments_total < paidCount) {
+    throw new Error(
+      `Cannot set ${payload.installments_total} installments — ${paidCount} already paid.`
+    );
+  }
+
   const { error: loanError } = await supabase
     .from("loans")
     .update({
@@ -30,42 +38,66 @@ async function updateLoan(payload: UpdateLoanPayload): Promise<void> {
       service_fee: payload.service_fee,
       due_day_of_month: payload.due_day_of_month,
       notes: payload.notes,
+      started_at: payload.started_at,
+      installments_total: payload.installments_total,
     })
     .eq("id", payload.loanId);
 
   if (loanError) throw loanError;
 
-  // 2. Recompute unpaid/pending installments
-  const unpaid = payload.installments.filter((i) => i.status !== "paid");
-  if (unpaid.length === 0) return;
-
-  const { baseAmount, lastAmount } = computeInstallmentAmounts(payload.loan_type, {
+  const schedule = buildInstallmentSchedule({
+    loan_type: payload.loan_type,
     principal: payload.principal,
     interest_rate: payload.interest_rate,
     service_fee: payload.service_fee,
     installments_total: payload.installments_total,
+    started_at: payload.started_at,
+    due_day_of_month: payload.due_day_of_month,
+    first_due_strategy: payload.first_due_strategy,
   });
 
-  const dueDayChanged = payload.due_day_of_month !== payload.originalDueDay;
+  const existingByNo = new Map(payload.installments.map((i) => [i.installment_no, i]));
 
-  await Promise.all(
-    unpaid.map((inst) => {
-      const isLast = inst.installment_no === payload.installments_total;
-      const newAmount = isLast ? lastAmount : baseAmount;
-
-      const updates: { amount: number; due_date?: string } = { amount: newAmount };
-
-      if (dueDayChanged && payload.due_day_of_month !== null) {
-        // Preserve year/month; only update the day component
-        const [year, month] = inst.due_date.split("-").map(Number);
-        const lastDayOfMonth = new Date(year, month, 0).getDate();
-        const newDay = Math.min(payload.due_day_of_month, lastDayOfMonth);
-        updates.due_date = `${year}-${String(month).padStart(2, "0")}-${String(newDay).padStart(2, "0")}`;
-      }
-
-      return supabase.from("installments").update(updates).eq("id", inst.id);
-    })
+  // Remove unpaid installments beyond the new total
+  const toDelete = payload.installments.filter(
+    (i) => i.status !== "paid" && i.installment_no > payload.installments_total
   );
+  if (toDelete.length > 0) {
+    const { error } = await supabase
+      .from("installments")
+      .delete()
+      .in(
+        "id",
+        toDelete.map((i) => i.id)
+      );
+    if (error) throw error;
+  }
+
+  for (const entry of schedule) {
+    const existing = existingByNo.get(entry.installment_no);
+
+    if (existing?.status === "paid") continue;
+
+    if (existing) {
+      const { error } = await supabase
+        .from("installments")
+        .update({
+          amount: entry.amount,
+          due_date: entry.due_date,
+        })
+        .eq("id", existing.id);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase.from("installments").insert({
+        loan_id: payload.loanId,
+        installment_no: entry.installment_no,
+        due_date: entry.due_date,
+        amount: entry.amount,
+        status: "unpaid",
+      });
+      if (error) throw error;
+    }
+  }
 }
 
 export function useUpdateLoan(loanId: string) {
@@ -83,8 +115,8 @@ export function useUpdateLoan(loanId: string) {
       void queryClient.invalidateQueries({ queryKey: ["overdue-installments"] });
       void queryClient.invalidateQueries({ queryKey: ["admin", "stats"] });
     },
-    onError: () => {
-      toast.error("Failed to update loan. Please try again.");
+    onError: (err: Error) => {
+      toast.error(err.message || "Failed to update loan. Please try again.");
     },
   });
 }

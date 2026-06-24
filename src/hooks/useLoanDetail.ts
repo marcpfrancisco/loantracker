@@ -8,6 +8,7 @@ import type {
   RegionType,
   PaymentStatus,
 } from "@/types/enums";
+import type { FirstDueStrategy } from "@/types/schema";
 
 export interface InstallmentDetail {
   id: string;
@@ -33,6 +34,7 @@ export interface LoanDetail {
   ended_at: string | null;
   due_day_of_month: number | null;
   notes: string | null;
+  first_due_strategy: FirstDueStrategy;
   credit_source: { name: string; type: CreditSourceType };
   borrower: { id: string; full_name: string } | null;
   installments: InstallmentDetail[];
@@ -42,7 +44,7 @@ async function fetchLoanDetail(id: string): Promise<LoanDetail> {
   const { data, error } = await supabase
     .from("loans")
     .select(
-      "id, loan_type, currency, principal, interest_rate, service_fee, installments_total, status, region, started_at, ended_at, due_day_of_month, notes, credit_sources!loans_source_id_fkey(name, type), profiles!loans_borrower_id_fkey(id, full_name), installments(id, installment_no, due_date, amount, status, paid_at, receipt_url)"
+      "id, loan_type, currency, principal, interest_rate, service_fee, installments_total, status, region, started_at, ended_at, due_day_of_month, notes, first_due_strategy, credit_sources!loans_source_id_fkey(name, type), profiles!loans_borrower_id_fkey(id, full_name), installments(id, installment_no, due_date, amount, status, paid_at, receipt_url)"
     )
     .eq("id", id)
     .single();
@@ -75,6 +77,7 @@ async function fetchLoanDetail(id: string): Promise<LoanDetail> {
     ended_at: data.ended_at,
     due_day_of_month: data.due_day_of_month !== null ? Number(data.due_day_of_month) : null,
     notes: data.notes,
+    first_due_strategy: data.first_due_strategy as FirstDueStrategy,
     credit_source: {
       name: data.credit_sources?.name ?? "Unknown",
       type: data.credit_sources?.type ?? "custom",

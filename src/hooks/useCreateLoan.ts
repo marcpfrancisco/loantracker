@@ -1,9 +1,9 @@
 import { CREDIT_SOURCE_CONFIGS, type FirstDueStrategy } from "./../types/schema";
+import { buildInstallmentSchedule } from "@/lib/generateInstallments";
 import type { TablesInsert } from "@/types/database";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
-import { computeInstallmentAmounts } from "@/lib/installmentStrategies";
 import type { LoanType, CurrencyType, RegionType } from "@/types/enums";
 
 export interface CreateLoanPayload {
@@ -32,73 +32,28 @@ function generateInstallments(
   loanId: string,
   payload: CreateLoanPayload
 ): TablesInsert<"installments">[] {
-  const {
-    principal,
-    interest_rate,
-    service_fee,
-    installments_total,
-    started_at,
-    due_day_of_month,
-    loan_type,
-    first_due_strategy,
-    installment_overrides,
-  } = payload;
-
-  const { baseAmount, lastAmount } = computeInstallmentAmounts(loan_type, {
-    principal,
-    interest_rate,
-    service_fee,
-    installments_total,
+  const schedule = buildInstallmentSchedule({
+    loan_type: payload.loan_type,
+    principal: payload.principal,
+    interest_rate: payload.interest_rate,
+    service_fee: payload.service_fee,
+    installments_total: payload.installments_total,
+    started_at: payload.started_at,
+    due_day_of_month: payload.due_day_of_month,
+    first_due_strategy: payload.first_due_strategy,
+    installment_overrides: payload.installment_overrides,
   });
 
-  const startDate = new Date(started_at + "T00:00:00");
-  const startDay = startDate.getDate();
-  const startYear = startDate.getFullYear();
-  const startMonth = startDate.getMonth(); // 0-indexed
-
-  // Determine month offset for the first installment
-  const firstOffset =
-    first_due_strategy === "same_month_if_possible"
-      ? due_day_of_month !== null && startDay <= due_day_of_month
-        ? 0
-        : 1
-      : first_due_strategy === "immediate_first_then_monthly"
-        ? 0 // first payment same day as purchase
-        : 1;
-
-  const isImmediateFirst = first_due_strategy === "immediate_first_then_monthly";
-
-  return Array.from({ length: installments_total }, (_, i) => {
-    const rawMonth = startMonth + firstOffset + i;
-
-    const targetYear = startYear + Math.floor(rawMonth / 12);
-    const targetMonth = rawMonth % 12;
-
-    const lastDayOfMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
-
-    const targetDay =
-      due_day_of_month !== null ? Math.min(due_day_of_month, lastDayOfMonth) : startDay;
-
-    const mo = String(targetMonth + 1).padStart(2, "0");
-    const d = String(targetDay).padStart(2, "0");
-
-    const amount =
-      installment_overrides?.[i] ??
-      (i === installments_total - 1 ? lastAmount : baseAmount);
-
-    // For immediate-first strategies (e.g. Tabby), the first payment is collected
-    // at checkout — mark it paid so it appears correctly in the installment list.
-    const isPaidAtCheckout = isImmediateFirst && i === 0;
-
-    return {
-      loan_id: loanId,
-      installment_no: i + 1,
-      due_date: `${targetYear}-${mo}-${d}`,
-      amount,
-      status: isPaidAtCheckout ? ("paid" as const) : ("unpaid" as const),
-      paid_at: isPaidAtCheckout ? new Date(started_at + "T00:00:00").toISOString() : null,
-    };
-  });
+  return schedule.map((entry) => ({
+    loan_id: loanId,
+    installment_no: entry.installment_no,
+    due_date: entry.due_date,
+    amount: entry.amount,
+    status: entry.paid_at_checkout ? ("paid" as const) : ("unpaid" as const),
+    paid_at: entry.paid_at_checkout
+      ? new Date(payload.started_at + "T00:00:00").toISOString()
+      : null,
+  }));
 }
 
 async function createLoan(payload: CreateLoanPayload): Promise<{ loanId: string }> {

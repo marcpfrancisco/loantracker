@@ -11,7 +11,7 @@ import {
   CheckSquare,
   Loader2,
   Pencil,
-  Lock,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { cardVariants } from "@/lib/animations";
@@ -19,9 +19,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { useLoanDetail } from "@/hooks/useLoanDetail";
 import { useUpdateInstallment, useBulkMarkPaid } from "@/hooks/useUpdateInstallment";
 import { useUpdateLoanStatus } from "@/hooks/useUpdateLoanStatus";
+import { useDeleteLoan } from "@/hooks/useDeleteLoan";
 import { InstallmentRow } from "@/components/loans/InstallmentRow";
 import { LoanBreakdownSummary } from "@/components/loans/LoanBreakdownSummary";
 import { EditLoanDrawer } from "@/components/loans/EditLoanDrawer";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { RegionLabel } from "@/components/ui/region-badge";
 import { getLoanTypeConfig, FALLBACK_LOAN_TYPE } from "@/types/schema";
 import type { LoanStatus, LoanType, CreditSourceType, PaymentStatus } from "@/types/enums";
@@ -103,9 +105,8 @@ function PageSkeleton() {
 export default function LoanDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { profile, activePlan } = useAuth();
+  const { profile } = useAuth();
   const isAdmin = profile?.role === "admin";
-  const isOwnerPlan = activePlan === "owner";
 
   const { data: loan, isLoading, error } = useLoanDetail(id);
   const {
@@ -114,11 +115,14 @@ export default function LoanDetailPage() {
     variables: updatingVars,
   } = useUpdateInstallment(id ?? "");
   const { mutate: updateLoanStatus, isPending: updatingStatus } = useUpdateLoanStatus(id ?? "");
+  const { mutate: deleteLoan, isPending: deletingLoan } = useDeleteLoan();
   const { mutate: bulkMarkPaid, isPending: bulkPending } = useBulkMarkPaid(id ?? "");
 
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [editDrawerOpen, setEditDrawerOpen] = useState(false);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   function exitBulkMode() {
     setBulkMode(false);
@@ -160,11 +164,30 @@ export default function LoanDetailPage() {
     loan.installments_total > 0 ? paidInstallments.length / loan.installments_total : 0;
 
   const allPaid = paidInstallments.length === loan.installments_total;
-  const hasPayments = paidInstallments.length > 0;
-
   function handleInstallmentUpdate(installmentId: string, status: PaymentStatus) {
     updateInstallment({ id: installmentId, status, loanId: id ?? "" });
   }
+
+  function handleConfirmCancel() {
+    if (!id) return;
+    updateLoanStatus({ id, status: "cancelled" }, { onSuccess: () => setShowCancelConfirm(false) });
+  }
+
+  function handleConfirmDelete() {
+    if (!id) return;
+    deleteLoan(id, {
+      onSuccess: () => {
+        setShowDeleteConfirm(false);
+        void navigate("/loans");
+      },
+    });
+  }
+
+  const borrowerLabel = loan.borrower?.full_name ?? "the borrower";
+  const deleteDescription =
+    loan.status === "cancelled"
+      ? `This will permanently delete this cancelled loan for ${borrowerLabel}, including all installments and payment records. It will no longer appear on their account. This cannot be undone.`
+      : `This will permanently delete this ${loan.status} loan for ${borrowerLabel}, including all installments and payment records. It will no longer appear on their account. This cannot be undone.`;
 
   return (
     <div className="mx-auto max-w-2xl space-y-5 p-6">
@@ -204,24 +227,10 @@ export default function LoanDetailPage() {
             {isAdmin && (
               <button
                 onClick={() => setEditDrawerOpen(true)}
-                title={
-                  hasPayments && !isOwnerPlan
-                    ? "Editing locked — requires Owner plan when payments exist"
-                    : "Edit loan"
-                }
-                className={cn(
-                  "cursor-pointer rounded-lg p-1.5 transition-colors",
-                  hasPayments && !isOwnerPlan
-                    ? "text-muted-foreground/40 cursor-not-allowed"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                )}
-                disabled={hasPayments && !isOwnerPlan}
+                title="Edit loan details"
+                className="text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer rounded-lg p-1.5 transition-colors"
               >
-                {hasPayments && !isOwnerPlan ? (
-                  <Lock className="h-3.5 w-3.5" />
-                ) : (
-                  <Pencil className="h-3.5 w-3.5" />
-                )}
+                <Pencil className="h-3.5 w-3.5" />
               </button>
             )}
           </div>
@@ -345,6 +354,13 @@ export default function LoanDetailPage() {
             Loan Actions
           </p>
           <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setEditDrawerOpen(true)}
+              className="border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/40 flex cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors"
+            >
+              <Pencil className="h-3 w-3" />
+              Edit Loan
+            </button>
             {allPaid && (
               <button
                 onClick={() => updateLoanStatus({ id: loan.id, status: "completed" })}
@@ -362,17 +378,64 @@ export default function LoanDetailPage() {
               Mark Defaulted
             </button>
             <button
-              onClick={() => updateLoanStatus({ id: loan.id, status: "cancelled" })}
+              type="button"
+              onClick={() => setShowCancelConfirm(true)}
               disabled={updatingStatus}
               className="border-border/60 text-muted-foreground hover:text-foreground cursor-pointer rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
             >
               Cancel Loan
             </button>
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={deletingLoan}
+              className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-medium text-rose-400 transition-colors hover:bg-rose-500/20 disabled:opacity-50"
+            >
+              <Trash2 className="h-3 w-3" />
+              Remove permanently
+            </button>
           </div>
         </motion.div>
       )}
 
-      {/* Reopen for non-active admin */}
+      {/* Cancelled — remove from borrower account */}
+      {isAdmin && loan.status === "cancelled" && (
+        <motion.div
+          variants={cardVariants}
+          initial="hidden"
+          animate="visible"
+          className="bg-card border-border/60 rounded-xl border p-4"
+        >
+          <p className="text-muted-foreground mb-3 text-xs font-semibold tracking-wider uppercase">
+            Cancelled Loan
+          </p>
+          <p className="text-muted-foreground mb-3 text-xs leading-relaxed">
+            This loan is cancelled but still visible to {borrowerLabel}. Remove it permanently to
+            clear it from their account.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setEditDrawerOpen(true)}
+              className="border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/40 flex cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors"
+            >
+              <Pencil className="h-3 w-3" />
+              Edit Loan
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={deletingLoan}
+              className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-medium text-rose-400 transition-colors hover:bg-rose-500/20 disabled:opacity-50"
+            >
+              <Trash2 className="h-3 w-3" />
+              Remove from account
+            </button>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Reopen for non-active admin (not cancelled) */}
       {isAdmin && loan.status !== "active" && loan.status !== "cancelled" && (
         <motion.div
           variants={cardVariants}
@@ -383,13 +446,31 @@ export default function LoanDetailPage() {
           <p className="text-muted-foreground mb-3 text-xs font-semibold tracking-wider uppercase">
             Loan Actions
           </p>
-          <button
-            onClick={() => updateLoanStatus({ id: loan.id, status: "active" })}
-            disabled={updatingStatus}
-            className="cursor-pointer rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-400 transition-colors hover:bg-emerald-500/20 disabled:opacity-50"
-          >
-            Reopen Loan
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => setEditDrawerOpen(true)}
+              className="border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/40 flex cursor-pointer items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors"
+            >
+              <Pencil className="h-3 w-3" />
+              Edit Loan
+            </button>
+            <button
+              onClick={() => updateLoanStatus({ id: loan.id, status: "active" })}
+              disabled={updatingStatus}
+              className="cursor-pointer rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-400 transition-colors hover:bg-emerald-500/20 disabled:opacity-50"
+            >
+              Reopen Loan
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={deletingLoan}
+              className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-medium text-rose-400 transition-colors hover:bg-rose-500/20 disabled:opacity-50"
+            >
+              <Trash2 className="h-3 w-3" />
+              Remove permanently
+            </button>
+          </div>
         </motion.div>
       )}
 
@@ -522,9 +603,29 @@ export default function LoanDetailPage() {
           open={editDrawerOpen}
           onClose={() => setEditDrawerOpen(false)}
           loan={loan}
-          isOwnerPlan={isOwnerPlan}
         />
       )}
+
+      <ConfirmDialog
+        open={showCancelConfirm}
+        title="Cancel this loan?"
+        description={`The loan will be marked cancelled and remain visible to ${borrowerLabel}. You can remove it from their account afterward using "Remove from account".`}
+        confirmLabel="Cancel loan"
+        variant="warning"
+        isPending={updatingStatus}
+        onConfirm={handleConfirmCancel}
+        onCancel={() => setShowCancelConfirm(false)}
+      />
+
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title="Remove loan permanently?"
+        description={deleteDescription}
+        confirmLabel="Remove permanently"
+        isPending={deletingLoan}
+        onConfirm={handleConfirmDelete}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </div>
   );
 }

@@ -3,18 +3,11 @@ import { useNavigate } from "react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { CalendarClock, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getInitials } from "@/lib/getInitials";
+import { isLoanOverdue } from "@/lib/groupLoansByBorrower";
 import type { LoanListItem } from "@/hooks/useLoans";
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
-
-export function getInitials(name: string) {
-  return name
-    .split(" ")
-    .map((w) => w[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-}
 
 function formatCurrency(amount: number, currency: string) {
   return new Intl.NumberFormat("en-US", {
@@ -36,14 +29,6 @@ function formatDueDate(dateStr: string): string {
   return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
-function isLoanOverdue(loan: LoanListItem) {
-  return (
-    loan.status === "active" &&
-    loan.nextDueDate !== null &&
-    new Date(loan.nextDueDate + "T00:00:00") < new Date(new Date().toDateString())
-  );
-}
-
 // ── Status badge styles ────────────────────────────────────────────────────────
 
 const statusStyles = {
@@ -55,7 +40,7 @@ const statusStyles = {
 
 // ── CompactLoanRow ─────────────────────────────────────────────────────────────
 
-export function CompactLoanRow({ loan }: { loan: LoanListItem }) {
+function CompactLoanRow({ loan }: { loan: LoanListItem }) {
   const navigate = useNavigate();
   const progress = loan.installments_total > 0 ? loan.paidCount / loan.installments_total : 0;
   const isOverdue = isLoanOverdue(loan);
@@ -64,7 +49,7 @@ export function CompactLoanRow({ loan }: { loan: LoanListItem }) {
     <button
       type="button"
       onClick={() => void navigate(`/loans/${loan.id}`)}
-      className="group flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/30"
+      className="group hover:bg-muted/30 flex w-full items-center gap-3 px-4 py-3 text-left transition-colors"
     >
       {/* Source + status + progress */}
       <div className="min-w-0 flex-1">
@@ -150,7 +135,7 @@ export function BorrowerLoanGroup({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full cursor-pointer items-center gap-3 px-4 py-3.5 transition-colors hover:bg-muted/20"
+        className="hover:bg-muted/20 flex w-full cursor-pointer items-center gap-3 px-4 py-3.5 transition-colors"
       >
         {/* Avatar */}
         <div className="bg-primary/10 text-primary border-primary/20 flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-semibold">
@@ -244,31 +229,4 @@ export function BorrowerLoanGroupSkeleton({ rows = 2 }: { rows?: number }) {
       </div>
     </div>
   );
-}
-
-// ── groupLoansByBorrower util ──────────────────────────────────────────────────
-
-export interface BorrowerGroup {
-  id: string;
-  name: string;
-  loans: LoanListItem[];
-}
-
-export function groupLoansByBorrower(loans: LoanListItem[]): BorrowerGroup[] {
-  const map = new Map<string, BorrowerGroup>();
-
-  for (const loan of loans) {
-    const id = loan.borrower?.id ?? "__unknown";
-    const name = loan.borrower?.full_name ?? "Unknown Borrower";
-    if (!map.has(id)) map.set(id, { id, name, loans: [] });
-    map.get(id)!.loans.push(loan);
-  }
-
-  return [...map.values()].sort((a, b) => {
-    // Borrowers with overdue loans float first, then alphabetical
-    const aOverdue = a.loans.some(isLoanOverdue);
-    const bOverdue = b.loans.some(isLoanOverdue);
-    if (aOverdue !== bOverdue) return aOverdue ? -1 : 1;
-    return a.name.localeCompare(b.name);
-  });
 }

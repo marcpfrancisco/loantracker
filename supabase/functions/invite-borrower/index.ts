@@ -118,13 +118,11 @@ Deno.serve(async (req: Request) => {
     // it on profiles (migration 007). org membership is created explicitly below.
     const siteUrl = Deno.env.get("SITE_URL") ?? "http://localhost:5173";
 
-    const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-      email,
-      {
+    const { data: inviteData, error: inviteError } =
+      await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
         data: { full_name, region, role: "borrower" },
         options: { redirectTo: `${siteUrl}/reset-password` },
-      }
-    );
+      });
 
     if (inviteError) {
       const message = inviteError.message.includes("already been registered")
@@ -155,19 +153,20 @@ Deno.serve(async (req: Request) => {
         .insert({ user_id: borrowerUserId, org_id: orgId });
 
       if (contextInsertError) {
-        console.error("[invite-borrower] user_org_context insert failed:", contextInsertError.message);
+        console.error(
+          "[invite-borrower] user_org_context insert failed:",
+          contextInsertError.message
+        );
       }
     } else {
-      console.warn("[invite-borrower] no user id returned from invite — org_members/context not created");
+      console.warn(
+        "[invite-borrower] no user id returned from invite — org_members/context not created"
+      );
     }
 
     return Response.json({ success: true }, { headers: corsHeaders });
-
   } catch (err) {
     console.error("[invite-borrower] unexpected error:", err);
-    return Response.json(
-      { error: "Internal server error" },
-      { status: 500, headers: corsHeaders }
-    );
+    return Response.json({ error: "Internal server error" }, { status: 500, headers: corsHeaders });
   }
 });

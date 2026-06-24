@@ -46,7 +46,9 @@ async function fetchAllCreditSources(): Promise<CreditSourceRow[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { data, error } = await (supabase as any)
     .from("credit_sources")
-    .select("id, name, type, region, is_active, default_interest_rate, default_installments, default_due_day")
+    .select(
+      "id, name, type, region, is_active, default_interest_rate, default_installments, default_due_day"
+    )
     .order("region")
     .order("name");
   if (error) throw error;

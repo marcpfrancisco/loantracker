@@ -27,10 +27,10 @@ export function getDefaultCurrency(countryCode: string): string {
 // ── Sorted country options ─────────────────────────────────────────────────────
 // Returns all countries as a flat sorted array suitable for a picker.
 export interface CountryOption {
-  code: string;       // ISO 3166-1 alpha-2  e.g. 'PH'
-  name: string;       // English name         e.g. 'Philippines'
-  flag: string;       // flag emoji           e.g. '🇵🇭'
-  currency: string;   // first ISO 4217 code  e.g. 'PHP'
+  code: string; // ISO 3166-1 alpha-2  e.g. 'PH'
+  name: string; // English name         e.g. 'Philippines'
+  flag: string; // flag emoji           e.g. '🇵🇭'
+  currency: string; // first ISO 4217 code  e.g. 'PHP'
 }
 
 let _cachedOptions: CountryOption[] | null = null;

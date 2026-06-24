@@ -88,9 +88,7 @@ export function LoanBreakdownSummary({
         )}
 
         {/* Service fee — only when amortized into installments */}
-        {showAmortizedFee && (
-          <Row label="Service Fee" value={fmt(serviceFee, currency)} subtle />
-        )}
+        {showAmortizedFee && <Row label="Service Fee" value={fmt(serviceFee, currency)} subtle />}
 
         <Divider />
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { motion } from "framer-motion";
@@ -101,9 +101,7 @@ function RegionChip({
       <span className={cn("text-[11px]", isPrimary ? "text-primary/70" : "text-muted-foreground")}>
         {getDefaultCurrency(code)}
       </span>
-      {isPrimary && (
-        <span className="text-primary/60 ml-0.5 text-[10px]">primary</span>
-      )}
+      {isPrimary && <span className="text-primary/60 ml-0.5 text-[10px]">primary</span>}
       {!isPrimary && onRemove && (
         <button
           type="button"
@@ -135,14 +133,13 @@ export default function OrgSettingsPage() {
     register,
     handleSubmit,
     reset,
-    watch,
     control,
     formState: { errors, isSubmitting, isDirty },
   } = useForm<OrgSettingsFormData>({
     resolver: zodResolver(orgSettingsSchema),
   });
 
-  const watchedRegion = watch("region");
+  const watchedRegion = useWatch({ control, name: "region" });
 
   // ── Fetch org ───────────────────────────────────────────────────────────────
 
@@ -174,15 +171,14 @@ export default function OrgSettingsPage() {
       });
   }, [activeOrgId, profile?.full_name, reset]);
 
-  // When primary region changes, auto-add it to active_regions if missing
-  useEffect(() => {
-    if (!watchedRegion) return;
+  function handlePrimaryRegionChange(code: string, onChange: (value: string) => void) {
+    onChange(code);
     setLocalActiveRegions((prev) => {
-      if (prev.includes(watchedRegion)) return prev;
+      if (prev.includes(code)) return prev;
       setRegionsDirty(true);
-      return [...prev, watchedRegion];
+      return [...prev, code];
     });
-  }, [watchedRegion]);
+  }
 
   // ── Region list helpers ─────────────────────────────────────────────────────
 
@@ -214,10 +210,7 @@ export default function OrgSettingsPage() {
         .from("organizations")
         .update({ name: values.name, region: values.region, active_regions: finalRegions })
         .eq("id", activeOrgId),
-      supabase
-        .from("profiles")
-        .update({ full_name: values.name })
-        .eq("id", profile.id),
+      supabase.from("profiles").update({ full_name: values.name }).eq("id", profile.id),
     ]);
 
     if (orgResult.error || profileResult.error) {
@@ -227,7 +220,12 @@ export default function OrgSettingsPage() {
 
     setOrg((prev) =>
       prev
-        ? { ...prev, name: values.name, region: values.region as RegionType, active_regions: finalRegions }
+        ? {
+            ...prev,
+            name: values.name,
+            region: values.region as RegionType,
+            active_regions: finalRegions,
+          }
         : prev
     );
     setLocalActiveRegions(finalRegions);
@@ -257,7 +255,6 @@ export default function OrgSettingsPage() {
       {/* ── General ─────────────────────────────────────────────────── */}
       <Section title="General">
         <form onSubmit={(e) => void handleSubmit(onSubmit)(e)} noValidate className="space-y-4">
-
           {/* Lender name */}
           <div className="flex flex-col gap-1.5">
             <label htmlFor="org-name" className="text-foreground text-xs font-medium">
@@ -283,16 +280,14 @@ export default function OrgSettingsPage() {
 
           {/* Primary Country */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-foreground text-xs font-medium">
-              Primary Country
-            </label>
+            <label className="text-foreground text-xs font-medium">Primary Country</label>
             <Controller
               name="region"
               control={control}
               render={({ field }) => (
                 <CountryPicker
                   value={field.value}
-                  onChange={field.onChange}
+                  onChange={(code) => handlePrimaryRegionChange(code, field.onChange)}
                 />
               )}
             />
@@ -329,8 +324,8 @@ export default function OrgSettingsPage() {
               showCurrency={true}
             />
             <p className="text-muted-foreground text-xs">
-              Determines which currencies are available when creating loans.
-              The primary country cannot be removed.
+              Determines which currencies are available when creating loans. The primary country
+              cannot be removed.
             </p>
           </div>
 
@@ -352,7 +347,6 @@ export default function OrgSettingsPage() {
       {/* ── Workspace info (read-only) ───────────────────────────────── */}
       <Section title="Workspace Info">
         <div className="space-y-4">
-
           {/* Slug */}
           <div className="flex flex-col gap-1.5">
             <label className="text-foreground text-xs font-medium">Workspace Slug</label>

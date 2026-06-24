@@ -3,17 +3,18 @@ import { motion } from "framer-motion";
 import { Plus, AlertCircle, Loader2, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
-import { useLoansInfinite, useDistinctLoanRegions, LOANS_PAGE_SIZE } from "@/hooks/useLoansInfinite";
+import {
+  useLoansInfinite,
+  useDistinctLoanRegions,
+  LOANS_PAGE_SIZE,
+} from "@/hooks/useLoansInfinite";
 import type { StatusFilter, RegionFilter } from "@/hooks/useLoansInfinite";
 import { getFlagEmoji } from "@/lib/countries";
 import { LoanCard } from "@/components/dashboard/LoanCard";
 import { AddLoanDrawer } from "@/components/loans/AddLoanDrawer";
 import { RefreshButton } from "@/components/ui/refresh-button";
-import {
-  BorrowerLoanGroup,
-  BorrowerLoanGroupSkeleton,
-  groupLoansByBorrower,
-} from "@/components/loans/BorrowerLoanGroup";
+import { BorrowerLoanGroup, BorrowerLoanGroupSkeleton } from "@/components/loans/BorrowerLoanGroup";
+import { groupLoansByBorrower } from "@/lib/groupLoansByBorrower";
 import type { LoanListItem } from "@/hooks/useLoans";
 
 // ── Filter options ─────────────────────────────────────────────────────────────
@@ -109,9 +110,9 @@ export default function LoansPage() {
   const distinctRegions = useDistinctLoanRegions();
   const regionOptions: { value: RegionFilter; label: string }[] = [
     { value: "all", label: "All Regions" },
-    ...[...new Set([...(profile?.region ? [profile.region] : []), ...distinctRegions])].sort().map(
-      (r) => ({ value: r as RegionFilter, label: `${getFlagEmoji(r)} ${r}` })
-    ),
+    ...[...new Set([...(profile?.region ? [profile.region] : []), ...distinctRegions])]
+      .sort()
+      .map((r) => ({ value: r as RegionFilter, label: `${getFlagEmoji(r)} ${r}` })),
   ];
 
   return (
@@ -188,7 +189,9 @@ export default function LoansPage() {
       {isLoading ? (
         isAdmin ? (
           <div className="space-y-3">
-            {[1, 2, 3].map((i) => <BorrowerLoanGroupSkeleton key={i} />)}
+            {[1, 2, 3].map((i) => (
+              <BorrowerLoanGroupSkeleton key={i} />
+            ))}
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
@@ -218,7 +221,10 @@ export default function LoansPage() {
             animate="visible"
           >
             {grouped.map((group) => (
-              <motion.div key={`${group.id}-${regionFilter}-${statusFilter}`} variants={{ hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0 } }}>
+              <motion.div
+                key={`${group.id}-${regionFilter}-${statusFilter}`}
+                variants={{ hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0 } }}
+              >
                 <BorrowerLoanGroup
                   borrowerName={group.name}
                   loans={group.loans}
@@ -253,7 +259,10 @@ export default function LoansPage() {
                 className="border-border/60 text-muted-foreground hover:text-foreground flex cursor-pointer items-center gap-2 rounded-lg border px-5 py-2.5 text-sm transition-colors disabled:opacity-60"
               >
                 {isFetchingNextPage ? (
-                  <><Loader2 className="h-4 w-4 animate-spin" />Loading…</>
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading…
+                  </>
                 ) : (
                   "Load more"
                 )}
@@ -284,7 +293,10 @@ export default function LoansPage() {
                 className="border-border/60 text-muted-foreground hover:text-foreground flex cursor-pointer items-center gap-2 rounded-lg border px-5 py-2.5 text-sm transition-colors disabled:opacity-60"
               >
                 {isFetchingNextPage ? (
-                  <><Loader2 className="h-4 w-4 animate-spin" />Loading…</>
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading…
+                  </>
                 ) : (
                   "Load more"
                 )}

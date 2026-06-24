@@ -79,8 +79,8 @@ function DefaultFields({
 }: DefaultFieldsProps) {
   return (
     <div className="space-y-2">
-      <p className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
-        {label} <span className="normal-case font-normal">(optional)</span>
+      <p className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
+        {label} <span className="font-normal normal-case">(optional)</span>
       </p>
       <div className="grid grid-cols-3 gap-2">
         {/* Interest rate */}
@@ -95,7 +95,7 @@ function DefaultFields({
               value={interestRate}
               onChange={(e) => onInterestRateChange(e.target.value)}
               placeholder="e.g. 3.5"
-              className="bg-muted/50 border-border/60 focus:border-primary/60 placeholder:text-muted-foreground/40 w-full rounded-lg border py-1.5 pl-2.5 pr-5 text-xs transition-colors outline-none"
+              className="bg-muted/50 border-border/60 focus:border-primary/60 placeholder:text-muted-foreground/40 w-full rounded-lg border py-1.5 pr-5 pl-2.5 text-xs transition-colors outline-none"
             />
             <span className="text-muted-foreground absolute top-1/2 right-2 -translate-y-1/2 text-[10px]">
               %
@@ -161,8 +161,8 @@ function LoanTypeDefaultsEditor({ loanTypes, value, onChange }: LoanTypeDefaults
 
   return (
     <div className="space-y-3">
-      <p className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
-        Per-Type Defaults <span className="normal-case font-normal">(optional)</span>
+      <p className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
+        Per-Type Defaults <span className="font-normal normal-case">(optional)</span>
       </p>
       {loanTypes.map((lt, i) => {
         const row = value[i];
@@ -182,10 +182,8 @@ function LoanTypeDefaultsEditor({ loanTypes, value, onChange }: LoanTypeDefaults
                     step="0.01"
                     value={row.interest_rate}
                     onChange={(e) => updateRow(i, { interest_rate: e.target.value })}
-                    placeholder={
-                      lt.interest_rate !== null ? String(lt.interest_rate) : "e.g. 3.5"
-                    }
-                    className="bg-muted/50 border-border/60 focus:border-primary/60 placeholder:text-muted-foreground/40 w-full rounded-lg border py-1.5 pl-2.5 pr-5 text-xs transition-colors outline-none"
+                    placeholder={lt.interest_rate !== null ? String(lt.interest_rate) : "e.g. 3.5"}
+                    className="bg-muted/50 border-border/60 focus:border-primary/60 placeholder:text-muted-foreground/40 w-full rounded-lg border py-1.5 pr-5 pl-2.5 text-xs transition-colors outline-none"
                   />
                   <span className="text-muted-foreground absolute top-1/2 right-2 -translate-y-1/2 text-[10px]">
                     %
@@ -256,8 +254,8 @@ function CustomLoanTypeEditor({ value, onChange }: CustomLoanTypeEditorProps) {
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <p className="text-muted-foreground text-[11px] font-medium uppercase tracking-wide">
-          Per Loan Type <span className="normal-case font-normal">(optional)</span>
+        <p className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
+          Per Loan Type <span className="font-normal normal-case">(optional)</span>
         </p>
         <button
           type="button"
@@ -289,7 +287,7 @@ function CustomLoanTypeEditor({ value, onChange }: CustomLoanTypeEditorProps) {
             <button
               type="button"
               onClick={() => removeRow(i)}
-              className="text-muted-foreground hover:text-rose-400 rounded p-1 transition-colors"
+              className="text-muted-foreground rounded p-1 transition-colors hover:text-rose-400"
               title="Remove"
             >
               <X className="h-3.5 w-3.5" />
@@ -309,7 +307,7 @@ function CustomLoanTypeEditor({ value, onChange }: CustomLoanTypeEditorProps) {
                   value={row.interest_rate}
                   onChange={(e) => updateRow(i, { interest_rate: e.target.value })}
                   placeholder="e.g. 3.5"
-                  className="bg-muted/50 border-border/60 focus:border-primary/60 placeholder:text-muted-foreground/40 w-full rounded-lg border py-1.5 pl-2.5 pr-5 text-xs transition-colors outline-none"
+                  className="bg-muted/50 border-border/60 focus:border-primary/60 placeholder:text-muted-foreground/40 w-full rounded-lg border py-1.5 pr-5 pl-2.5 text-xs transition-colors outline-none"
                 />
                 <span className="text-muted-foreground absolute top-1/2 right-2 -translate-y-1/2 text-[10px]">
                   %
@@ -384,21 +382,24 @@ function buildLtDefaultRows(
     const db = dbRows.find((r) => r.loan_type === lt.loan_type);
     return {
       loan_type: lt.loan_type,
-      interest_rate: db?.interest_rate != null
-        ? fmtRate(db.interest_rate)
-        : lt.interest_rate !== null
-          ? String(lt.interest_rate)
-          : "",
-      installments: db?.installments != null
-        ? fmtInt(db.installments)
-        : lt.installments_total
-          ? String(lt.installments_total)
-          : "",
-      due_day: db?.due_day != null
-        ? fmtInt(db.due_day)
-        : lt.due_day_of_month != null
-          ? String(lt.due_day_of_month)
-          : "",
+      interest_rate:
+        db?.interest_rate != null
+          ? fmtRate(db.interest_rate)
+          : lt.interest_rate !== null
+            ? String(lt.interest_rate)
+            : "",
+      installments:
+        db?.installments != null
+          ? fmtInt(db.installments)
+          : lt.installments_total
+            ? String(lt.installments_total)
+            : "",
+      due_day:
+        db?.due_day != null
+          ? fmtInt(db.due_day)
+          : lt.due_day_of_month != null
+            ? String(lt.due_day_of_month)
+            : "",
     };
   });
 }
@@ -413,7 +414,8 @@ interface SourceEditDefaults {
 
 function getEditDefaults(source: CreditSourceRow): SourceEditDefaults {
   return {
-    interestRate: source.default_interest_rate !== null ? fmtRate(source.default_interest_rate) : "",
+    interestRate:
+      source.default_interest_rate !== null ? fmtRate(source.default_interest_rate) : "",
     installments: source.default_installments !== null ? fmtInt(source.default_installments) : "",
     dueDay: source.default_due_day !== null ? fmtInt(source.default_due_day) : "",
   };
@@ -423,21 +425,18 @@ function getEditDefaults(source: CreditSourceRow): SourceEditDefaults {
  * Formats a per-loan-type summary line for view mode.
  * Shows DB override if present, otherwise falls back to schema.ts.
  */
-function formatLtSummary(
-  loanTypes: LoanTypeConfig[],
-  dbRows: LoanTypeDefault[]
-): string {
+function formatLtSummary(loanTypes: LoanTypeConfig[], dbRows: LoanTypeDefault[]): string {
   return loanTypes
     .map((lt) => {
       const db = dbRows.find((r) => r.loan_type === lt.loan_type);
-      const rate = db?.interest_rate != null
-        ? `${+(db.interest_rate * 100).toFixed(2)}%`
-        : lt.interest_rate !== null
-          ? `${lt.interest_rate}%`
-          : null;
-      const inst = db?.installments != null
-        ? `${db.installments} mo`
-        : `${lt.installments_total} mo`;
+      const rate =
+        db?.interest_rate != null
+          ? `${+(db.interest_rate * 100).toFixed(2)}%`
+          : lt.interest_rate !== null
+            ? `${lt.interest_rate}%`
+            : null;
+      const inst =
+        db?.installments != null ? `${db.installments} mo` : `${lt.installments_total} mo`;
       return [lt.label, rate, inst].filter(Boolean).join(" · ");
     })
     .join("  /  ");
@@ -473,7 +472,7 @@ function AddForm({ defaultRegion, onDone }: AddFormProps) {
     } else {
       setLtDefaults([]);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [schemaConfig?.name]);
 
   const isSaving = create.isPending || upsert.isPending;
@@ -489,11 +488,12 @@ function AddForm({ defaultRegion, onDone }: AddFormProps) {
         name: name.trim(),
         type,
         region,
-        default_interest_rate: !isKnownSource && interestRate
-          ? parseOptionalFloat(interestRate) !== null
-            ? parseOptionalFloat(interestRate)! / 100
-            : null
-          : null,
+        default_interest_rate:
+          !isKnownSource && interestRate
+            ? parseOptionalFloat(interestRate) !== null
+              ? parseOptionalFloat(interestRate)! / 100
+              : null
+            : null,
         default_installments: !isKnownSource ? parseOptionalInt(installments) : null,
         default_due_day: !isKnownSource ? parseOptionalInt(dueDay) : null,
       });
@@ -617,11 +617,7 @@ function AddForm({ defaultRegion, onDone }: AddFormProps) {
           disabled={isSaving}
           className="bg-primary text-primary-foreground hover:bg-primary/90 flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
         >
-          {isSaving ? (
-            <Loader2 className="h-3 w-3 animate-spin" />
-          ) : (
-            <Check className="h-3 w-3" />
-          )}
+          {isSaving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Check className="h-3 w-3" />}
           Save
         </button>
       </div>
@@ -650,9 +646,7 @@ function SourceRow({ source, loanTypeDefaults }: SourceRowProps) {
   const [editInstallments, setEditInstallments] = useState(defaults.installments);
   const [editDueDay, setEditDueDay] = useState(defaults.dueDay);
   const [editedLtDefaults, setEditedLtDefaults] = useState<LtDefaultRow[]>(() =>
-    isKnownSource
-      ? buildLtDefaultRows(schemaConfig.loan_types, loanTypeDefaults)
-      : []
+    isKnownSource ? buildLtDefaultRows(schemaConfig.loan_types, loanTypeDefaults) : []
   );
   const [customLtRows, setCustomLtRows] = useState<LtDefaultRow[]>(() =>
     !isKnownSource
@@ -713,17 +707,16 @@ function SourceRow({ source, loanTypeDefaults }: SourceRowProps) {
         id: source.id,
         name: editName,
         type: editType,
-        default_interest_rate: !isKnownSource && editInterestRate
-          ? parseOptionalFloat(editInterestRate) !== null
-            ? parseOptionalFloat(editInterestRate)! / 100
-            : null
-          : source.default_interest_rate,
+        default_interest_rate:
+          !isKnownSource && editInterestRate
+            ? parseOptionalFloat(editInterestRate) !== null
+              ? parseOptionalFloat(editInterestRate)! / 100
+              : null
+            : source.default_interest_rate,
         default_installments: !isKnownSource
           ? parseOptionalInt(editInstallments)
           : source.default_installments,
-        default_due_day: !isKnownSource
-          ? parseOptionalInt(editDueDay)
-          : source.default_due_day,
+        default_due_day: !isKnownSource ? parseOptionalInt(editDueDay) : source.default_due_day,
       });
 
       // 2. Save per-loan-type defaults
@@ -897,7 +890,8 @@ function SourceRow({ source, loanTypeDefaults }: SourceRowProps) {
             <p className="text-muted-foreground mt-0.5 truncate text-[10px]">
               {loanTypeDefaults
                 .map((d) => {
-                  const rate = d.interest_rate != null ? `${+(d.interest_rate * 100).toFixed(2)}%` : null;
+                  const rate =
+                    d.interest_rate != null ? `${+(d.interest_rate * 100).toFixed(2)}%` : null;
                   const inst = d.installments != null ? `${d.installments} mo` : null;
                   return [d.loan_type, rate, inst].filter(Boolean).join(" · ");
                 })
@@ -1035,7 +1029,7 @@ export function CreditSourcesDrawer({ open, onClose }: CreditSourcesDrawerProps)
             </div>
 
             {/* Tabs */}
-            <div className="border-border/60 flex gap-1 overflow-x-auto border-b px-3 scrollbar-none">
+            <div className="border-border/60 scrollbar-none flex gap-1 overflow-x-auto border-b px-3">
               {countryTabs.map((r) => (
                 <button
                   key={r}

@@ -131,6 +131,7 @@ export type Database = {
       budget_entries: {
         Row: {
           amount: number
+          card_account_id: string | null
           category_id: string
           created_at: string
           description: string | null
@@ -146,6 +147,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          card_account_id?: string | null
           category_id: string
           created_at?: string
           description?: string | null
@@ -161,6 +163,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          card_account_id?: string | null
           category_id?: string
           created_at?: string
           description?: string | null
@@ -175,6 +178,13 @@ export type Database = {
           wealth_account_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "budget_entries_card_account_id_fkey"
+            columns: ["card_account_id"]
+            isOneToOne: false
+            referencedRelation: "card_accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "budget_entries_category_id_fkey"
             columns: ["category_id"]

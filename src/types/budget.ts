@@ -1,4 +1,5 @@
 import type { CurrencyType } from "@/types/enums";
+import type { CardAccount } from "@/types/cards";
 
 export type BudgetGroupKey =
   | "income"
@@ -80,10 +81,12 @@ export interface BudgetEntry {
   description: string | null;
   notes: string | null;
   wealth_account_id: string | null;
+  card_account_id: string | null;
   created_at: string;
   updated_at: string;
   budget_categories?: Pick<BudgetCategory, "name" | "group_key"> | null;
   wealth_accounts?: Pick<WealthAccount, "name"> | null;
+  card_accounts?: Pick<CardAccount, "name" | "card_kind"> | null;
 }
 
 export interface WealthAccount {

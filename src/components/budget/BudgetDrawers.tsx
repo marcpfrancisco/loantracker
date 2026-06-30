@@ -1,6 +1,14 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowDownLeft, ArrowUpRight, Loader2, PiggyBank, Wallet, X } from "lucide-react";
+import {
+  ArrowDownLeft,
+  ArrowUpRight,
+  CreditCard,
+  Loader2,
+  PiggyBank,
+  Wallet,
+  X,
+} from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -8,13 +16,18 @@ import type { Resolver } from "react-hook-form";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/lib/formatCurrency";
 import {
+  cardAccountFieldLabel,
   getActiveGroupOrder,
   groupCategoriesByKey,
   inferEntryType,
+  showsCardPicker,
   wealthAccountFieldLabel,
+  wealthAndCardExclusive,
 } from "@/lib/budgetRules";
 import type { BudgetCategory, BudgetEntryType, WealthAccount } from "@/types/budget";
 import { BUDGET_GROUP_LABELS, WEALTH_ACCOUNT_KIND_LABELS } from "@/types/budget";
+import type { CardAccount } from "@/types/cards";
+import { CARD_KIND_LABELS } from "@/types/cards";
 
 const schema = z.object({
   category_id: z.string().min(1, "Select a category"),
@@ -22,20 +35,25 @@ const schema = z.object({
   entry_date: z.string().min(1, "Select a date"),
   description: z.string().optional(),
   wealth_account_id: z.string().optional(),
+  card_account_id: z.string().optional(),
 });
 
 type FormData = z.infer<typeof schema>;
 
-export type AddBudgetEntryFormData = Omit<FormData, "wealth_account_id"> & {
+export type AddBudgetEntryFormData = Omit<FormData, "wealth_account_id" | "card_account_id"> & {
   category: BudgetCategory;
   wealth_account_id: string | null;
+  card_account_id: string | null;
 };
+
+type ExpensePaymentSource = "none" | "wealth" | "card";
 
 interface AddBudgetEntryDrawerProps {
   open: boolean;
   onClose: () => void;
   categories: BudgetCategory[];
   wealthAccounts: WealthAccount[];
+  cardAccounts: CardAccount[];
   currency: string;
   defaultCategoryId?: string;
   isPending: boolean;
@@ -96,6 +114,7 @@ function AddBudgetEntryDrawerContent({
   onClose,
   categories,
   wealthAccounts,
+  cardAccounts,
   currency,
   defaultCategoryId,
   isPending,
@@ -117,24 +136,55 @@ function AddBudgetEntryDrawerContent({
       entry_date: new Date().toISOString().slice(0, 10),
       description: "",
       wealth_account_id: defaultWealthAccountId(initialCategory, wealthAccounts),
+      card_account_id: "",
     },
   });
+
+  const [expensePayment, setExpensePayment] = useState<ExpensePaymentSource>("none");
 
   const watchedCategoryId = watch("category_id");
   const watchedAmount = watch("amount");
   const watchedAccountId = watch("wealth_account_id");
+  const watchedCardId = watch("card_account_id");
   const selectedCategory = categories.find((c) => c.id === watchedCategoryId);
   const entryType = selectedCategory ? inferEntryType(selectedCategory) : null;
   const typeStyle = entryType ? ENTRY_TYPE_STYLES[entryType] : null;
   const selectedAccount = wealthAccounts.find((a) => a.id === watchedAccountId);
+  const selectedCard = cardAccounts.find((c) => c.id === watchedCardId);
+  const creditCards = cardAccounts.filter((c) => c.card_kind === "credit");
+  const showCardSection = showsCardPicker(entryType);
+  const exclusivePayment = wealthAndCardExclusive(entryType);
 
   const grouped = groupCategoriesByKey(categories);
   const groupOrder = getActiveGroupOrder(categories);
+
+  const syncsAccount = Boolean(watchedAccountId);
+  const syncsCard = Boolean(watchedCardId);
 
   function handleCategoryChange(categoryId: string) {
     setValue("category_id", categoryId);
     const cat = categories.find((c) => c.id === categoryId);
     setValue("wealth_account_id", defaultWealthAccountId(cat, wealthAccounts));
+    setValue("card_account_id", "");
+    setExpensePayment("none");
+  }
+
+  function handleExpensePaymentChange(source: ExpensePaymentSource) {
+    setExpensePayment(source);
+    if (source === "none") {
+      setValue("wealth_account_id", "");
+      setValue("card_account_id", "");
+    } else if (source === "wealth") {
+      setValue("card_account_id", "");
+      if (!watchedAccountId) {
+        setValue("wealth_account_id", defaultWealthAccountId(selectedCategory, wealthAccounts));
+      }
+    } else {
+      setValue("wealth_account_id", "");
+      if (!watchedCardId && creditCards[0]) {
+        setValue("card_account_id", creditCards[0].id);
+      }
+    }
   }
 
   return (
@@ -157,7 +207,10 @@ function AddBudgetEntryDrawerContent({
           <div>
             <h2 className="text-foreground font-heading text-base font-semibold">Add entry</h2>
             <p className="text-muted-foreground text-xs">
-              {currency} · updates budget{watchedAccountId ? " and linked account" : ""}
+              {currency}
+              {syncsAccount || syncsCard
+                ? ` · updates budget${syncsAccount ? ", account" : ""}${syncsCard ? ", card" : ""}`
+                : " · budget only"}
             </p>
           </div>
           <button type="button" onClick={onClose} className="text-muted-foreground shrink-0 p-1">
@@ -169,11 +222,12 @@ function AddBudgetEntryDrawerContent({
           onSubmit={handleSubmit((data) => {
             const category = categories.find((c) => c.id === data.category_id);
             if (!category) return;
-            const { wealth_account_id: accountId, ...rest } = data;
+            const { wealth_account_id: accountId, card_account_id: cardId, ...rest } = data;
             onSubmit({
               ...rest,
               category,
               wealth_account_id: accountId?.trim() || null,
+              card_account_id: cardId?.trim() || null,
             });
           })}
           className="flex min-h-0 flex-1 flex-col"
@@ -235,61 +289,181 @@ function AddBudgetEntryDrawerContent({
               {errors.amount && <p className="text-xs text-rose-400">{errors.amount.message}</p>}
             </div>
 
-            <div className="border-border/60 space-y-2 rounded-xl border p-3">
-              <label className="text-foreground text-xs font-medium">
-                {entryType ? wealthAccountFieldLabel(entryType) : "Wealth account"}
-                <span className="text-muted-foreground font-normal"> · optional</span>
-              </label>
+            {exclusivePayment ? (
+              <div className="border-border/60 space-y-3 rounded-xl border p-3">
+                <label className="text-foreground text-xs font-medium">
+                  How did you pay?
+                  <span className="text-muted-foreground font-normal"> · optional</span>
+                </label>
+                <div className="flex flex-col gap-2">
+                  {(
+                    [
+                      { value: "none", label: "Budget only — don't sync balances" },
+                      { value: "wealth", label: "Bank / cash account" },
+                      { value: "card", label: "Credit card" },
+                    ] as const
+                  ).map(({ value, label }) => (
+                    <label
+                      key={value}
+                      className={cn(
+                        "border-border/60 flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-xs",
+                        expensePayment === value && "border-primary/40 bg-primary/5"
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="expense_payment"
+                        checked={expensePayment === value}
+                        onChange={() => handleExpensePaymentChange(value)}
+                        className="accent-primary"
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
 
-              {wealthAccounts.length === 0 ? (
-                <p className="text-muted-foreground text-xs leading-relaxed">
-                  No {currency} wealth accounts yet. Add one under Wealth accounts to sync balances
-                  when you log entries.
-                </p>
-              ) : (
-                <>
-                  <select {...register("wealth_account_id")} className={inputClass}>
-                    <option value="">Budget only — don&apos;t update an account</option>
-                    {wealthAccounts.map((account) => (
-                      <option key={account.id} value={account.id}>
-                        {account.name}
-                        {account.institution ? ` · ${account.institution}` : ""} (
-                        {WEALTH_ACCOUNT_KIND_LABELS[account.account_kind]})
-                      </option>
-                    ))}
-                  </select>
-                  {selectedAccount && entryType && (
-                    <p className="text-muted-foreground text-[10px] leading-relaxed">
-                      {entryType === "income" && (
-                        <>
-                          Adds {formatCurrency(Number(watchedAmount) || 0, currency)} to{" "}
-                          {selectedAccount.name}.
-                        </>
-                      )}
-                      {entryType === "expense" && (
-                        <>
-                          Deducts {formatCurrency(Number(watchedAmount) || 0, currency)} from{" "}
-                          {selectedAccount.name}.
-                        </>
-                      )}
-                      {entryType === "allocation" && (
-                        <>
-                          Records a contribution of{" "}
-                          {formatCurrency(Number(watchedAmount) || 0, currency)} to{" "}
-                          {selectedAccount.name}.
-                        </>
-                      )}
-                      {entryType === "transfer" && (
-                        <>
-                          Deducts {formatCurrency(Number(watchedAmount) || 0, currency)} from{" "}
-                          {selectedAccount.name} for this transfer.
-                        </>
-                      )}
+                {expensePayment === "wealth" && (
+                  <>
+                    {wealthAccounts.length === 0 ? (
+                      <p className="text-muted-foreground text-xs leading-relaxed">
+                        No {currency} wealth accounts yet. Add one under Wealth accounts first.
+                      </p>
+                    ) : (
+                      <select {...register("wealth_account_id")} className={inputClass}>
+                        {wealthAccounts.map((account) => (
+                          <option key={account.id} value={account.id}>
+                            {account.name}
+                            {account.institution ? ` · ${account.institution}` : ""} (
+                            {WEALTH_ACCOUNT_KIND_LABELS[account.account_kind]})
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    {selectedAccount && (
+                      <p className="text-muted-foreground text-[10px] leading-relaxed">
+                        Deducts {formatCurrency(Number(watchedAmount) || 0, currency)} from{" "}
+                        {selectedAccount.name}.
+                      </p>
+                    )}
+                  </>
+                )}
+
+                {expensePayment === "card" && (
+                  <>
+                    {creditCards.length === 0 ? (
+                      <p className="text-muted-foreground text-xs leading-relaxed">
+                        No {currency} credit cards yet. Add one on the Cards page first.
+                      </p>
+                    ) : (
+                      <select {...register("card_account_id")} className={inputClass}>
+                        {creditCards.map((card) => (
+                          <option key={card.id} value={card.id}>
+                            {card.name}
+                            {card.issuer ? ` · ${card.issuer}` : ""}
+                            {card.last_four ? ` ···${card.last_four}` : ""}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    {selectedCard && (
+                      <p className="text-muted-foreground text-[10px] leading-relaxed">
+                        Adds {formatCurrency(Number(watchedAmount) || 0, currency)} to{" "}
+                        {selectedCard.name} balance owed.
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+            ) : (
+              <>
+                <div className="border-border/60 space-y-2 rounded-xl border p-3">
+                  <label className="text-foreground text-xs font-medium">
+                    {entryType ? wealthAccountFieldLabel(entryType) : "Wealth account"}
+                    <span className="text-muted-foreground font-normal"> · optional</span>
+                  </label>
+
+                  {wealthAccounts.length === 0 ? (
+                    <p className="text-muted-foreground text-xs leading-relaxed">
+                      No {currency} wealth accounts yet. Add one under Wealth accounts to sync
+                      balances when you log entries.
                     </p>
+                  ) : (
+                    <>
+                      <select {...register("wealth_account_id")} className={inputClass}>
+                        <option value="">Budget only — don&apos;t update an account</option>
+                        {wealthAccounts.map((account) => (
+                          <option key={account.id} value={account.id}>
+                            {account.name}
+                            {account.institution ? ` · ${account.institution}` : ""} (
+                            {WEALTH_ACCOUNT_KIND_LABELS[account.account_kind]})
+                          </option>
+                        ))}
+                      </select>
+                      {selectedAccount && entryType && (
+                        <p className="text-muted-foreground text-[10px] leading-relaxed">
+                          {entryType === "income" && (
+                            <>
+                              Adds {formatCurrency(Number(watchedAmount) || 0, currency)} to{" "}
+                              {selectedAccount.name}.
+                            </>
+                          )}
+                          {entryType === "allocation" && (
+                            <>
+                              Records a contribution of{" "}
+                              {formatCurrency(Number(watchedAmount) || 0, currency)} to{" "}
+                              {selectedAccount.name}.
+                            </>
+                          )}
+                          {entryType === "transfer" && (
+                            <>
+                              Deducts {formatCurrency(Number(watchedAmount) || 0, currency)} from{" "}
+                              {selectedAccount.name} for this payment.
+                            </>
+                          )}
+                        </p>
+                      )}
+                    </>
                   )}
-                </>
-              )}
-            </div>
+                </div>
+
+                {showCardSection && (
+                  <div className="border-border/60 space-y-2 rounded-xl border p-3">
+                    <label className="text-foreground flex items-center gap-1.5 text-xs font-medium">
+                      <CreditCard className="h-3.5 w-3.5" />
+                      {entryType ? cardAccountFieldLabel(entryType) : "Card"}
+                      <span className="text-muted-foreground font-normal"> · optional</span>
+                    </label>
+
+                    {creditCards.length === 0 ? (
+                      <p className="text-muted-foreground text-xs leading-relaxed">
+                        No {currency} credit cards yet. Add one on the Cards page to pay down
+                        balances from transfers.
+                      </p>
+                    ) : (
+                      <>
+                        <select {...register("card_account_id")} className={inputClass}>
+                          <option value="">Don&apos;t update a card</option>
+                          {creditCards.map((card) => (
+                            <option key={card.id} value={card.id}>
+                              {card.name}
+                              {card.issuer ? ` · ${card.issuer}` : ""}
+                              {card.last_four ? ` ···${card.last_four}` : ""} (
+                              {CARD_KIND_LABELS[card.card_kind]})
+                            </option>
+                          ))}
+                        </select>
+                        {selectedCard && entryType === "transfer" && (
+                          <p className="text-muted-foreground text-[10px] leading-relaxed">
+                            Reduces {formatCurrency(Number(watchedAmount) || 0, currency)} owed on{" "}
+                            {selectedCard.name}.
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
 
             <div className="flex flex-col gap-1.5">
               <label className="text-foreground text-xs font-medium">Date</label>

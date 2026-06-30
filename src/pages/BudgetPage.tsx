@@ -17,6 +17,7 @@ import { useBudgetCurrencies, useBudgetCurrencyMutations } from "@/hooks/useBudg
 import { useBudgetCategories, useBudgetSetup, useWealthAccounts } from "@/hooks/useBudgetSetup";
 import { useBudgetEntries, useBudgetTargets } from "@/hooks/useBudgetData";
 import { useBudgetMutations } from "@/hooks/useBudgetMutations";
+import { useCardAccounts } from "@/hooks/useCardAccounts";
 import { useCategoryMutations } from "@/hooks/useCategoryMutations";
 import {
   dismissWealthOnboarding,
@@ -120,6 +121,7 @@ export default function BudgetPage() {
 
   const { data: categories = [] } = useBudgetCategories(resolvedCurrency, setupReady);
   const { data: wealthAccounts = [] } = useWealthAccounts(resolvedCurrency, setupReady);
+  const { data: cardAccounts = [] } = useCardAccounts(resolvedCurrency, setupReady);
   const { data: onboardingStatus } = useWealthOnboardingStatus(
     profile?.id,
     resolvedCurrency,
@@ -365,6 +367,7 @@ export default function BudgetPage() {
         onClose={() => setAddOpen(false)}
         categories={categories}
         wealthAccounts={wealthAccounts}
+        cardAccounts={cardAccounts}
         currency={resolvedCurrency}
         isPending={addEntry.isPending}
         onSubmit={(data) => {
@@ -378,6 +381,7 @@ export default function BudgetPage() {
               entryDate: data.entry_date,
               description: data.description,
               wealthAccountId: data.wealth_account_id,
+              cardAccountId: data.card_account_id,
             },
             { onSuccess: () => setAddOpen(false) }
           );

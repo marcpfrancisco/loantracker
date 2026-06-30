@@ -71,7 +71,7 @@ export function WealthAccountsPanel({
         <div className="border-border/60 rounded-lg border border-dashed py-8 text-center">
           <p className="text-muted-foreground text-sm">No accounts yet for {currency}</p>
           <p className="text-muted-foreground mt-1 text-xs">
-            e.g. Mashreq Neo Savings, Maribank, GCash, Maya, MP2
+            e.g. Mashreq Neo Savings, Cash on hand, GCash, MP2
           </p>
           {onAddAccount && (
             <button

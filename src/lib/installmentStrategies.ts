@@ -174,6 +174,28 @@ function computeLazCredit(params: InstallmentParams): InstallmentBreakdown {
 }
 
 /**
+ * CashNow Standard Loan
+ *
+ * Formula:  total = principal + (principal × monthly_rate × term)
+ * Reason:   CashNow quotes a fixed monthly rate on reducing balance; total interest
+ *           is then split into equal EMIs. Enter the rate shown in the CashNow app.
+ *           Processing fee (service_fee) is deducted from disbursement — not amortized.
+ *
+ * Example (AED 5,400 / 6 months / ~3.83% from app):
+ *   totalInterest = 5,400 × 0.0383 × 6 = 1,241.88 → 1,242.00
+ *   total         = 6,642.00
+ *   EMI           → 1,107.00 × 6
+ *   processing fee AED 250 deducted → receive AED 5,150
+ */
+function computeCashnow(params: InstallmentParams): InstallmentBreakdown {
+  const { principal, interest_rate, installments_total } = params;
+  const totalInterest =
+    interest_rate !== null ? principal * (interest_rate / 100) * installments_total : 0;
+  const total = Math.round((principal + totalInterest) * 100) / 100;
+  return { total, feeExcludedFromTotal: true, ...splitEvenly(total, installments_total) };
+}
+
+/**
  * Tabby Pay Later
  *
  * Formula:  total = principal (0% interest, no fees)
@@ -224,6 +246,7 @@ const INSTALLMENT_STRATEGIES: Partial<Record<LoanType, InstallmentStrategy>> = {
   gloan: computeGLoan,
   lazcredit: computeLazCredit,
   tabby: computeTabby,
+  cashnow: computeCashnow,
 };
 
 // ── Dispatcher ────────────────────────────────────────────────────────────────

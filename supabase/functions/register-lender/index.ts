@@ -24,6 +24,7 @@ const CREDIT_SOURCE_SEEDS = [
   { name: "BPI", type: "credit_card", region: "PH" },
   { name: "Metrobank", type: "credit_card", region: "PH" },
   // UAE
+  { name: "CashNow", type: "e_wallet", region: "AE" },
   { name: "Tabby", type: "bnpl", region: "AE" },
   { name: "Emirates NBD", type: "credit_card", region: "AE" },
   { name: "Mashreq", type: "credit_card", region: "AE" },

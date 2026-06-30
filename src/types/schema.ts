@@ -176,6 +176,44 @@ export const CREDIT_SOURCE_CONFIGS: CreditSourceConfig[] = [
   // ── UAE ─────────────────────────────────────────────────────────────────────
 
   {
+    /**
+     * CashNow — UAE instant personal microloan (Quantix Technology Projects LLC).
+     *
+     * Standard Loan (per KFS): AED 300–8,000, 14 days–6 months, equal fixed EMIs on
+     * reducing balance (interest portion decreases each month). Processing fee is
+     * deducted from disbursement — not rolled into installments.
+     *
+     * Processing fees (Standard): 14d AED 25 · 28d AED 50 · 2mo AED 100 · 3mo AED 150 · 6mo AED 250
+     * Interest: 0–12%/mo (incl. VAT) on reducing balance — varies by amount, tenure, credit history.
+     * Due date: same calendar day each month as disbursement (first payment next month).
+     *
+     * Example (AED 5,400 / 6 months): processing fee AED 250 → receive AED 5,150;
+     * EMI AED 1,107 × 6 (total interest AED 1,242 on reducing balance).
+     */
+    name: "CashNow",
+    type: "e_wallet",
+    region: "AE",
+    loan_types: [
+      {
+        loan_type: "cashnow",
+        label: "CashNow",
+        installments_total: 6,
+        available_durations: [2, 3, 6],
+        interest_rate: null,
+        service_fee: 0,
+        due_day_of_month: null,
+        stamp_tax_tiers: [
+          { months: 2, amount: 100 },
+          { months: 3, amount: 150 },
+          { months: 6, amount: 250 },
+        ],
+        feeDisplayMode: { kind: "upfront_deduction", label: "Processing Fee" },
+        first_due_strategy: "always_next_month",
+      },
+    ],
+  },
+
+  {
     name: "Tabby",
     type: "bnpl",
     region: "AE",

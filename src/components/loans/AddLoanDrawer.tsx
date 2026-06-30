@@ -32,6 +32,7 @@ const addLoanSchema = z.object({
     "custom",
     "lazcredit",
     "maribank_credit",
+    "cashnow",
   ]),
   principal: z.coerce.number({ message: "Enter a valid amount" }).positive("Must be positive"),
   interest_rate: z.preprocess(

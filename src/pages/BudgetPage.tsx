@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, Plus, Settings2, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -18,9 +19,18 @@ import { useBudgetCategories, useBudgetSetup, useWealthAccounts } from "@/hooks/
 import { useBudgetEntries, useBudgetTargets } from "@/hooks/useBudgetData";
 import { useBudgetMutations } from "@/hooks/useBudgetMutations";
 import { useCategoryMutations } from "@/hooks/useCategoryMutations";
+import {
+  dismissWealthOnboarding,
+  useWealthMutations,
+  useWealthOnboardingStatus,
+} from "@/hooks/useWealthMutations";
 import { ManageCategoriesDrawer } from "@/components/budget/ManageCategoriesDrawer";
 import { BudgetGroupSection } from "@/components/budget/BudgetGroupSection";
 import { WealthAccountsPanel } from "@/components/budget/WealthAccountsPanel";
+import {
+  WealthOnboardingBanner,
+  WealthOpeningBalanceDrawer,
+} from "@/components/budget/WealthOpeningBalanceDrawer";
 import { BudgetEntryList } from "@/components/budget/BudgetEntryList";
 import { AddBudgetEntryDrawer, EditBudgetTargetDrawer } from "@/components/budget/BudgetDrawers";
 import { RefreshButton } from "@/components/ui/refresh-button";
@@ -58,6 +68,7 @@ function SummaryCard({
 
 export default function BudgetPage() {
   const { profile } = useAuth();
+  const queryClient = useQueryClient();
   const defaultCurrency = (
     profile?.region ? getDefaultCurrency(profile.region) : "AED"
   ) as CurrencyType;
@@ -70,6 +81,8 @@ export default function BudgetPage() {
   const [monthKey, setMonthKey] = useState(currentMonthStr());
   const [addOpen, setAddOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
+  const [wealthBalanceOpen, setWealthBalanceOpen] = useState(false);
+  const [wealthFocusAccountId, setWealthFocusAccountId] = useState<string | null>(null);
   const [targetEdit, setTargetEdit] = useState<{ id: string; name: string; target: number } | null>(
     null
   );
@@ -87,6 +100,7 @@ export default function BudgetPage() {
 
   const { data: categories = [] } = useBudgetCategories(currency, setupReady);
   const { data: wealthAccounts = [] } = useWealthAccounts(currency, setupReady);
+  const { data: onboardingStatus } = useWealthOnboardingStatus(profile?.id, currency, setupReady);
   const { data: targets = [] } = useBudgetTargets(periodId);
   const { data: entries = [] } = useBudgetEntries(periodId);
 
@@ -95,6 +109,21 @@ export default function BudgetPage() {
     currency,
     profile?.id
   );
+  const { setOpeningBalance, setOpeningBalancesBatch } = useWealthMutations(currency, profile?.id);
+
+  function openWealthBalances(accountId: string | null) {
+    setWealthFocusAccountId(accountId);
+    setWealthBalanceOpen(true);
+  }
+
+  function handleDismissWealthOnboarding() {
+    if (profile?.id) {
+      dismissWealthOnboarding(profile.id, currency);
+      void queryClient.invalidateQueries({
+        queryKey: ["budget", "wealth-onboarding", profile.id, currency],
+      });
+    }
+  }
 
   const activeGroups = useMemo(() => getActiveGroupOrder(categories), [categories]);
 
@@ -180,7 +209,7 @@ export default function BudgetPage() {
           <p className="font-medium">Could not load budget</p>
           <p className="mt-1 text-xs opacity-90">
             {(periodError as Error).message.includes("budget_periods")
-              ? "Run migration 013_personal_budget.sql in Supabase, then refresh."
+              ? "Run migration 015_personal_budget.sql in Supabase, then refresh."
               : (periodError as Error).message}
           </p>
         </div>
@@ -234,7 +263,20 @@ export default function BudgetPage() {
             />
           </motion.div>
 
-          <WealthAccountsPanel accounts={wealthAccounts} currency={currency} />
+          {onboardingStatus?.needsOnboarding && wealthAccounts.length > 0 && (
+            <WealthOnboardingBanner
+              currency={currency}
+              accountCount={wealthAccounts.length}
+              onSetBalances={() => openWealthBalances(null)}
+              onDismiss={handleDismissWealthOnboarding}
+            />
+          )}
+
+          <WealthAccountsPanel
+            accounts={wealthAccounts}
+            currency={currency}
+            onEditBalance={(accountId) => openWealthBalances(accountId)}
+          />
 
           <div className="space-y-3">
             {activeGroups.map((groupKey) => (
@@ -331,6 +373,25 @@ export default function BudgetPage() {
           })
         }
         onDelete={(categoryId) => deleteCategory.mutate(categoryId)}
+      />
+
+      <WealthOpeningBalanceDrawer
+        open={wealthBalanceOpen}
+        onClose={() => {
+          setWealthBalanceOpen(false);
+          setWealthFocusAccountId(null);
+        }}
+        accounts={wealthAccounts}
+        currency={currency}
+        focusAccountId={wealthFocusAccountId}
+        isPending={setOpeningBalance.isPending || setOpeningBalancesBatch.isPending}
+        onSubmit={async (inputs) => {
+          if (wealthFocusAccountId && inputs.length === 1) {
+            await setOpeningBalance.mutateAsync(inputs[0]!);
+          } else {
+            await setOpeningBalancesBatch.mutateAsync(inputs);
+          }
+        }}
       />
 
       <EditBudgetTargetDrawer

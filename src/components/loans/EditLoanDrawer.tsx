@@ -8,6 +8,7 @@ import type { Resolver } from "react-hook-form";
 import { cn } from "@/lib/utils";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { roundInterestRatePercent, INTEREST_RATE_INPUT_STEP } from "@/lib/interestRate";
 import { useUpdateLoan } from "@/hooks/useUpdateLoan";
 import { getLoanTypeConfig, FALLBACK_LOAN_TYPE } from "@/types/schema";
 import { LoanBreakdownSummary } from "@/components/loans/LoanBreakdownSummary";
@@ -130,7 +131,7 @@ export function EditLoanDrawer({ open, onClose, loan }: EditLoanDrawerProps) {
     resolver: zodResolver(editLoanSchema) as Resolver<FormData>,
     defaultValues: {
       principal: loan.principal,
-      interest_rate: loan.interest_rate,
+      interest_rate: roundInterestRatePercent(loan.interest_rate),
       service_fee: loan.service_fee,
       installments_total: loan.installments_total,
       started_at: loan.started_at,
@@ -143,7 +144,7 @@ export function EditLoanDrawer({ open, onClose, loan }: EditLoanDrawerProps) {
     if (open) {
       reset({
         principal: loan.principal,
-        interest_rate: loan.interest_rate,
+        interest_rate: roundInterestRatePercent(loan.interest_rate),
         service_fee: loan.service_fee,
         installments_total: loan.installments_total,
         started_at: loan.started_at,
@@ -335,15 +336,15 @@ export function EditLoanDrawer({ open, onClose, loan }: EditLoanDrawerProps) {
                     <FieldWrapper
                       label="Interest Rate (%)"
                       error={errors.interest_rate?.message}
-                      hint="Monthly add-on rate"
+                      hint="Monthly add-on rate — up to 5 decimals for exact EMI"
                     >
                       <input
                         {...register("interest_rate")}
                         type="number"
-                        step="0.01"
+                        step={INTEREST_RATE_INPUT_STEP}
                         min="0"
                         max="100"
-                        placeholder="e.g. 2.95"
+                        placeholder="e.g. 2.95 or 3.83333"
                         className={inputClass}
                       />
                     </FieldWrapper>

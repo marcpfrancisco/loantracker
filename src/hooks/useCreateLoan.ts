@@ -1,5 +1,6 @@
 import { CREDIT_SOURCE_CONFIGS, type FirstDueStrategy } from "./../types/schema";
 import { buildInstallmentSchedule } from "@/lib/generateInstallments";
+import { roundInterestRatePercent } from "@/lib/interestRate";
 import type { TablesInsert } from "@/types/database";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -68,6 +69,7 @@ async function createLoan(payload: CreateLoanPayload): Promise<{ loanId: string 
   const resolvedPayload: CreateLoanPayload = {
     ...payload,
     first_due_strategy: loanConfig.first_due_strategy,
+    interest_rate: roundInterestRatePercent(payload.interest_rate),
   };
 
   const { data: loan, error: loanError } = await supabase

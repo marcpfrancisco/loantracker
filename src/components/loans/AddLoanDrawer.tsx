@@ -17,6 +17,7 @@ import { getLoanTypesForSource, getLoanTypeConfig, type FirstDueStrategy } from 
 import { LoanBreakdownSummary } from "@/components/loans/LoanBreakdownSummary";
 import type { LoanType, RegionType, CurrencyType } from "@/types/enums";
 import { getDefaultCurrency, getFlagEmoji, getCountryName } from "@/lib/countries";
+import { INTEREST_RATE_INPUT_STEP } from "@/lib/interestRate";
 
 // ── Schema ────────────────────────────────────────────────────────────────────
 
@@ -545,15 +546,15 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
                     <FieldWrapper
                       label="Interest Rate (%)"
                       error={errors.interest_rate?.message}
-                      hint="Monthly add-on rate"
+                      hint="Monthly add-on rate — up to 5 decimals for exact EMI (e.g. CashNow 3.83333)"
                     >
                       <input
                         {...register("interest_rate")}
                         type="number"
-                        step="0.01"
+                        step={INTEREST_RATE_INPUT_STEP}
                         min="0"
                         max="100"
-                        placeholder="e.g. 2.95"
+                        placeholder="e.g. 2.95 or 3.83333"
                         className={inputClass}
                       />
                     </FieldWrapper>

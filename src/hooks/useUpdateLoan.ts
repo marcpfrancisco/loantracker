@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { buildInstallmentSchedule } from "@/lib/generateInstallments";
+import { roundInterestRatePercent } from "@/lib/interestRate";
 import type { LoanType } from "@/types/enums";
 import type { FirstDueStrategy } from "@/types/schema";
 import type { InstallmentDetail } from "@/hooks/useLoanDetail";
@@ -23,6 +24,7 @@ export interface UpdateLoanPayload {
 async function updateLoan(payload: UpdateLoanPayload): Promise<void> {
   const paid = payload.installments.filter((i) => i.status === "paid");
   const paidCount = paid.length;
+  const interestRate = roundInterestRatePercent(payload.interest_rate);
 
   if (payload.installments_total < paidCount) {
     throw new Error(
@@ -34,7 +36,7 @@ async function updateLoan(payload: UpdateLoanPayload): Promise<void> {
     .from("loans")
     .update({
       principal: payload.principal,
-      interest_rate: payload.interest_rate,
+      interest_rate: interestRate,
       service_fee: payload.service_fee,
       due_day_of_month: payload.due_day_of_month,
       notes: payload.notes,
@@ -48,7 +50,7 @@ async function updateLoan(payload: UpdateLoanPayload): Promise<void> {
   const schedule = buildInstallmentSchedule({
     loan_type: payload.loan_type,
     principal: payload.principal,
-    interest_rate: payload.interest_rate,
+    interest_rate: interestRate,
     service_fee: payload.service_fee,
     installments_total: payload.installments_total,
     started_at: payload.started_at,

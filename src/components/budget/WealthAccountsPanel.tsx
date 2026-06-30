@@ -18,8 +18,8 @@ export function WealthAccountsPanel({
   onEditBalance,
   onEditAccount,
 }: WealthAccountsPanelProps) {
-  const totalCash = accounts.reduce((s, a) => s + Number(a.cash_balance), 0);
-  const totalMarket = accounts.reduce((s, a) => s + Number(a.market_value ?? a.cash_balance), 0);
+  const totalBooked = accounts.reduce((s, a) => s + Number(a.cash_balance), 0);
+  const totalAssets = accounts.reduce((s, a) => s + Number(a.market_value ?? a.cash_balance), 0);
   const allZero =
     accounts.length > 0 &&
     accounts.every((a) => Number(a.cash_balance) === 0 && a.market_value == null);
@@ -36,9 +36,12 @@ export function WealthAccountsPanel({
               <span className="text-amber-500/90">Balances not set yet</span>
             ) : (
               <>
-                Cash {formatCurrency(totalCash, currency)}
-                {totalMarket !== totalCash && (
-                  <span> · Total {formatCurrency(totalMarket, currency)}</span>
+                Total assets {formatCurrency(totalAssets, currency)}
+                {totalAssets !== totalBooked && (
+                  <span className="text-muted-foreground/80">
+                    {" "}
+                    · Book value {formatCurrency(totalBooked, currency)}
+                  </span>
                 )}
               </>
             )}
@@ -71,7 +74,7 @@ export function WealthAccountsPanel({
         <div className="border-border/60 rounded-lg border border-dashed py-8 text-center">
           <p className="text-muted-foreground text-sm">No accounts yet for {currency}</p>
           <p className="text-muted-foreground mt-1 text-xs">
-            e.g. Mashreq Neo Savings, Cash on hand, GCash, MP2
+            e.g. Mashreq Neo Savings, Cash, GCash, MP2
           </p>
           {onAddAccount && (
             <button

@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
-import { inferEntryType } from "@/lib/budgetRules";
+import { inferEntryType, wealthTxnTypeForEntry } from "@/lib/budgetRules";
 import { budgetKeys } from "@/hooks/useBudgetSetup";
 import type { BudgetCategory, BudgetEntryType } from "@/types/budget";
 import type { CurrencyType } from "@/types/enums";
@@ -14,6 +14,7 @@ interface AddEntryParams {
   entryDate: string;
   description?: string;
   notes?: string;
+  wealthAccountId?: string | null;
 }
 
 interface UpsertTargetParams {
@@ -38,6 +39,7 @@ export function useBudgetMutations(currency: CurrencyType, periodId: string | un
   const addEntry = useMutation({
     mutationFn: async (params: AddEntryParams) => {
       const entryType: BudgetEntryType = inferEntryType(params.category);
+      const wealthAccountId = params.wealthAccountId ?? params.category.wealth_account_id ?? null;
 
       const { data: entry, error } = await supabase
         .from("budget_entries")
@@ -50,18 +52,19 @@ export function useBudgetMutations(currency: CurrencyType, periodId: string | un
           entry_date: params.entryDate,
           description: params.description?.trim() || null,
           notes: params.notes?.trim() || null,
-          wealth_account_id: entryType === "allocation" ? params.category.wealth_account_id : null,
+          wealth_account_id: wealthAccountId,
         })
         .select("id")
         .single();
 
       if (error) throw error;
 
-      if (entryType === "allocation" && params.category.wealth_account_id) {
+      const txnType = wealthTxnTypeForEntry(entryType);
+      if (wealthAccountId && txnType) {
         const { error: txnError } = await supabase.from("wealth_transactions").insert({
           user_id: params.userId,
-          account_id: params.category.wealth_account_id,
-          txn_type: "contribution",
+          account_id: wealthAccountId,
+          txn_type: txnType,
           amount: params.amount,
           txn_date: params.entryDate,
           notes: params.description?.trim() || null,

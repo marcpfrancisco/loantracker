@@ -93,6 +93,41 @@ export type Database = {
           },
         ]
       }
+      budget_currencies: {
+        Row: {
+          created_at: string
+          currency: string
+          id: string
+          org_id: string
+          sort_order: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          currency: string
+          id?: string
+          org_id?: string
+          sort_order?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          id?: string
+          org_id?: string
+          sort_order?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_currencies_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       budget_entries: {
         Row: {
           amount: number

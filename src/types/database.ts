@@ -669,7 +669,8 @@ export type Database = {
         | "credit_card"
         | "custom"
         | "lazcredit"
-        | "maribank_credit";
+        | "maribank_credit"
+        | "cashnow";
       payment_status: "unpaid" | "pending" | "paid";
       proof_status: "pending" | "approved" | "rejected";
       user_role: "admin" | "borrower";
@@ -809,6 +810,7 @@ export const Constants = {
         "custom",
         "lazcredit",
         "maribank_credit",
+        "cashnow",
       ],
       payment_status: ["unpaid", "pending", "paid"],
       proof_status: ["pending", "approved", "rejected"],

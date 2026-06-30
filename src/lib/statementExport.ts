@@ -31,6 +31,7 @@ const STATUS_LABEL: Record<string, string> = {
 
 const LOAN_TYPE_LABEL: Record<string, string> = {
   maribank_credit: "Maribank Credit",
+  cashnow: "CashNow",
   sloan: "S-Loan",
   gloan: "G-Loan",
   spaylater: "SPayLater",

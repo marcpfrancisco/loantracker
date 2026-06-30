@@ -40,6 +40,7 @@ const loanTypeLabels: Record<LoanType, string> = {
   custom: "Custom",
   lazcredit: "LazCredit",
   maribank_credit: "Maribank Credit",
+  cashnow: "CashNow",
 };
 
 const sourceTypeLabels: Record<CreditSourceType, string> = {

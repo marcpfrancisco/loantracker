@@ -281,7 +281,6 @@ function EditCardDrawerContent({
   const [creditLimit, setCreditLimit] = useState(
     card.credit_limit != null ? String(card.credit_limit) : ""
   );
-  const [outstanding, setOutstanding] = useState(String(card.outstanding_balance));
   const [statementDay, setStatementDay] = useState(
     card.statement_day != null ? String(card.statement_day) : ""
   );
@@ -320,7 +319,6 @@ function EditCardDrawerContent({
                 cardKind === "credit" && creditLimit.trim() !== ""
                   ? Number(creditLimit) || 0
                   : null,
-              outstanding_balance: Number(outstanding) || 0,
               statement_day:
                 cardKind === "credit" && statementDay.trim() !== ""
                   ? Number(statementDay) || null
@@ -366,12 +364,10 @@ function EditCardDrawerContent({
               />
             </>
           )}
-          <Field
-            label={`Balance owed (${currency})`}
-            value={outstanding}
-            onChange={setOutstanding}
-            type="number"
-          />
+          <p className="text-muted-foreground text-xs leading-relaxed">
+            Balance is managed via transactions on the card detail page (or from Budget when
+            linked).
+          </p>
           <button
             type="submit"
             disabled={isPending || !name.trim()}

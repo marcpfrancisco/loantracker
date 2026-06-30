@@ -1,6 +1,6 @@
 # Global Loan Tracker — Progress & Roadmap
 
-> Last updated: 2026-04-08 (migrations 008–011 applied ✅)
+> Last updated: 2026-06-30 (migrations 015–022 applied ✅)
 
 ---
 
@@ -38,7 +38,7 @@
 - [x] Global loading bar (thin green line at top, synced with all React Query fetches via `useIsFetching()`)
 - [x] Scroll-to-top on every route navigation
 - [x] Per-page refresh buttons with spin animation (`RefreshButton`)
-- [x] Navigation items: Dashboard, Loans, Tabs, Admin, Profile
+- [x] Navigation items: Dashboard, **Finance** (hub), Loans, Tabs, Admin, Profile — mobile bottom nav uses Home / Finance / Loans / More sheet; desktop sidebar groups Finance → Budget, Cards, Tabs
 
 ### Dashboard
 - [x] Active loan cards with outstanding balance, progress bar, next due date
@@ -128,6 +128,74 @@
 - [x] Avatar upload (Supabase Storage) + DiceBear avatar selector
 - [x] Change password form
 - [x] Full Name update syncs to `organizations.name` (admin only)
+- [x] **Settings backup & restore** — export/import JSON for profile, budget/card currencies, org settings, and credit sources (admin); `dataBackup.ts`, `DataBackupSection.tsx`
+
+### Personal Finance Module (Budget + Wealth + Cards)
+User-scoped RLS — private to each authenticated user; not visible to admin or other org members.
+
+#### Phase 1 — Budget & Wealth ✅
+- [x] **Migration `015_personal_budget.sql`** — `budget_periods`, `budget_categories` (with `group_key`), `budget_targets`, `budget_entries`, `wealth_accounts`, `wealth_transactions` + balance sync trigger + user-scoped RLS
+- [x] **Migration `016_wealth_account_kinds.sql`** — expanded `account_kind` (salary, cash, e_wallet, etc.)
+- [x] **Migration `017_wealth_account_cash_kind.sql`** — cash-kind handling for wealth balances
+- [x] **`/budget` page** — grouped sections (Income, Essentials, Lifestyle, Savings, Investments, Transfers, Debt); summary cards; month navigation
+- [x] **Wealth accounts panel** — user adds own accounts (no forced default seed); total assets header
+- [x] **Category CRUD** — `ManageCategoriesDrawer`, `useCategoryMutations`
+- [x] **Add entry drawer** — grouped category picker; income / expense / allocation / transfer types
+- [x] **Wealth sync on entries** — deposits, withdrawals, contributions via `wealth_transactions` + trigger
+- [x] **Opening balance onboarding** — `WealthOpeningBalanceDrawer` + dismiss banner per currency
+- [x] **Month/year picker** — `BudgetMonthPicker`
+
+#### Phase 1b — Currency & Backup ✅
+- [x] **Migration `018_budget_currencies.sql`** — user-managed budget currency list (add/remove beyond PHP/AED defaults)
+- [x] **`ManageBudgetCurrenciesDrawer`** — CRUD on Budget page
+- [x] **Profile JSON backup/restore** — profile, budget currencies, card currencies, org name/country, credit sources (admin)
+
+#### Phase 2 — Card Accounts ✅
+- [x] **Migration `019_card_accounts.sql`** — `card_accounts` (credit/debit, limit, outstanding balance, statement day)
+- [x] **Migration `020_card_currencies.sql`** — user-managed card currency list
+- [x] **`/cards` page** — CRUD, balance updates, utilization bar; `CardDrawers`, `CardAccountsPanel`
+- [x] **`ManageCardCurrenciesDrawer`** — independent from budget currencies
+- [x] **`/finance` hub** — links Budget, Cards, Tabs (`FinanceHubPage`)
+- [x] Card currencies included in settings backup export/restore
+
+#### Phase 2b — Budget ↔ Card Link ✅
+- [x] **Migration `021_budget_entry_card_link.sql`** — `card_account_id` FK on `budget_entries`
+- [x] **Expense + credit card** — one entry updates budget category **and** increases card `outstanding_balance` (e.g. AED 29.38 subscription)
+- [x] **Transfer + card** — optional pay-from wealth + pay-down card (statement payment flow)
+- [x] **Delete entry** — reverses wealth transaction and card balance delta
+- [x] **Add entry UI** — “Budget only | Bank/cash | Credit card” for expenses; card name shown in entry list
+
+#### Phase 2c — Card Statements & Transactions ✅
+- [x] **Migration `022_card_statements_transactions.sql`** — `card_statements`, `card_transactions` + balance sync trigger
+- [x] **Ledger-backed balances** — `outstanding_balance` synced from transaction insert/delete (charge/fee +, payment/refund −)
+- [x] **Budget ↔ ledger** — budget card entries insert `card_transactions`; delete reverses via ledger
+- [x] **`/cards/:id` detail page** — balance summary, transaction history, add charge/payment, set balance manually
+- [x] **Statements panel** — add statement cycles, mark paid (creates payment txn)
+- [x] **Cards list** — tap card to open detail; balance no longer edited directly on edit form
+
+#### Phase 3 — Loan-on-Card ⬜ Next
+- [ ] Optional `card_transaction_id` (or `budget_entry_id`) on `loans`
+- [ ] “Convert to installment plan” from a card charge → `AddLoanDrawer`
+- [ ] Loan detail ↔ card purchase link
+- [ ] Wire `billing_cycle_based` due dates in `generateInstallments.ts`
+
+#### Phase 4 — Investment Value Tracking ⬜
+- [ ] Manual **market value** updates for UITF / REIT / Bond / Stocks accounts
+- [ ] Dividend / interest ledger entries on wealth accounts
+- [ ] Gain/loss vs contributions in wealth panel
+- [ ] **Wealth transaction history** — per-account ledger view (audit trail)
+
+#### Phase 5 — Cross-Border Intelligence ⬜ Optional
+- [ ] Manual FX rate table + `Money` conversion utility
+- [ ] Remittance planner (“PH card due ₱X → ~AED Y”)
+- [ ] Unified net-worth snapshot (informational, per-currency + FX equivalent)
+- [ ] Dashboard widget: budget health + wealth + card due dates
+
+#### Phase 1 polish (remaining) ⬜
+- [ ] **Budget period close** — mark month `closed` so totals lock
+- [ ] Smoother allocation → wealth account picker UX on add entry
+- [ ] `get_budget_summary` RPC (currently computed client-side in `budgetRules.ts`)
+
 
 ### UI / Design System
 - [x] `CountryPicker` — searchable popover, any ISO country, flag + name + currency
@@ -161,20 +229,46 @@
 - Billing enforcement (free plan borrower/loan caps) is not yet wired up in the frontend or enforced via RLS.
 - No push notifications for due date reminders (Web Push Phase 2 not yet implemented).
 - No FX conversion utility — multi-currency totals are always kept separate per currency.
+- **Personal finance:** card balances are ledger-backed via `card_transactions`; opening balances on new cards create an opening charge row.
+- **Personal finance:** budget summary is client-computed; no server-side `get_budget_summary` RPC yet.
+- **Personal finance:** settings backup covers profile/settings/credit sources — not full budget entries, wealth ledger, or card history (by design for now).
+
+---
+
+## Personal Finance — Phase Checklist
+
+Quick reference for what’s done vs what’s next:
+
+| Phase | Scope | Status |
+|-------|--------|--------|
+| **1** | Budget + wealth accounts, grouped categories, entries/targets | ✅ Done |
+| **1b** | Budget currency CRUD, profile JSON backup/restore | ✅ Done |
+| **2** | Card accounts page, card currency CRUD, Finance hub + nav | ✅ Done |
+| **2b** | Budget entry ↔ card link (pay with card, pay down card) | ✅ Done |
+| **2c** | Card statements + transaction ledger + card detail page | ✅ Done |
+| **3** | Loan-on-card (purchase → installment plan) | ⬜ **Next** |
+| **4** | Investment market value, dividends, wealth ledger UI | ⬜ Planned |
+| **5** | FX rates, remittance planner, net-worth snapshot | ⬜ Optional |
+
+**Recommended next step:** **Phase 3** — link a card charge or budget entry to the Loans engine (“convert to installment plan”). Phase 2c is complete: every balance change is ledger-backed and auditable on `/cards/:id`.
 
 ---
 
 ## Roadmap
 
-### Next Up — High Value, Low Effort
+### Next Up — Personal Finance
 
-#### Wire Credit Source Defaults into Add Loan Form
-The `default_interest_rate`, `default_installments`, and `default_due_day` columns are now stored on `credit_sources` but not yet applied. When a lender selects a credit source in `AddLoanDrawer`, these values should pre-fill the form fields — overriding the static `schema.ts` template defaults for sources that the lender has customised.
+1. **Phase 3 — Loan-on-card** — link card purchases to existing Loans engine
+2. **Phase 1 polish** — budget period close, wealth transaction history per account
+3. **Phase 4 — Investment tracking** — manual market value + dividend ledger
 
-Implementation: in the `useEffect` that watches `watchedSourceId`, check `selectedSource.default_*` fields and `setValue` before the schema config defaults kick in.
+### Next Up — Core App (Loans / Admin)
+
+#### ~~Wire Credit Source Defaults into Add Loan Form~~ ✅ Done
+Defaults from `credit_sources` and `credit_source_loan_type_defaults` pre-fill `AddLoanDrawer`.
 
 #### ~~Loan Editing~~ ✅ Done
-~~Allow the admin to edit a loan's principal, interest rate, notes, and due day after creation without deleting and re-creating. Key constraint: installment amounts may need to be recomputed.~~
+Admin can edit loan principal, rates, due day; unpaid installments recomputed.
 
 ### High Priority
 
@@ -218,6 +312,15 @@ src/
 │   │   ├── InviteBorrowerDrawer.tsx  # Invite borrower — CountryPicker for region
 │   │   ├── LoanStatementDrawer.tsx   # PDF/CSV export — dynamic multi-currency summary
 │   │   └── StatCard.tsx              # Dashboard stat card
+│   ├── budget/
+│   │   ├── BudgetDrawers.tsx         # Add entry — budget / wealth / card payment modes
+│   │   ├── ManageBudgetCurrenciesDrawer.tsx
+│   │   └── WealthOpeningBalanceDrawer.tsx
+│   ├── cards/
+│   │   ├── CardAccountsPanel.tsx
+│   │   └── CardDrawers.tsx
+│   ├── settings/
+│   │   └── DataBackupSection.tsx     # Profile JSON export/restore
 │   ├── dashboard/
 │   │   ├── LoanCard.tsx              # Active loan card (borrower flat view)
 │   │   └── UpcomingPayments.tsx      # Next 30-day payments
@@ -245,6 +348,15 @@ src/
 │   ├── useAdminBorrowers.ts
 │   ├── useAdminStats.ts              # Dynamic Record<region, stat> + Record<currency, amount>
 │   ├── useAuth.ts                    # activeOrgId, activeRole, switchOrg
+│   ├── useBudgetCurrencies.ts
+│   ├── useBudgetData.ts
+│   ├── useBudgetMutations.ts         # Entries + card balance sync (Phase 2b)
+│   ├── useBudgetSetup.ts
+│   ├── useCardAccounts.ts
+│   ├── useCardCurrencies.ts
+│   ├── useCardMutations.ts
+│   ├── useCategoryMutations.ts
+│   ├── useWealthMutations.ts
 │   ├── useBorrowerDetail.ts
 │   ├── useBorrowerStatement.ts       # summary: Record<string, CurrencySummary>
 │   ├── useCreditSourceMutations.ts   # create/update include default_* fields
@@ -263,6 +375,9 @@ src/
 │   ├── useUpdateProfile.ts           # Syncs full_name → organizations.name for admins
 │   └── useUpcomingInstallments.ts
 ├── lib/
+│   ├── budgetRules.ts
+│   ├── budgetSeed.ts
+│   ├── dataBackup.ts
 │   ├── countries.ts                  # getFlagEmoji, getCountryName, getDefaultCurrency, getCountryOptions
 │   ├── installmentStrategies.ts      # computeMaribank / SLoan / GLoan / LazCredit / Tabby
 │   ├── loaders.ts                    # requireAuth, requireAdmin (uses is_admin RPC)
@@ -270,6 +385,10 @@ src/
 │   └── supabase.ts
 ├── pages/
 │   ├── AdminPage.tsx                 # Active loans grouped by borrower
+│   ├── BudgetPage.tsx                # /budget — grouped monthly budget + wealth
+│   ├── CardsPage.tsx                 # /cards — credit/debit accounts
+│   ├── CardDetailPage.tsx            # /cards/:id — ledger, statements
+│   ├── FinanceHubPage.tsx            # /finance — Budget, Cards, Tabs hub
 │   ├── BorrowerDetailPage.tsx
 │   ├── DashboardPage.tsx
 │   ├── ExpenseTabDetailPage.tsx
@@ -284,6 +403,9 @@ src/
 │   └── SignupPage.tsx
 ├── types/
 │   ├── database.ts                   # Auto-generated (run npm run gen:types after migrations)
+│   ├── budget.ts
+│   ├── cards.ts
+│   ├── dataBackup.ts
 │   ├── enums.ts                      # Hand-maintained aliases; RegionType/CurrencyType = string
 │   └── schema.ts                     # CREDIT_SOURCE_CONFIGS — single source of truth for loan types + defaults
 └── router.tsx
@@ -308,7 +430,18 @@ supabase/
 │   ├── 008_fix_profiles_rls.sql      # my_profile_role() SECURITY DEFINER; fixed recursion
 │   ├── 009_owner_plan.sql            # owner plan tier + set owner account
 │   ├── 010_flexible_regions.sql      # region/currency enums → text; UAE → AE
-│   └── 011_credit_source_defaults.sql # default_interest_rate / _installments / _due_day on credit_sources
+│   ├── 011_credit_source_defaults.sql
+│   ├── 012_credit_source_loan_type_defaults.sql
+│   ├── 013_cashnow_loan_type.sql
+│   ├── 014_interest_rate_precision.sql
+│   ├── 015_personal_budget.sql       # Budget + wealth (Phase 1)
+│   ├── 016_wealth_account_kinds.sql
+│   ├── 017_wealth_account_cash_kind.sql
+│   ├── 018_budget_currencies.sql     # Phase 1b
+│   ├── 019_card_accounts.sql         # Phase 2
+│   ├── 020_card_currencies.sql
+│   └── 021_budget_entry_card_link.sql # Phase 2b
+│   └── 022_card_statements_transactions.sql # Phase 2c
 └── email-templates/
     ├── invite-user.html
     └── reset-password.html

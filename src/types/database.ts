@@ -401,6 +401,156 @@ export type Database = {
           },
         ]
       }
+      card_statements: {
+        Row: {
+          card_account_id: string
+          created_at: string
+          id: string
+          min_payment: number | null
+          notes: string | null
+          org_id: string
+          payment_due_date: string | null
+          period_end: string
+          period_start: string
+          statement_balance: number
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          card_account_id: string
+          created_at?: string
+          id?: string
+          min_payment?: number | null
+          notes?: string | null
+          org_id?: string
+          payment_due_date?: string | null
+          period_end: string
+          period_start: string
+          statement_balance?: number
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          card_account_id?: string
+          created_at?: string
+          id?: string
+          min_payment?: number | null
+          notes?: string | null
+          org_id?: string
+          payment_due_date?: string | null
+          period_end?: string
+          period_start?: string
+          statement_balance?: number
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_statements_card_account_id_fkey"
+            columns: ["card_account_id"]
+            isOneToOne: false
+            referencedRelation: "card_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_statements_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      card_transactions: {
+        Row: {
+          amount: number
+          budget_category_id: string | null
+          budget_entry_id: string | null
+          card_account_id: string
+          created_at: string
+          description: string | null
+          id: string
+          merchant: string | null
+          notes: string | null
+          org_id: string
+          statement_id: string | null
+          txn_date: string
+          txn_type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          budget_category_id?: string | null
+          budget_entry_id?: string | null
+          card_account_id: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          merchant?: string | null
+          notes?: string | null
+          org_id?: string
+          statement_id?: string | null
+          txn_date?: string
+          txn_type: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          budget_category_id?: string | null
+          budget_entry_id?: string | null
+          card_account_id?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          merchant?: string | null
+          notes?: string | null
+          org_id?: string
+          statement_id?: string | null
+          txn_date?: string
+          txn_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_transactions_budget_category_id_fkey"
+            columns: ["budget_category_id"]
+            isOneToOne: false
+            referencedRelation: "budget_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_transactions_budget_entry_id_fkey"
+            columns: ["budget_entry_id"]
+            isOneToOne: false
+            referencedRelation: "budget_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_transactions_card_account_id_fkey"
+            columns: ["card_account_id"]
+            isOneToOne: false
+            referencedRelation: "card_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_transactions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_transactions_statement_id_fkey"
+            columns: ["statement_id"]
+            isOneToOne: false
+            referencedRelation: "card_statements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       credit_source_loan_type_defaults: {
         Row: {
           credit_source_id: string

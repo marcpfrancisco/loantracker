@@ -1,9 +1,14 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { supabase } from "@/lib/supabase";
-import { cardBalanceDeltaForEntry, inferEntryType, wealthTxnTypeForEntry } from "@/lib/budgetRules";
+import { inferEntryType, wealthTxnTypeForEntry } from "@/lib/budgetRules";
+import { cardTxnTypeForBudgetEntry } from "@/lib/cardRules";
 import { budgetKeys } from "@/hooks/useBudgetSetup";
 import { cardKeys } from "@/hooks/useCardAccounts";
+import {
+  deleteCardLedgerForBudgetEntry,
+  insertCardLedgerRow,
+} from "@/hooks/useCardLedgerMutations";
+import { supabase } from "@/lib/supabase";
 import type { BudgetCategory, BudgetEntryType } from "@/types/budget";
 import type { CardKind } from "@/types/cards";
 import type { CurrencyType } from "@/types/enums";
@@ -26,32 +31,15 @@ interface UpsertTargetParams {
   amountLimit: number;
 }
 
-async function adjustCardBalance(cardAccountId: string, delta: number): Promise<void> {
-  const { data: card, error: fetchError } = await supabase
-    .from("card_accounts")
-    .select("outstanding_balance")
-    .eq("id", cardAccountId)
-    .single();
-
-  if (fetchError) throw fetchError;
-
-  const newBalance = Math.max(0, Number(card.outstanding_balance) + delta);
-  const { error } = await supabase
-    .from("card_accounts")
-    .update({
-      outstanding_balance: newBalance,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", cardAccountId);
-
-  if (error) throw error;
-}
-
-async function syncCardBalanceForEntry(
+async function syncCardLedgerForEntry(
+  userId: string,
   cardAccountId: string,
+  categoryId: string,
+  entryId: string,
   entryType: BudgetEntryType,
   amount: number,
-  direction: "apply" | "reverse"
+  entryDate: string,
+  description?: string
 ): Promise<void> {
   const { data: card, error } = await supabase
     .from("card_accounts")
@@ -61,22 +49,35 @@ async function syncCardBalanceForEntry(
 
   if (error) throw error;
 
-  const delta = cardBalanceDeltaForEntry(entryType, card.card_kind as CardKind, amount, direction);
-  if (delta === null) return;
+  const txnType = cardTxnTypeForBudgetEntry(entryType, card.card_kind as CardKind);
+  if (!txnType) return;
 
-  await adjustCardBalance(cardAccountId, delta);
+  await insertCardLedgerRow({
+    userId,
+    cardAccountId,
+    txnType,
+    amount,
+    txnDate: entryDate,
+    description: description?.trim() || null,
+    budgetEntryId: entryId,
+    budgetCategoryId: categoryId,
+  });
 }
 
 export function useBudgetMutations(currency: CurrencyType, periodId: string | undefined) {
   const qc = useQueryClient();
 
-  const invalidate = () => {
+  const invalidate = (cardAccountId?: string | null) => {
     void qc.invalidateQueries({ queryKey: budgetKeys.entries(periodId ?? "") });
     void qc.invalidateQueries({ queryKey: budgetKeys.targets(periodId ?? "") });
     void qc.invalidateQueries({ queryKey: budgetKeys.wealth(currency) });
     void qc.invalidateQueries({ queryKey: budgetKeys.categories(currency) });
     void qc.invalidateQueries({ queryKey: cardKeys.byCurrency(currency) });
     void qc.invalidateQueries({ queryKey: cardKeys.all });
+    if (cardAccountId) {
+      void qc.invalidateQueries({ queryKey: cardKeys.detail(cardAccountId) });
+      void qc.invalidateQueries({ queryKey: cardKeys.transactions(cardAccountId) });
+    }
     if (periodId) {
       void qc.invalidateQueries({ queryKey: budgetKeys.period(currency, "") });
     }
@@ -125,13 +126,22 @@ export function useBudgetMutations(currency: CurrencyType, periodId: string | un
       }
 
       if (cardAccountId) {
-        await syncCardBalanceForEntry(cardAccountId, entryType, params.amount, "apply");
+        await syncCardLedgerForEntry(
+          params.userId,
+          cardAccountId,
+          params.category.id,
+          entry.id,
+          entryType,
+          params.amount,
+          params.entryDate,
+          params.description
+        );
       }
 
-      return entry;
+      return { entry, cardAccountId };
     },
-    onSuccess: () => {
-      invalidate();
+    onSuccess: (result) => {
+      invalidate(result.cardAccountId);
       toast.success("Entry added");
     },
     onError: (err: Error) => toast.error(err.message),
@@ -141,11 +151,13 @@ export function useBudgetMutations(currency: CurrencyType, periodId: string | un
     mutationFn: async (entryId: string) => {
       const { data: entry, error: fetchError } = await supabase
         .from("budget_entries")
-        .select("amount, entry_type, card_account_id, card_accounts(card_kind)")
+        .select("card_account_id")
         .eq("id", entryId)
         .single();
 
       if (fetchError) throw fetchError;
+
+      await deleteCardLedgerForBudgetEntry(entryId);
 
       const { error: txnDeleteError } = await supabase
         .from("wealth_transactions")
@@ -154,20 +166,13 @@ export function useBudgetMutations(currency: CurrencyType, periodId: string | un
 
       if (txnDeleteError) throw txnDeleteError;
 
-      if (entry.card_account_id && entry.card_accounts) {
-        await syncCardBalanceForEntry(
-          entry.card_account_id,
-          entry.entry_type as BudgetEntryType,
-          Number(entry.amount),
-          "reverse"
-        );
-      }
-
       const { error } = await supabase.from("budget_entries").delete().eq("id", entryId);
       if (error) throw error;
+
+      return entry.card_account_id as string | null;
     },
-    onSuccess: () => {
-      invalidate();
+    onSuccess: (cardAccountId) => {
+      invalidate(cardAccountId);
       toast.success("Entry removed");
     },
     onError: (err: Error) => toast.error(err.message),

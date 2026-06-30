@@ -11,11 +11,7 @@ import { useCardAccounts } from "@/hooks/useCardAccounts";
 import { useCardMutations } from "@/hooks/useCardMutations";
 import { CardAccountsPanel } from "@/components/cards/CardAccountsPanel";
 import { ManageCardCurrenciesDrawer } from "@/components/cards/ManageCardCurrenciesDrawer";
-import {
-  AddCardDrawer,
-  EditCardDrawer,
-  UpdateCardBalanceDrawer,
-} from "@/components/cards/CardDrawers";
+import { AddCardDrawer, EditCardDrawer } from "@/components/cards/CardDrawers";
 import { RefreshButton } from "@/components/ui/refresh-button";
 import type { CurrencyType } from "@/types/enums";
 
@@ -29,7 +25,6 @@ export default function CardsPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [currenciesOpen, setCurrenciesOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-  const [balanceCardId, setBalanceCardId] = useState<string | null>(null);
 
   const { data: cardCurrencyRows = [], isLoading: currenciesLoading } = useCardCurrencies(
     profile?.id,
@@ -48,13 +43,9 @@ export default function CardsPage() {
   }, [cardCurrencies, currency, defaultCurrency]);
 
   const { data: cards = [], isFetching, refetch, error } = useCardAccounts(resolvedCurrency);
-  const { createCard, updateCard, updateBalance, deleteCard } = useCardMutations(
-    resolvedCurrency,
-    profile?.id
-  );
+  const { createCard, updateCard, deleteCard } = useCardMutations(resolvedCurrency, profile?.id);
 
   const editCard = editId ? cards.find((c) => c.id === editId) : undefined;
-  const balanceCard = balanceCardId ? cards.find((c) => c.id === balanceCardId) : undefined;
 
   const totalOwed = cards.reduce((s, c) => s + Number(c.outstanding_balance), 0);
 
@@ -110,7 +101,7 @@ export default function CardsPage() {
           <p className="mt-1 text-xs opacity-90">
             {(error as Error).message.includes("card_accounts") ||
             (error as Error).message.includes("card_currencies")
-              ? "Run migrations 019_card_accounts.sql and 020_card_currencies.sql in Supabase, then refresh."
+              ? "Run migrations 019–022 in Supabase, then refresh."
               : (error as Error).message}
           </p>
         </div>
@@ -135,7 +126,6 @@ export default function CardsPage() {
         currency={resolvedCurrency}
         onAdd={() => setAddOpen(true)}
         onEdit={(id) => setEditId(id)}
-        onUpdateBalance={(id) => setBalanceCardId(id)}
       />
 
       <button
@@ -178,20 +168,6 @@ export default function CardsPage() {
           }}
           onDelete={async () => {
             await deleteCard.mutateAsync(editCard.id);
-          }}
-        />
-      )}
-
-      {balanceCard && (
-        <UpdateCardBalanceDrawer
-          open={Boolean(balanceCardId)}
-          onClose={() => setBalanceCardId(null)}
-          cardName={balanceCard.name}
-          currency={resolvedCurrency}
-          currentBalance={Number(balanceCard.outstanding_balance)}
-          isPending={updateBalance.isPending}
-          onSubmit={async (balance) => {
-            await updateBalance.mutateAsync({ cardId: balanceCard.id, balance });
           }}
         />
       )}

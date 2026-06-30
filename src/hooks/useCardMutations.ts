@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { cardKeys } from "@/hooks/useCardAccounts";
+import { insertCardLedgerRow } from "@/hooks/useCardLedgerMutations";
 import type { CardAccountFormInput } from "@/types/cards";
 import type { CurrencyType } from "@/types/enums";
 
@@ -18,22 +19,38 @@ export function useCardMutations(currency: CurrencyType, userId: string | undefi
       if (!userId) throw new Error("Not authenticated");
 
       const lastFour = input.last_four?.replace(/\D/g, "").slice(-4) || null;
+      const openingBalance = input.outstanding_balance ?? 0;
 
-      const { error } = await supabase.from("card_accounts").insert({
-        user_id: userId,
-        name: input.name.trim(),
-        issuer: input.issuer?.trim() || null,
-        card_kind: input.card_kind,
-        currency,
-        last_four: lastFour,
-        credit_limit: input.credit_limit ?? null,
-        outstanding_balance: input.outstanding_balance ?? 0,
-        statement_day: input.statement_day ?? null,
-        notes: input.notes?.trim() || null,
-        region: input.region ?? null,
-      });
+      const { data: card, error } = await supabase
+        .from("card_accounts")
+        .insert({
+          user_id: userId,
+          name: input.name.trim(),
+          issuer: input.issuer?.trim() || null,
+          card_kind: input.card_kind,
+          currency,
+          last_four: lastFour,
+          credit_limit: input.credit_limit ?? null,
+          outstanding_balance: 0,
+          statement_day: input.statement_day ?? null,
+          notes: input.notes?.trim() || null,
+          region: input.region ?? null,
+        })
+        .select("id")
+        .single();
 
       if (error) throw error;
+
+      if (openingBalance > 0) {
+        await insertCardLedgerRow({
+          userId,
+          cardAccountId: card.id,
+          txnType: "charge",
+          amount: openingBalance,
+          txnDate: new Date().toISOString().slice(0, 10),
+          description: "Opening balance",
+        });
+      }
     },
     onSuccess: () => {
       invalidate();
@@ -57,7 +74,6 @@ export function useCardMutations(currency: CurrencyType, userId: string | undefi
           card_kind: input.card_kind,
           last_four: lastFour,
           credit_limit: input.credit_limit ?? null,
-          outstanding_balance: input.outstanding_balance ?? 0,
           statement_day: input.statement_day ?? null,
           notes: input.notes?.trim() || null,
           updated_at: new Date().toISOString(),
@@ -66,28 +82,10 @@ export function useCardMutations(currency: CurrencyType, userId: string | undefi
 
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
       invalidate();
+      void qc.invalidateQueries({ queryKey: cardKeys.detail(variables.cardId) });
       toast.success("Card updated");
-    },
-    onError: (err: Error) => toast.error(err.message),
-  });
-
-  const updateBalance = useMutation({
-    mutationFn: async ({ cardId, balance }: { cardId: string; balance: number }) => {
-      const { error } = await supabase
-        .from("card_accounts")
-        .update({
-          outstanding_balance: balance,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", cardId);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      invalidate();
-      toast.success("Balance updated");
     },
     onError: (err: Error) => toast.error(err.message),
   });
@@ -104,5 +102,5 @@ export function useCardMutations(currency: CurrencyType, userId: string | undefi
     onError: (err: Error) => toast.error(err.message),
   });
 
-  return { createCard, updateCard, updateBalance, deleteCard };
+  return { createCard, updateCard, deleteCard };
 }

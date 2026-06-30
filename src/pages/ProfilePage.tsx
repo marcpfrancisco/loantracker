@@ -1,5 +1,6 @@
 import { useRef, useState, useEffect } from "react";
 import { useNavigate } from "react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Upload,
@@ -20,6 +21,10 @@ import { useAuth } from "@/hooks/useAuth";
 import { useMyLoans } from "@/hooks/useMyLoans";
 import { useUpdateProfile } from "@/hooks/useUpdateProfile";
 import { useChangePassword } from "@/hooks/useChangePassword";
+import {
+  DataBackupSection,
+  settingsRestoreInvalidations,
+} from "@/components/settings/DataBackupSection";
 import { RegionLabel } from "@/components/ui/region-badge";
 import type { LoanStatus, CreditSourceType, LoanType } from "@/types/enums";
 
@@ -194,6 +199,7 @@ function ProfilePageSkeleton() {
 export default function ProfilePage() {
   const { profile, session } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const isAdmin = profile?.role === "admin";
 
   // ── Avatar state ───────────────────────────────────────────────────────────
@@ -586,6 +592,14 @@ export default function ProfilePage() {
           )}
         </Section>
       )}
+
+      <DataBackupSection
+        onRestored={() => {
+          for (const key of settingsRestoreInvalidations) {
+            void queryClient.invalidateQueries({ queryKey: [...key] });
+          }
+        }}
+      />
 
       {/* ── Danger Zone ──────────────────────────────────────────────── */}
       <motion.div

@@ -83,6 +83,7 @@ export interface BudgetEntry {
   created_at: string;
   updated_at: string;
   budget_categories?: Pick<BudgetCategory, "name" | "group_key"> | null;
+  wealth_accounts?: Pick<WealthAccount, "name"> | null;
 }
 
 export interface WealthAccount {
@@ -153,7 +154,7 @@ export const BUDGET_GROUP_LABELS: Record<BudgetGroupKey, string> = {
 export const WEALTH_ACCOUNT_KIND_LABELS: Record<WealthAccountKind, string> = {
   savings: "Savings",
   salary: "Salary account",
-  cash: "Cash on hand",
+  cash: "Cash",
   e_wallet: "E-wallet",
   emergency: "Emergency fund",
   mp2: "MP2",
@@ -179,5 +180,5 @@ export const WEALTH_ACCOUNT_KIND_OPTIONS: WealthAccountKind[] = [
   "other",
 ];
 
-/** Currencies shown in the budget currency switcher for Phase 1. */
-export const BUDGET_CURRENCIES = ["PHP", "AED"] as const satisfies readonly CurrencyType[];
+/** Default currencies seeded for new budget users (before they customize). */
+export const DEFAULT_BUDGET_CURRENCIES = ["PHP", "AED"] as const satisfies readonly CurrencyType[];

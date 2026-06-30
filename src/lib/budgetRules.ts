@@ -136,6 +136,36 @@ export function inferEntryType(category: Pick<BudgetCategory, "entry_type_hint">
   return category.entry_type_hint;
 }
 
+/** Maps a budget entry type to the wealth ledger transaction type, if any. */
+export function wealthTxnTypeForEntry(
+  entryType: BudgetEntryType
+): "deposit" | "withdrawal" | "contribution" | null {
+  switch (entryType) {
+    case "income":
+      return "deposit";
+    case "expense":
+    case "transfer":
+      return "withdrawal";
+    case "allocation":
+      return "contribution";
+    default:
+      return null;
+  }
+}
+
+export function wealthAccountFieldLabel(entryType: BudgetEntryType): string {
+  switch (entryType) {
+    case "income":
+      return "Deposit to account";
+    case "allocation":
+      return "Contribute to account";
+    case "transfer":
+      return "Transfer from account";
+    default:
+      return "Pay from account";
+  }
+}
+
 export function isBurnGroup(group: BudgetGroupKey): boolean {
   return group === "essentials" || group === "lifestyle";
 }

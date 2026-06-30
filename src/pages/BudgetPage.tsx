@@ -1,20 +1,19 @@
 import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, Plus, Settings2, Wallet } from "lucide-react";
+import { Coins, Plus, Settings2, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { cardVariants } from "@/lib/animations";
 import {
   computeBudgetSummary,
   currentMonthStr,
   formatMonthLabel,
-  formatMonthShort,
   getActiveGroupOrder,
-  shiftMonth,
 } from "@/lib/budgetRules";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { getDefaultCurrency } from "@/lib/countries";
 import { useAuth } from "@/hooks/useAuth";
+import { useBudgetCurrencies, useBudgetCurrencyMutations } from "@/hooks/useBudgetCurrencies";
 import { useBudgetCategories, useBudgetSetup, useWealthAccounts } from "@/hooks/useBudgetSetup";
 import { useBudgetEntries, useBudgetTargets } from "@/hooks/useBudgetData";
 import { useBudgetMutations } from "@/hooks/useBudgetMutations";
@@ -29,16 +28,18 @@ import {
   WealthOpeningBalanceDrawer,
 } from "@/components/budget/WealthOpeningBalanceDrawer";
 import { ManageCategoriesDrawer } from "@/components/budget/ManageCategoriesDrawer";
+import { ManageBudgetCurrenciesDrawer } from "@/components/budget/ManageBudgetCurrenciesDrawer";
 import { WealthAccountsPanel } from "@/components/budget/WealthAccountsPanel";
 import {
   AddWealthAccountDrawer,
   EditWealthAccountDrawer,
 } from "@/components/budget/AddWealthAccountDrawer";
+import { BudgetMonthPicker } from "@/components/budget/BudgetMonthPicker";
 import { BudgetGroupSection } from "@/components/budget/BudgetGroupSection";
 import { BudgetEntryList } from "@/components/budget/BudgetEntryList";
 import { AddBudgetEntryDrawer, EditBudgetTargetDrawer } from "@/components/budget/BudgetDrawers";
 import { RefreshButton } from "@/components/ui/refresh-button";
-import { BUDGET_CURRENCIES, BUDGET_GROUP_LABELS } from "@/types/budget";
+import { BUDGET_GROUP_LABELS } from "@/types/budget";
 import type { CurrencyType } from "@/types/enums";
 
 function SummaryCard({
@@ -77,14 +78,11 @@ export default function BudgetPage() {
     profile?.region ? getDefaultCurrency(profile.region) : "AED"
   ) as CurrencyType;
 
-  const [currency, setCurrency] = useState<CurrencyType>(
-    BUDGET_CURRENCIES.includes(defaultCurrency as (typeof BUDGET_CURRENCIES)[number])
-      ? defaultCurrency
-      : "AED"
-  );
+  const [currency, setCurrency] = useState<CurrencyType>(defaultCurrency);
   const [monthKey, setMonthKey] = useState(currentMonthStr());
   const [addOpen, setAddOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
+  const [currenciesOpen, setCurrenciesOpen] = useState(false);
   const [wealthBalanceOpen, setWealthBalanceOpen] = useState(false);
   const [wealthFocusAccountId, setWealthFocusAccountId] = useState<string | null>(null);
   const [wealthAddOpen, setWealthAddOpen] = useState(false);
@@ -93,26 +91,46 @@ export default function BudgetPage() {
     null
   );
 
+  const { data: budgetCurrencyRows = [], isLoading: currenciesLoading } = useBudgetCurrencies(
+    profile?.id,
+    profile?.region
+  );
+  const budgetCurrencies = useMemo(
+    () => budgetCurrencyRows.map((r) => r.currency as CurrencyType),
+    [budgetCurrencyRows]
+  );
+  const { addCurrency, removeCurrency } = useBudgetCurrencyMutations(profile?.id);
+
+  const resolvedCurrency = useMemo((): CurrencyType => {
+    if (budgetCurrencies.length === 0) return currency;
+    if (budgetCurrencies.includes(currency)) return currency;
+    return budgetCurrencies.includes(defaultCurrency) ? defaultCurrency : budgetCurrencies[0];
+  }, [budgetCurrencies, currency, defaultCurrency]);
+
   const {
     data: period,
     isLoading: periodLoading,
     isFetching,
     error: periodError,
     refetch,
-  } = useBudgetSetup(currency, monthKey, profile?.id);
+  } = useBudgetSetup(resolvedCurrency, monthKey, profile?.id);
 
   const periodId = period?.id;
   const setupReady = Boolean(periodId);
 
-  const { data: categories = [] } = useBudgetCategories(currency, setupReady);
-  const { data: wealthAccounts = [] } = useWealthAccounts(currency, setupReady);
-  const { data: onboardingStatus } = useWealthOnboardingStatus(profile?.id, currency, setupReady);
+  const { data: categories = [] } = useBudgetCategories(resolvedCurrency, setupReady);
+  const { data: wealthAccounts = [] } = useWealthAccounts(resolvedCurrency, setupReady);
+  const { data: onboardingStatus } = useWealthOnboardingStatus(
+    profile?.id,
+    resolvedCurrency,
+    setupReady
+  );
   const { data: targets = [] } = useBudgetTargets(periodId);
   const { data: entries = [] } = useBudgetEntries(periodId);
 
-  const { addEntry, deleteEntry, upsertTarget } = useBudgetMutations(currency, periodId);
+  const { addEntry, deleteEntry, upsertTarget } = useBudgetMutations(resolvedCurrency, periodId);
   const { createCategory, updateCategory, deleteCategory } = useCategoryMutations(
-    currency,
+    resolvedCurrency,
     profile?.id
   );
   const {
@@ -121,7 +139,7 @@ export default function BudgetPage() {
     createWealthAccount,
     updateWealthAccount,
     deleteWealthAccount,
-  } = useWealthMutations(currency, profile?.id);
+  } = useWealthMutations(resolvedCurrency, profile?.id);
 
   const wealthEditAccount = wealthEditId
     ? wealthAccounts.find((a) => a.id === wealthEditId)
@@ -134,9 +152,9 @@ export default function BudgetPage() {
 
   function handleDismissWealthOnboarding() {
     if (profile?.id) {
-      dismissWealthOnboarding(profile.id, currency);
+      dismissWealthOnboarding(profile.id, resolvedCurrency);
       void queryClient.invalidateQueries({
-        queryKey: ["budget", "wealth-onboarding", profile.id, currency],
+        queryKey: ["budget", "wealth-onboarding", profile.id, resolvedCurrency],
       });
     }
   }
@@ -177,44 +195,38 @@ export default function BudgetPage() {
       </div>
 
       {/* Currency tabs */}
-      <div className="flex gap-2">
-        {BUDGET_CURRENCIES.map((c) => (
-          <button
-            key={c}
-            type="button"
-            onClick={() => setCurrency(c)}
-            className={cn(
-              "rounded-full border px-4 py-1.5 text-sm font-medium transition-colors",
-              currency === c
-                ? "border-primary/40 bg-primary/10 text-primary"
-                : "border-border/60 text-muted-foreground hover:text-foreground"
-            )}
-          >
-            {c}
-          </button>
-        ))}
+      <div className="flex flex-wrap items-center gap-2">
+        {currenciesLoading ? (
+          <div className="bg-muted h-8 w-24 animate-pulse rounded-full" />
+        ) : (
+          budgetCurrencies.map((c) => (
+            <button
+              key={c}
+              type="button"
+              onClick={() => setCurrency(c)}
+              className={cn(
+                "rounded-full border px-4 py-1.5 text-sm font-medium transition-colors",
+                resolvedCurrency === c
+                  ? "border-primary/40 bg-primary/10 text-primary"
+                  : "border-border/60 text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {c}
+            </button>
+          ))
+        )}
+        <button
+          type="button"
+          onClick={() => setCurrenciesOpen(true)}
+          className="border-border/60 text-muted-foreground hover:text-foreground inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium"
+          title="Manage budget currencies"
+        >
+          <Coins className="h-3.5 w-3.5" />
+          Currencies
+        </button>
       </div>
 
-      {/* Month navigation */}
-      <div className="flex items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={() => setMonthKey((m) => shiftMonth(m, -1))}
-          className="border-border/60 hover:bg-muted/50 rounded-lg border p-2"
-          aria-label="Previous month"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </button>
-        <span className="text-foreground text-sm font-medium">{formatMonthShort(monthKey)}</span>
-        <button
-          type="button"
-          onClick={() => setMonthKey((m) => shiftMonth(m, 1))}
-          className="border-border/60 hover:bg-muted/50 rounded-lg border p-2"
-          aria-label="Next month"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </button>
-      </div>
+      <BudgetMonthPicker monthKey={monthKey} onMonthChange={setMonthKey} />
 
       {periodLoading && (
         <div className="text-muted-foreground py-12 text-center text-sm">Loading budget…</div>
@@ -233,7 +245,7 @@ export default function BudgetPage() {
 
       {!periodLoading && period && !periodError && !summary && (
         <div className="border-border/60 rounded-xl border border-dashed p-8 text-center">
-          <p className="text-muted-foreground text-sm">No categories for {currency} yet.</p>
+          <p className="text-muted-foreground text-sm">No categories for {resolvedCurrency} yet.</p>
           <button
             type="button"
             onClick={() => setManageOpen(true)}
@@ -254,34 +266,34 @@ export default function BudgetPage() {
           >
             <SummaryCard
               label="Income"
-              value={formatCurrency(summary.period.income_total, currency)}
+              value={formatCurrency(summary.period.income_total, resolvedCurrency)}
               accent="green"
             />
             <SummaryCard
               label="Living"
               value={formatCurrency(
                 summary.period.essentials_spent + summary.period.lifestyle_spent,
-                currency
+                resolvedCurrency
               )}
             />
             <SummaryCard
               label="Saved & invested"
               value={formatCurrency(
                 summary.period.savings_allocated + summary.period.investments_allocated,
-                currency
+                resolvedCurrency
               )}
             />
             <SummaryCard
               label="Net flow"
-              value={formatCurrency(summary.period.net_cash_flow, currency)}
+              value={formatCurrency(summary.period.net_cash_flow, resolvedCurrency)}
               accent={summary.period.net_cash_flow >= 0 ? "green" : "rose"}
-              sub={`Unallocated ${formatCurrency(summary.period.unallocated_income, currency)}`}
+              sub={`Unallocated ${formatCurrency(summary.period.unallocated_income, resolvedCurrency)}`}
             />
           </motion.div>
 
           {onboardingStatus?.needsOnboarding && wealthAccounts.length > 0 && (
             <WealthOnboardingBanner
-              currency={currency}
+              currency={resolvedCurrency}
               accountCount={wealthAccounts.length}
               onSetBalances={() => openWealthBalances(null)}
               onDismiss={handleDismissWealthOnboarding}
@@ -290,7 +302,7 @@ export default function BudgetPage() {
 
           <WealthAccountsPanel
             accounts={wealthAccounts}
-            currency={currency}
+            currency={resolvedCurrency}
             onAddAccount={() => setWealthAddOpen(true)}
             onEditBalance={(accountId) => openWealthBalances(accountId)}
             onEditAccount={(accountId) => setWealthEditId(accountId)}
@@ -303,7 +315,7 @@ export default function BudgetPage() {
                 groupKey={groupKey}
                 label={BUDGET_GROUP_LABELS[groupKey]}
                 categories={summary.categories}
-                currency={currency}
+                currency={resolvedCurrency}
                 defaultOpen={groupKey !== "transfers" && groupKey !== "debt"}
                 onEditTarget={(categoryId, currentTarget) => {
                   const cat = categories.find((c) => c.id === categoryId);
@@ -331,7 +343,7 @@ export default function BudgetPage() {
             </div>
             <BudgetEntryList
               entries={entries.slice(0, 20)}
-              currency={currency}
+              currency={resolvedCurrency}
               onDelete={(id) => deleteEntry.mutate(id)}
               isDeleting={deleteEntry.isPending}
             />
@@ -352,6 +364,8 @@ export default function BudgetPage() {
         open={addOpen}
         onClose={() => setAddOpen(false)}
         categories={categories}
+        wealthAccounts={wealthAccounts}
+        currency={resolvedCurrency}
         isPending={addEntry.isPending}
         onSubmit={(data) => {
           if (!periodId || !profile?.id) return;
@@ -363,6 +377,7 @@ export default function BudgetPage() {
               amount: data.amount,
               entryDate: data.entry_date,
               description: data.description,
+              wealthAccountId: data.wealth_account_id,
             },
             { onSuccess: () => setAddOpen(false) }
           );
@@ -372,7 +387,7 @@ export default function BudgetPage() {
       <ManageCategoriesDrawer
         open={manageOpen}
         onClose={() => setManageOpen(false)}
-        currency={currency}
+        currency={resolvedCurrency}
         categories={categories}
         wealthAccounts={wealthAccounts}
         isPending={createCategory.isPending || updateCategory.isPending}
@@ -400,7 +415,7 @@ export default function BudgetPage() {
           setWealthFocusAccountId(null);
         }}
         accounts={wealthAccounts}
-        currency={currency}
+        currency={resolvedCurrency}
         focusAccountId={wealthFocusAccountId}
         isPending={setOpeningBalance.isPending || setOpeningBalancesBatch.isPending}
         onSubmit={async (inputs) => {
@@ -415,12 +430,17 @@ export default function BudgetPage() {
       <AddWealthAccountDrawer
         open={wealthAddOpen}
         onClose={() => setWealthAddOpen(false)}
-        currency={currency}
+        currency={resolvedCurrency}
         isPending={createWealthAccount.isPending}
         onSubmit={async (input) => {
           await createWealthAccount.mutateAsync({
             ...input,
-            region: currency === "PHP" ? "PH" : currency === "AED" ? "AE" : profile?.region,
+            region:
+              resolvedCurrency === "PHP"
+                ? "PH"
+                : resolvedCurrency === "AED"
+                  ? "AE"
+                  : profile?.region,
           });
         }}
       />
@@ -429,7 +449,7 @@ export default function BudgetPage() {
         <EditWealthAccountDrawer
           open={Boolean(wealthEditId)}
           onClose={() => setWealthEditId(null)}
-          currency={currency}
+          currency={resolvedCurrency}
           accountName={wealthEditAccount.name}
           institution={wealthEditAccount.institution}
           isPending={updateWealthAccount.isPending}
@@ -446,11 +466,30 @@ export default function BudgetPage() {
         />
       )}
 
+      <ManageBudgetCurrenciesDrawer
+        open={currenciesOpen}
+        onClose={() => setCurrenciesOpen(false)}
+        currencies={budgetCurrencyRows}
+        activeCurrency={resolvedCurrency}
+        isAdding={addCurrency.isPending}
+        isRemoving={removeCurrency.isPending}
+        onAdd={async (code) => {
+          await addCurrency.mutateAsync(code);
+        }}
+        onRemove={async (code) => {
+          await removeCurrency.mutateAsync(code);
+          if (code === resolvedCurrency && budgetCurrencies.length > 1) {
+            const next = budgetCurrencies.find((c) => c !== code);
+            if (next) setCurrency(next);
+          }
+        }}
+      />
+
       <EditBudgetTargetDrawer
         open={Boolean(targetEdit)}
         onClose={() => setTargetEdit(null)}
         categoryName={targetCategoryName ?? ""}
-        currency={currency}
+        currency={resolvedCurrency}
         currentTarget={targetEdit?.target ?? 0}
         isPending={upsertTarget.isPending}
         onSubmit={(amountLimit) => {

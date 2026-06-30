@@ -1,4 +1,5 @@
-import { Pencil, Plus } from "lucide-react";
+import { ChevronRight, Pencil, Plus } from "lucide-react";
+import { Link } from "react-router";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { cn } from "@/lib/utils";
 import type { CardAccount } from "@/types/cards";
@@ -9,16 +10,9 @@ interface CardAccountsPanelProps {
   currency: string;
   onAdd?: () => void;
   onEdit?: (cardId: string) => void;
-  onUpdateBalance?: (cardId: string) => void;
 }
 
-export function CardAccountsPanel({
-  cards,
-  currency,
-  onAdd,
-  onEdit,
-  onUpdateBalance,
-}: CardAccountsPanelProps) {
+export function CardAccountsPanel({ cards, currency, onAdd, onEdit }: CardAccountsPanelProps) {
   const totalOwed = cards.reduce((s, c) => s + Number(c.outstanding_balance), 0);
   const totalLimit = cards
     .filter((c) => c.card_kind === "credit" && c.credit_limit != null)
@@ -83,9 +77,10 @@ export function CardAccountsPanel({
               limit && limit > 0 ? Math.min(100, Math.round((owed / limit) * 100)) : null;
 
             return (
-              <div
+              <Link
                 key={card.id}
-                className="border-border/50 bg-muted/30 flex flex-col gap-2 rounded-lg border px-3 py-2.5"
+                to={`/cards/${card.id}`}
+                className="border-border/50 bg-muted/30 hover:border-primary/30 flex flex-col gap-2 rounded-lg border px-3 py-2.5 transition-colors"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
@@ -100,13 +95,18 @@ export function CardAccountsPanel({
                     {onEdit && (
                       <button
                         type="button"
-                        onClick={() => onEdit(card.id)}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onEdit(card.id);
+                        }}
                         className="text-muted-foreground hover:text-foreground rounded p-1"
                         aria-label={`Edit ${card.name}`}
                       >
                         <Pencil className="h-3 w-3" />
                       </button>
                     )}
+                    <ChevronRight className="text-muted-foreground h-4 w-4 self-center" />
                   </div>
                 </div>
 
@@ -145,17 +145,7 @@ export function CardAccountsPanel({
                     </p>
                   )}
                 </div>
-
-                {onUpdateBalance && (
-                  <button
-                    type="button"
-                    onClick={() => onUpdateBalance(card.id)}
-                    className="text-muted-foreground hover:text-primary self-start text-[10px] hover:underline"
-                  >
-                    Update balance
-                  </button>
-                )}
-              </div>
+              </Link>
             );
           })}
         </div>

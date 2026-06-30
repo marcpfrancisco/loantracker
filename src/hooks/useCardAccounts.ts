@@ -6,6 +6,9 @@ import type { CurrencyType } from "@/types/enums";
 export const cardKeys = {
   all: ["cards"] as const,
   byCurrency: (currency: string) => ["cards", currency] as const,
+  detail: (cardId: string) => ["cards", "detail", cardId] as const,
+  transactions: (cardId: string) => ["cards", "detail", cardId, "transactions"] as const,
+  statements: (cardId: string) => ["cards", "detail", cardId, "statements"] as const,
 };
 
 async function fetchCardAccounts(currency: CurrencyType): Promise<CardAccount[]> {

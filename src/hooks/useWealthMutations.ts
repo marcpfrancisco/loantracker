@@ -180,6 +180,8 @@ export function useWealthMutations(currency: CurrencyType, userId: string | unde
     mutationFn: async (params: {
       name: string;
       account_kind: WealthAccountKind;
+      institution?: string;
+      region?: string;
       openingCash?: number;
       openingMarketValue?: number | null;
     }) => {
@@ -192,6 +194,8 @@ export function useWealthMutations(currency: CurrencyType, userId: string | unde
           name: params.name.trim(),
           currency,
           account_kind: params.account_kind,
+          institution: params.institution?.trim() || null,
+          region: params.region ?? null,
         })
         .select("id")
         .single();
@@ -216,9 +220,74 @@ export function useWealthMutations(currency: CurrencyType, userId: string | unde
     onError: (err: Error) => toast.error(err.message),
   });
 
+  const updateWealthAccount = useMutation({
+    mutationFn: async (params: { accountId: string; name: string; institution: string | null }) => {
+      if (!userId) throw new Error("Not authenticated");
+
+      const { error } = await supabase
+        .from("wealth_accounts")
+        .update({
+          name: params.name.trim(),
+          institution: params.institution,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", params.accountId)
+        .eq("user_id", userId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      invalidate();
+      toast.success("Account updated");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  const deleteWealthAccount = useMutation({
+    mutationFn: async (accountId: string) => {
+      if (!userId) throw new Error("Not authenticated");
+
+      const { count: entryCount, error: entryError } = await supabase
+        .from("budget_entries")
+        .select("*", { count: "exact", head: true })
+        .eq("wealth_account_id", accountId);
+
+      if (entryError) throw entryError;
+      if ((entryCount ?? 0) > 0) {
+        throw new Error(
+          "This account has budget entries linked to it. Remove those entries first."
+        );
+      }
+
+      const { error: unlinkError } = await supabase
+        .from("budget_categories")
+        .update({ wealth_account_id: null })
+        .eq("wealth_account_id", accountId)
+        .eq("user_id", userId);
+
+      if (unlinkError) throw unlinkError;
+
+      const { error } = await supabase
+        .from("wealth_accounts")
+        .delete()
+        .eq("id", accountId)
+        .eq("user_id", userId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      invalidate();
+      void qc.invalidateQueries({ queryKey: budgetKeys.categories(currency) });
+      toast.success("Account removed");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
   return {
     setOpeningBalance,
     setOpeningBalancesBatch,
     createWealthAccount,
+    updateWealthAccount,
+    deleteWealthAccount,
   };
 }

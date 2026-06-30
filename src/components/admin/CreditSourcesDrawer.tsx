@@ -10,6 +10,7 @@ import {
   useUpdateCreditSource,
   useToggleCreditSourceActive,
   useDeleteCreditSource,
+  useSyncSchemaCreditSources,
 } from "@/hooks/useCreditSourceMutations";
 import {
   useAllLoanTypeDefaults,
@@ -20,7 +21,7 @@ import type { LoanTypeDefault } from "@/hooks/useLoanTypeDefaults";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { CountryPicker } from "@/components/ui/country-picker";
 import { getFlagEmoji, getCountryName } from "@/lib/countries";
-import { getSourceConfig } from "@/types/schema";
+import { getSourceConfig, findMissingSchemaCreditSources } from "@/types/schema";
 import type { LoanTypeConfig } from "@/types/schema";
 import type { CreditSourceType } from "@/types/enums";
 
@@ -957,18 +958,26 @@ interface CreditSourcesDrawerProps {
 }
 
 export function CreditSourcesDrawer({ open, onClose }: CreditSourcesDrawerProps) {
-  const { profile } = useAuth();
+  const { profile, activeRegions } = useAuth();
   const lenderRegion = profile?.region ?? "PH";
 
   const [activeTab, setActiveTab] = useState(lenderRegion);
   const { data: allSources = [], isLoading, error } = useAllCreditSources();
   const { data: allLoanTypeDefaults = [] } = useAllLoanTypeDefaults();
+  const syncSchema = useSyncSchemaCreditSources();
+
+  const missingSchemaSources = useMemo(
+    () => findMissingSchemaCreditSources(allSources),
+    [allSources]
+  );
 
   const countryTabs = useMemo(() => {
     const regions = new Set<string>(allSources.map((s) => s.region));
     regions.add(lenderRegion);
+    for (const r of activeRegions) regions.add(r);
+    for (const c of missingSchemaSources) regions.add(c.region);
     return [...regions].sort();
-  }, [allSources, lenderRegion]);
+  }, [allSources, lenderRegion, activeRegions, missingSchemaSources]);
 
   const safeTab =
     countryTabs.includes(activeTab) || activeTab === NEW_TAB ? activeTab : lenderRegion;
@@ -984,6 +993,20 @@ export function CreditSourcesDrawer({ open, onClose }: CreditSourcesDrawerProps)
       setActiveTab(savedRegion);
     } else {
       setActiveTab(lenderRegion);
+    }
+  }
+
+  async function handleSyncSchema() {
+    try {
+      const createdRegions = await syncSchema.mutateAsync(allSources);
+      const cashNowRegion = missingSchemaSources.find((c) => c.name === "CashNow")?.region;
+      if (cashNowRegion) {
+        setActiveTab(cashNowRegion);
+      } else if (createdRegions.length > 0) {
+        setActiveTab(createdRegions[0]);
+      }
+    } catch {
+      // mutation error state shown in banner
     }
   }
 
@@ -1064,6 +1087,35 @@ export function CreditSourcesDrawer({ open, onClose }: CreditSourcesDrawerProps)
 
             {/* Body */}
             <div className="flex-1 space-y-2 overflow-y-auto px-5 py-4">
+              {missingSchemaSources.length > 0 && safeTab !== NEW_TAB && (
+                <div className="border-primary/30 bg-primary/5 space-y-2 rounded-xl border px-3 py-3">
+                  <p className="text-foreground text-xs font-medium">Built-in sources available</p>
+                  <p className="text-muted-foreground text-[11px] leading-relaxed">
+                    {missingSchemaSources.map((c) => c.name).join(", ")} can be added from app
+                    defaults. Schema config alone does not create database rows for existing orgs.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void handleSyncSchema()}
+                    disabled={syncSchema.isPending}
+                    className="bg-primary text-primary-foreground hover:bg-primary/90 inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60"
+                  >
+                    {syncSchema.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Plus className="h-3.5 w-3.5" />
+                    )}
+                    Add {missingSchemaSources.length} missing source
+                    {missingSchemaSources.length === 1 ? "" : "s"}
+                  </button>
+                  {syncSchema.isError && (
+                    <p className="text-xs text-rose-400">
+                      Sync failed. Check permissions and retry.
+                    </p>
+                  )}
+                </div>
+              )}
+
               {safeTab === NEW_TAB && (
                 <AddForm defaultRegion={lenderRegion} onDone={handleAddDone} />
               )}

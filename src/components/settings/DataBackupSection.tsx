@@ -11,6 +11,7 @@ import {
 } from "@/lib/dataBackup";
 import { useAuth } from "@/hooks/useAuth";
 import { budgetCurrencyKeys } from "@/hooks/useBudgetCurrencies";
+import { cardCurrencyKeys } from "@/hooks/useCardCurrencies";
 
 interface DataBackupSectionProps {
   onRestored?: () => void;
@@ -61,6 +62,8 @@ export function DataBackupSection({ onRestored }: DataBackupSectionProps) {
         result.profileUpdated && "profile",
         result.budgetCurrenciesUpdated > 0 &&
           `${result.budgetCurrenciesUpdated} budget ${result.budgetCurrenciesUpdated === 1 ? "currency" : "currencies"}`,
+        result.cardCurrenciesUpdated > 0 &&
+          `${result.cardCurrenciesUpdated} card ${result.cardCurrenciesUpdated === 1 ? "currency" : "currencies"}`,
         result.organizationUpdated && "organization",
         result.creditSourcesUpserted > 0 &&
           `${result.creditSourcesUpserted} credit ${result.creditSourcesUpserted === 1 ? "source" : "sources"}`,
@@ -87,7 +90,7 @@ export function DataBackupSection({ onRestored }: DataBackupSectionProps) {
       </div>
       <div className="space-y-4 px-5 py-5">
         <p className="text-muted-foreground text-xs leading-relaxed">
-          Export a JSON snapshot of your important settings — profile, budget currencies
+          Export a JSON snapshot of your important settings — profile, budget & card currencies
           {isAdmin ? ", organization settings, and credit source defaults" : ""}. Loans, budget
           entries, wealth balances, and expense tabs are not included.
         </p>
@@ -145,4 +148,8 @@ export function DataBackupSection({ onRestored }: DataBackupSectionProps) {
 }
 
 /** Query keys to invalidate after a settings restore. */
-export const settingsRestoreInvalidations = [budgetCurrencyKeys.all, ["credit-sources"]] as const;
+export const settingsRestoreInvalidations = [
+  budgetCurrencyKeys.all,
+  cardCurrencyKeys.all,
+  ["credit-sources"],
+] as const;

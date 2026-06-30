@@ -26,6 +26,8 @@ export const CARD_KIND_LABELS: Record<CardKind, string> = {
   debit: "Debit card",
 };
 
+export const DEFAULT_CARD_CURRENCIES = ["PHP", "AED"] as const satisfies readonly CurrencyType[];
+
 export interface CardAccountFormInput {
   name: string;
   issuer?: string;

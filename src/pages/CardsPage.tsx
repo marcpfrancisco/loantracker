@@ -1,15 +1,16 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { CreditCard, Plus } from "lucide-react";
+import { Coins, CreditCard, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { cardVariants } from "@/lib/animations";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { getDefaultCurrency } from "@/lib/countries";
 import { useAuth } from "@/hooks/useAuth";
-import { useBudgetCurrencies } from "@/hooks/useBudgetCurrencies";
+import { useCardCurrencies, useCardCurrencyMutations } from "@/hooks/useCardCurrencies";
 import { useCardAccounts } from "@/hooks/useCardAccounts";
 import { useCardMutations } from "@/hooks/useCardMutations";
 import { CardAccountsPanel } from "@/components/cards/CardAccountsPanel";
+import { ManageCardCurrenciesDrawer } from "@/components/cards/ManageCardCurrenciesDrawer";
 import {
   AddCardDrawer,
   EditCardDrawer,
@@ -26,23 +27,25 @@ export default function CardsPage() {
 
   const [currency, setCurrency] = useState<CurrencyType>(defaultCurrency);
   const [addOpen, setAddOpen] = useState(false);
+  const [currenciesOpen, setCurrenciesOpen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [balanceCardId, setBalanceCardId] = useState<string | null>(null);
 
-  const { data: budgetCurrencyRows = [], isLoading: currenciesLoading } = useBudgetCurrencies(
+  const { data: cardCurrencyRows = [], isLoading: currenciesLoading } = useCardCurrencies(
     profile?.id,
     profile?.region
   );
-  const budgetCurrencies = useMemo(
-    () => budgetCurrencyRows.map((r) => r.currency as CurrencyType),
-    [budgetCurrencyRows]
+  const cardCurrencies = useMemo(
+    () => cardCurrencyRows.map((r) => r.currency as CurrencyType),
+    [cardCurrencyRows]
   );
+  const { addCurrency, removeCurrency } = useCardCurrencyMutations(profile?.id);
 
   const resolvedCurrency = useMemo((): CurrencyType => {
-    if (budgetCurrencies.length === 0) return currency;
-    if (budgetCurrencies.includes(currency)) return currency;
-    return budgetCurrencies.includes(defaultCurrency) ? defaultCurrency : budgetCurrencies[0];
-  }, [budgetCurrencies, currency, defaultCurrency]);
+    if (cardCurrencies.length === 0) return currency;
+    if (cardCurrencies.includes(currency)) return currency;
+    return cardCurrencies.includes(defaultCurrency) ? defaultCurrency : cardCurrencies[0];
+  }, [cardCurrencies, currency, defaultCurrency]);
 
   const { data: cards = [], isFetching, refetch, error } = useCardAccounts(resolvedCurrency);
   const { createCard, updateCard, updateBalance, deleteCard } = useCardMutations(
@@ -70,11 +73,11 @@ export default function CardsPage() {
         <RefreshButton onRefresh={() => void refetch()} isRefetching={isFetching} />
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {currenciesLoading ? (
           <div className="bg-muted h-8 w-24 animate-pulse rounded-full" />
         ) : (
-          budgetCurrencies.map((c) => (
+          cardCurrencies.map((c) => (
             <button
               key={c}
               type="button"
@@ -90,14 +93,24 @@ export default function CardsPage() {
             </button>
           ))
         )}
+        <button
+          type="button"
+          onClick={() => setCurrenciesOpen(true)}
+          className="border-border/60 text-muted-foreground hover:text-foreground inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium"
+          title="Manage card currencies"
+        >
+          <Coins className="h-3.5 w-3.5" />
+          Currencies
+        </button>
       </div>
 
       {error && (
         <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-sm text-rose-300">
           <p className="font-medium">Could not load cards</p>
           <p className="mt-1 text-xs opacity-90">
-            {(error as Error).message.includes("card_accounts")
-              ? "Run migration 019_card_accounts.sql in Supabase, then refresh."
+            {(error as Error).message.includes("card_accounts") ||
+            (error as Error).message.includes("card_currencies")
+              ? "Run migrations 019_card_accounts.sql and 020_card_currencies.sql in Supabase, then refresh."
               : (error as Error).message}
           </p>
         </div>
@@ -182,6 +195,25 @@ export default function CardsPage() {
           }}
         />
       )}
+
+      <ManageCardCurrenciesDrawer
+        open={currenciesOpen}
+        onClose={() => setCurrenciesOpen(false)}
+        currencies={cardCurrencyRows}
+        activeCurrency={resolvedCurrency}
+        isAdding={addCurrency.isPending}
+        isRemoving={removeCurrency.isPending}
+        onAdd={async (code) => {
+          await addCurrency.mutateAsync(code);
+        }}
+        onRemove={async (code) => {
+          await removeCurrency.mutateAsync(code);
+          if (code === resolvedCurrency && cardCurrencies.length > 1) {
+            const next = cardCurrencies.find((c) => c !== code);
+            if (next) setCurrency(next);
+          }
+        }}
+      />
     </div>
   );
 }

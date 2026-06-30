@@ -356,6 +356,41 @@ export type Database = {
           },
         ]
       }
+      card_currencies: {
+        Row: {
+          created_at: string
+          currency: string
+          id: string
+          org_id: string
+          sort_order: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          currency: string
+          id?: string
+          org_id?: string
+          sort_order?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          id?: string
+          org_id?: string
+          sort_order?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_currencies_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       credit_source_loan_type_defaults: {
         Row: {
           credit_source_id: string

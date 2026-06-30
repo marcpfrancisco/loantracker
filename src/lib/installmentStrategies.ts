@@ -181,7 +181,7 @@ function computeLazCredit(params: InstallmentParams): InstallmentBreakdown {
  *           is then split into equal EMIs. Enter the rate shown in the CashNow app.
  *           Processing fee (service_fee) is deducted from disbursement — not amortized.
  *
- * Example (AED 5,400 / 6 months / ~3.83% from app):
+ * Example (AED 5,400 / 6 months / 3.83333%):
  *   totalInterest = 5,400 × 0.0383 × 6 = 1,241.88 → 1,242.00
  *   total         = 6,642.00
  *   EMI           → 1,107.00 × 6

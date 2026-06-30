@@ -1,4 +1,5 @@
 import { computeInstallmentAmounts } from "@/lib/installmentStrategies";
+import { formatInterestRatePercent } from "@/lib/interestRate";
 import type { LoanTypeConfig } from "@/types/schema";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -33,9 +34,9 @@ function interestLabel(
 ): string {
   const mode = loanTypeConfig.feeDisplayMode;
   if (mode?.kind === "upfront_deduction") {
-    return `${interestRate}% × ${installmentsTotal} mo. (add-on)`;
+    return `${formatInterestRatePercent(interestRate)}% × ${installmentsTotal} mo. (add-on)`;
   }
-  return `${interestRate}% flat`;
+  return `${formatInterestRatePercent(interestRate)}% flat`;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────

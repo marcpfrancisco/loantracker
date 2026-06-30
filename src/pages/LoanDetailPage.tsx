@@ -26,6 +26,7 @@ import { EditLoanDrawer } from "@/components/loans/EditLoanDrawer";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { RegionLabel } from "@/components/ui/region-badge";
 import { getLoanTypeConfig, FALLBACK_LOAN_TYPE } from "@/types/schema";
+import { formatInterestRatePercent } from "@/lib/interestRate";
 import { computeInstallmentAmounts } from "@/lib/installmentStrategies";
 import type { LoanStatus, LoanType, CreditSourceType, PaymentStatus } from "@/types/enums";
 
@@ -301,7 +302,9 @@ export default function LoanDetailPage() {
           {loan.interest_rate !== null && (
             <div>
               <p className="text-muted-foreground text-[10px]">Interest</p>
-              <p className="text-foreground text-xs font-medium">{loan.interest_rate}%</p>
+              <p className="text-foreground text-xs font-medium">
+                {formatInterestRatePercent(loan.interest_rate)}%
+              </p>
             </div>
           )}
           {loan.service_fee > 0 && (

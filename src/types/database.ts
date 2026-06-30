@@ -39,6 +39,223 @@ export type Database = {
   }
   public: {
     Tables: {
+      budget_categories: {
+        Row: {
+          created_at: string
+          currency: string
+          entry_type_hint: string
+          group_key: string
+          id: string
+          name: string
+          org_id: string
+          sort_order: number
+          user_id: string
+          wealth_account_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          currency: string
+          entry_type_hint: string
+          group_key: string
+          id?: string
+          name: string
+          org_id?: string
+          sort_order?: number
+          user_id: string
+          wealth_account_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          entry_type_hint?: string
+          group_key?: string
+          id?: string
+          name?: string
+          org_id?: string
+          sort_order?: number
+          user_id?: string
+          wealth_account_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_categories_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budget_categories_wealth_account_id_fkey"
+            columns: ["wealth_account_id"]
+            isOneToOne: false
+            referencedRelation: "wealth_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      budget_entries: {
+        Row: {
+          amount: number
+          category_id: string
+          created_at: string
+          description: string | null
+          entry_date: string
+          entry_type: string
+          id: string
+          notes: string | null
+          org_id: string
+          period_id: string
+          updated_at: string
+          user_id: string
+          wealth_account_id: string | null
+        }
+        Insert: {
+          amount: number
+          category_id: string
+          created_at?: string
+          description?: string | null
+          entry_date?: string
+          entry_type: string
+          id?: string
+          notes?: string | null
+          org_id?: string
+          period_id: string
+          updated_at?: string
+          user_id: string
+          wealth_account_id?: string | null
+        }
+        Update: {
+          amount?: number
+          category_id?: string
+          created_at?: string
+          description?: string | null
+          entry_date?: string
+          entry_type?: string
+          id?: string
+          notes?: string | null
+          org_id?: string
+          period_id?: string
+          updated_at?: string
+          user_id?: string
+          wealth_account_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_entries_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "budget_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budget_entries_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budget_entries_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "budget_periods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budget_entries_wealth_account_id_fkey"
+            columns: ["wealth_account_id"]
+            isOneToOne: false
+            referencedRelation: "wealth_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      budget_periods: {
+        Row: {
+          created_at: string
+          currency: string
+          id: string
+          notes: string | null
+          org_id: string
+          period_month: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          currency: string
+          id?: string
+          notes?: string | null
+          org_id?: string
+          period_month: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          currency?: string
+          id?: string
+          notes?: string | null
+          org_id?: string
+          period_month?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_periods_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      budget_targets: {
+        Row: {
+          amount_limit: number
+          category_id: string
+          created_at: string
+          id: string
+          period_id: string
+          updated_at: string
+        }
+        Insert: {
+          amount_limit?: number
+          category_id: string
+          created_at?: string
+          id?: string
+          period_id: string
+          updated_at?: string
+        }
+        Update: {
+          amount_limit?: number
+          category_id?: string
+          created_at?: string
+          id?: string
+          period_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_targets_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "budget_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budget_targets_period_id_fkey"
+            columns: ["period_id"]
+            isOneToOne: false
+            referencedRelation: "budget_periods"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       credit_source_loan_type_defaults: {
         Row: {
           credit_source_id: string
@@ -653,6 +870,123 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "user_org_context_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wealth_accounts: {
+        Row: {
+          account_kind: string
+          cash_balance: number
+          created_at: string
+          currency: string
+          id: string
+          institution: string | null
+          market_value: number | null
+          name: string
+          notes: string | null
+          org_id: string
+          region: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_kind: string
+          cash_balance?: number
+          created_at?: string
+          currency: string
+          id?: string
+          institution?: string | null
+          market_value?: number | null
+          name: string
+          notes?: string | null
+          org_id?: string
+          region?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_kind?: string
+          cash_balance?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          institution?: string | null
+          market_value?: number | null
+          name?: string
+          notes?: string | null
+          org_id?: string
+          region?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wealth_accounts_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      wealth_transactions: {
+        Row: {
+          account_id: string
+          amount: number
+          budget_entry_id: string | null
+          created_at: string
+          id: string
+          notes: string | null
+          org_id: string
+          txn_date: string
+          txn_type: string
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          amount: number
+          budget_entry_id?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          org_id?: string
+          txn_date?: string
+          txn_type: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          amount?: number
+          budget_entry_id?: string | null
+          created_at?: string
+          id?: string
+          notes?: string | null
+          org_id?: string
+          txn_date?: string
+          txn_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "wealth_transactions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "wealth_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wealth_transactions_budget_entry_id_fkey"
+            columns: ["budget_entry_id"]
+            isOneToOne: false
+            referencedRelation: "budget_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "wealth_transactions_org_id_fkey"
             columns: ["org_id"]
             isOneToOne: false
             referencedRelation: "organizations"

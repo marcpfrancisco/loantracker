@@ -321,3 +321,11 @@ export function getLoanTypesForSource(sourceName: string): LoanTypeConfig[] {
 export function getLoanTypeConfig(sourceName: string, loanType: LoanType): LoanTypeConfig | null {
   return getSourceConfig(sourceName)?.loan_types.find((lt) => lt.loan_type === loanType) ?? null;
 }
+
+/** Credit sources defined in schema.ts that are not yet in the org's database. */
+export function findMissingSchemaCreditSources(
+  existing: { name: string; region: string }[]
+): CreditSourceConfig[] {
+  const keys = new Set(existing.map((s) => `${s.region}\0${s.name}`));
+  return CREDIT_SOURCE_CONFIGS.filter((c) => !keys.has(`${c.region}\0${c.name}`));
+}

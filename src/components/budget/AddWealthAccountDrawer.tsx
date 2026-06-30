@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Loader2, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -28,8 +28,13 @@ interface AddWealthAccountDrawerProps {
   onSubmit: (input: WealthAccountFormInput) => Promise<void>;
 }
 
-export function AddWealthAccountDrawer({
-  open,
+export function AddWealthAccountDrawer(props: AddWealthAccountDrawerProps) {
+  return (
+    <AnimatePresence>{props.open && <AddWealthAccountDrawerContent {...props} />}</AnimatePresence>
+  );
+}
+
+function AddWealthAccountDrawerContent({
   onClose,
   currency,
   isPending,
@@ -41,165 +46,150 @@ export function AddWealthAccountDrawer({
   const [openingCash, setOpeningCash] = useState("");
   const [openingMarket, setOpeningMarket] = useState("");
 
-  useEffect(() => {
-    if (open) {
-      setName("");
-      setAccountKind("savings");
-      setInstitution("");
-      setOpeningCash("");
-      setOpeningMarket("");
-    }
-  }, [open]);
-
   const showMarket = isInvestmentKind(accountKind);
 
   return (
-    <AnimatePresence>
-      {open && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
-            onClick={onClose}
-          />
-          <motion.div
-            initial={{ y: "100%" }}
-            animate={{ y: 0 }}
-            exit={{ y: "100%" }}
-            transition={{ type: "spring", damping: 28, stiffness: 320 }}
-            className="bg-background border-border/60 fixed inset-x-0 bottom-0 z-50 flex max-h-[90vh] flex-col rounded-t-2xl border shadow-2xl md:inset-x-auto md:top-0 md:right-0 md:bottom-0 md:max-h-none md:w-full md:max-w-md md:rounded-none md:rounded-l-2xl md:border-l"
-          >
-            <div className="border-border/60 flex shrink-0 items-center justify-between border-b px-5 py-4">
-              <div>
-                <h2 className="text-foreground font-heading text-base font-semibold">
-                  Add wealth account
-                </h2>
-                <p className="text-muted-foreground text-xs">
-                  {currency} · e.g. Mashreq Neo, GCash, MP2
-                </p>
-              </div>
-              <button type="button" onClick={onClose} className="text-muted-foreground p-1">
-                <X className="h-5 w-5" />
-              </button>
+    <>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      <motion.div
+        initial={{ y: "100%" }}
+        animate={{ y: 0 }}
+        exit={{ y: "100%" }}
+        transition={{ type: "spring", damping: 28, stiffness: 320 }}
+        className="bg-background border-border/60 fixed inset-x-0 bottom-0 z-50 flex max-h-[90vh] flex-col rounded-t-2xl border shadow-2xl md:inset-x-auto md:top-0 md:right-0 md:bottom-0 md:max-h-none md:w-full md:max-w-md md:rounded-none md:rounded-l-2xl md:border-l"
+      >
+        <div className="border-border/60 flex shrink-0 items-center justify-between border-b px-5 py-4">
+          <div>
+            <h2 className="text-foreground font-heading text-base font-semibold">
+              Add wealth account
+            </h2>
+            <p className="text-muted-foreground text-xs">
+              {currency} · e.g. Mashreq Neo, GCash, MP2
+            </p>
+          </div>
+          <button type="button" onClick={onClose} className="text-muted-foreground p-1">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!name.trim()) return;
+            void onSubmit({
+              name: name.trim(),
+              account_kind: accountKind,
+              institution: institution.trim() || undefined,
+              openingCash: openingCash.trim() === "" ? undefined : Number(openingCash) || 0,
+              openingMarketValue: openingMarket.trim() === "" ? null : Number(openingMarket) || 0,
+            }).then(() => onClose());
+          }}
+          className="flex min-h-0 flex-1 flex-col"
+        >
+          <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-foreground text-xs font-medium">Account name</label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className={inputClass}
+                placeholder="Mashreq Neo Savings, GCash, MP2…"
+                required
+              />
             </div>
 
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                if (!name.trim()) return;
-                void onSubmit({
-                  name: name.trim(),
-                  account_kind: accountKind,
-                  institution: institution.trim() || undefined,
-                  openingCash: openingCash.trim() === "" ? undefined : Number(openingCash) || 0,
-                  openingMarketValue:
-                    openingMarket.trim() === "" ? null : Number(openingMarket) || 0,
-                }).then(() => onClose());
-              }}
-              className="flex min-h-0 flex-1 flex-col"
+            <div className="flex flex-col gap-1.5">
+              <label className="text-foreground text-xs font-medium">Type</label>
+              <select
+                value={accountKind}
+                onChange={(e) => setAccountKind(e.target.value as WealthAccountKind)}
+                className={inputClass}
+              >
+                {WEALTH_ACCOUNT_KIND_OPTIONS.map((kind) => (
+                  <option key={kind} value={kind}>
+                    {WEALTH_ACCOUNT_KIND_LABELS[kind]}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-foreground text-xs font-medium">
+                Bank / provider (optional)
+              </label>
+              <input
+                type="text"
+                value={institution}
+                onChange={(e) => setInstitution(e.target.value)}
+                className={inputClass}
+                placeholder="Mashreq, Maribank, Pag-IBIG…"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-foreground text-xs font-medium">
+                Current balance ({currency}) — optional
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={openingCash}
+                onChange={(e) => setOpeningCash(e.target.value)}
+                className={inputClass}
+                placeholder="Set now or later"
+              />
+              <p className="text-muted-foreground text-[10px]">
+                Opening balance is not counted as monthly income.
+              </p>
+            </div>
+
+            {showMarket && (
+              <div className="flex flex-col gap-1.5">
+                <label className="text-foreground text-xs font-medium">
+                  Market value ({currency}) — optional
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={openingMarket}
+                  onChange={(e) => setOpeningMarket(e.target.value)}
+                  className={inputClass}
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="border-border/60 flex shrink-0 gap-3 border-t px-5 py-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="border-border/60 text-muted-foreground flex-1 rounded-lg border py-2 text-sm"
             >
-              <div className="flex-1 space-y-4 overflow-y-auto px-5 py-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-foreground text-xs font-medium">Account name</label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className={inputClass}
-                    placeholder="Mashreq Neo Savings, GCash, MP2…"
-                    required
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-foreground text-xs font-medium">Type</label>
-                  <select
-                    value={accountKind}
-                    onChange={(e) => setAccountKind(e.target.value as WealthAccountKind)}
-                    className={inputClass}
-                  >
-                    {WEALTH_ACCOUNT_KIND_OPTIONS.map((kind) => (
-                      <option key={kind} value={kind}>
-                        {WEALTH_ACCOUNT_KIND_LABELS[kind]}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-foreground text-xs font-medium">
-                    Bank / provider (optional)
-                  </label>
-                  <input
-                    type="text"
-                    value={institution}
-                    onChange={(e) => setInstitution(e.target.value)}
-                    className={inputClass}
-                    placeholder="Mashreq, Maribank, Pag-IBIG…"
-                  />
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-foreground text-xs font-medium">
-                    Current balance ({currency}) — optional
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={openingCash}
-                    onChange={(e) => setOpeningCash(e.target.value)}
-                    className={inputClass}
-                    placeholder="Set now or later"
-                  />
-                  <p className="text-muted-foreground text-[10px]">
-                    Opening balance is not counted as monthly income.
-                  </p>
-                </div>
-
-                {showMarket && (
-                  <div className="flex flex-col gap-1.5">
-                    <label className="text-foreground text-xs font-medium">
-                      Market value ({currency}) — optional
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={openingMarket}
-                      onChange={(e) => setOpeningMarket(e.target.value)}
-                      className={inputClass}
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="border-border/60 flex shrink-0 gap-3 border-t px-5 py-4">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="border-border/60 text-muted-foreground flex-1 rounded-lg border py-2 text-sm"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isPending || !name.trim()}
-                  className={cn(
-                    "bg-primary text-primary-foreground flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-sm font-medium disabled:opacity-50"
-                  )}
-                >
-                  {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                  Add account
-                </button>
-              </div>
-            </form>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isPending || !name.trim()}
+              className={cn(
+                "bg-primary text-primary-foreground flex flex-1 items-center justify-center gap-2 rounded-lg py-2 text-sm font-medium disabled:opacity-50"
+              )}
+            >
+              {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              Add account
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </>
   );
 }
 
@@ -228,13 +218,6 @@ export function EditWealthAccountDrawer({
 }: EditWealthAccountDrawerProps) {
   const [name, setName] = useState(accountName);
   const [inst, setInst] = useState(institution ?? "");
-
-  useEffect(() => {
-    if (open) {
-      setName(accountName);
-      setInst(institution ?? "");
-    }
-  }, [open, accountName, institution]);
 
   return (
     <AnimatePresence>

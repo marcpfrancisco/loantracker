@@ -30,6 +30,8 @@ const BorrowerDetailPage = lazyPage(() => import("@/pages/BorrowerDetailPage"));
 const ExpenseTabsPage = lazyPage(() => import("@/pages/ExpenseTabsPage"));
 const ExpenseTabDetailPage = lazyPage(() => import("@/pages/ExpenseTabDetailPage"));
 const BudgetPage = lazyPage(() => import("@/pages/BudgetPage"));
+const FinanceHubPage = lazyPage(() => import("@/pages/FinanceHubPage"));
+const CardsPage = lazyPage(() => import("@/pages/CardsPage"));
 const OrgSettingsPage = lazyPage(() => import("@/pages/OrgSettingsPage"));
 
 export const router = createBrowserRouter([
@@ -128,8 +130,16 @@ export const router = createBrowserRouter([
         Component: ExpenseTabDetailPage,
       },
       {
+        path: "finance",
+        Component: FinanceHubPage,
+      },
+      {
         path: "budget",
         Component: BudgetPage,
+      },
+      {
+        path: "cards",
+        Component: CardsPage,
       },
     ],
   },

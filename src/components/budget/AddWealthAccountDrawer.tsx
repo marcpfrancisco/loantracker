@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { Loader2, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -70,7 +71,11 @@ function AddWealthAccountDrawerContent({
               Add wealth account
             </h2>
             <p className="text-muted-foreground text-xs">
-              {currency} · e.g. Mashreq Neo, GCash, MP2
+              {currency} · savings & cash only —{" "}
+              <Link to="/cards" className="text-primary hover:underline">
+                credit cards
+              </Link>{" "}
+              are tracked separately
             </p>
           </div>
           <button type="button" onClick={onClose} className="text-muted-foreground p-1">

@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/context/ThemeContext";
-import { navItems } from "./navItems";
+import { desktopNavItems, navSectionLabels, type NavItem } from "./navItems";
 import { RegionBadge } from "@/components/ui/region-badge";
 import { NotificationBell } from "@/components/layout/NotificationBell";
 
@@ -31,17 +31,31 @@ function resolveAvatarUrl(avatarUrl: string | null, userId: string): string | nu
   return supabase.storage.from("avatars").getPublicUrl(avatarUrl).data.publicUrl;
 }
 
+function groupNavItems(items: NavItem[]): { section: NavItem["section"]; items: NavItem[] }[] {
+  const groups: { section: NavItem["section"]; items: NavItem[] }[] = [];
+  for (const item of items) {
+    const section = item.section ?? "overview";
+    const last = groups[groups.length - 1];
+    if (last?.section === section) {
+      last.items.push(item);
+    } else {
+      groups.push({ section, items: [item] });
+    }
+  }
+  return groups;
+}
+
 export function Sidebar() {
   const { profile, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const isAdmin = profile?.role === "admin";
 
-  const visibleItems = navItems.filter((item) => !item.adminOnly || isAdmin);
+  const visibleItems = desktopNavItems.filter((item) => !item.adminOnly || isAdmin);
+  const grouped = groupNavItems(visibleItems);
 
   return (
     <aside className="bg-card/60 border-border/60 hidden w-60 shrink-0 flex-col border-r backdrop-blur-sm md:flex">
-      {/* Logo */}
       <div className="border-border/60 flex h-16 items-center gap-3 border-b px-5">
         <div className="bg-primary/10 border-border flex h-8 w-8 items-center justify-center rounded-xl border">
           <LockKeyhole className="text-primary h-4 w-4" />
@@ -49,54 +63,62 @@ export function Sidebar() {
         <span className="text-foreground text-sm font-semibold tracking-tight">Loan Tracker</span>
       </div>
 
-      {/* Nav items */}
-      <nav className="flex flex-1 flex-col gap-1 px-3 py-4">
-        {visibleItems.map((item) => (
-          <NavLink key={item.to} to={item.to} end={item.to === "/dashboard"}>
-            {({ isActive }) => (
-              <div className="relative flex items-center gap-3 rounded-lg px-3 py-2.5">
-                {isActive && (
-                  <>
-                    <motion.div
-                      layoutId="sidebar-bg"
-                      className="bg-primary/10 absolute inset-0 rounded-lg"
-                      transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
-                    />
-                    <motion.div
-                      layoutId="sidebar-accent"
-                      className="bg-primary absolute top-1/2 left-0 h-5 w-[3px] -translate-y-1/2 rounded-r-full"
-                      transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
-                    />
-                  </>
-                )}
-                <item.icon
-                  className={cn(
-                    "relative z-10 h-4 w-4 shrink-0 transition-colors",
-                    isActive ? "text-primary" : "text-muted-foreground"
-                  )}
-                />
-                <span
-                  className={cn(
-                    "relative z-10 text-sm font-medium transition-colors",
-                    isActive ? "text-foreground" : "text-muted-foreground"
-                  )}
-                >
-                  {item.label}
-                </span>
-              </div>
+      <nav className="flex flex-1 flex-col gap-4 overflow-y-auto px-3 py-4">
+        {grouped.map(({ section, items }) => (
+          <div key={section}>
+            {section && (
+              <p className="text-muted-foreground mb-1.5 px-3 text-[10px] font-semibold tracking-wider uppercase">
+                {navSectionLabels[section]}
+              </p>
             )}
-          </NavLink>
+            <div className="flex flex-col gap-0.5">
+              {items.map((item) => (
+                <NavLink key={item.to} to={item.to} end={item.to === "/dashboard"}>
+                  {({ isActive }) => (
+                    <div className="relative flex items-center gap-3 rounded-lg px-3 py-2.5">
+                      {isActive && (
+                        <>
+                          <motion.div
+                            layoutId="sidebar-bg"
+                            className="bg-primary/10 absolute inset-0 rounded-lg"
+                            transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
+                          />
+                          <motion.div
+                            layoutId="sidebar-accent"
+                            className="bg-primary absolute top-1/2 left-0 h-5 w-[3px] -translate-y-1/2 rounded-r-full"
+                            transition={{ type: "spring", bounce: 0.2, duration: 0.4 }}
+                          />
+                        </>
+                      )}
+                      <item.icon
+                        className={cn(
+                          "relative z-10 h-4 w-4 shrink-0 transition-colors",
+                          isActive ? "text-primary" : "text-muted-foreground"
+                        )}
+                      />
+                      <span
+                        className={cn(
+                          "relative z-10 text-sm font-medium transition-colors",
+                          isActive ? "text-foreground" : "text-muted-foreground"
+                        )}
+                      >
+                        {item.label}
+                      </span>
+                    </div>
+                  )}
+                </NavLink>
+              ))}
+            </div>
+          </div>
         ))}
       </nav>
 
-      {/* User section */}
       {profile && (
         <div className="border-border/60 border-t px-3 py-4">
           <button
             onClick={() => void navigate("/profile")}
             className="hover:bg-muted/50 mb-2 flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2 transition-colors"
           >
-            {/* Avatar */}
             {(() => {
               const src = resolveAvatarUrl(profile.avatar_url, profile.id);
               return src ? (
@@ -120,7 +142,6 @@ export function Sidebar() {
               </div>
             </div>
           </button>
-          {/* Notifications */}
           <div className="flex items-center gap-3 rounded-lg px-3 py-2">
             <NotificationBell panelOrigin="bottom-right" />
             <span className="text-muted-foreground text-sm">Notifications</span>

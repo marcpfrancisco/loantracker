@@ -291,6 +291,71 @@ export type Database = {
           },
         ]
       }
+      card_accounts: {
+        Row: {
+          card_kind: string
+          created_at: string
+          credit_limit: number | null
+          currency: string
+          id: string
+          is_active: boolean
+          issuer: string | null
+          last_four: string | null
+          name: string
+          notes: string | null
+          org_id: string
+          outstanding_balance: number
+          region: string | null
+          statement_day: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          card_kind: string
+          created_at?: string
+          credit_limit?: number | null
+          currency: string
+          id?: string
+          is_active?: boolean
+          issuer?: string | null
+          last_four?: string | null
+          name: string
+          notes?: string | null
+          org_id?: string
+          outstanding_balance?: number
+          region?: string | null
+          statement_day?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          card_kind?: string
+          created_at?: string
+          credit_limit?: number | null
+          currency?: string
+          id?: string
+          is_active?: boolean
+          issuer?: string | null
+          last_four?: string | null
+          name?: string
+          notes?: string | null
+          org_id?: string
+          outstanding_balance?: number
+          region?: string | null
+          statement_day?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_accounts_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       credit_source_loan_type_defaults: {
         Row: {
           credit_source_id: string

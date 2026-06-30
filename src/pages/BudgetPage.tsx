@@ -24,13 +24,17 @@ import {
   useWealthMutations,
   useWealthOnboardingStatus,
 } from "@/hooks/useWealthMutations";
-import { ManageCategoriesDrawer } from "@/components/budget/ManageCategoriesDrawer";
-import { BudgetGroupSection } from "@/components/budget/BudgetGroupSection";
-import { WealthAccountsPanel } from "@/components/budget/WealthAccountsPanel";
 import {
   WealthOnboardingBanner,
   WealthOpeningBalanceDrawer,
 } from "@/components/budget/WealthOpeningBalanceDrawer";
+import { ManageCategoriesDrawer } from "@/components/budget/ManageCategoriesDrawer";
+import { WealthAccountsPanel } from "@/components/budget/WealthAccountsPanel";
+import {
+  AddWealthAccountDrawer,
+  EditWealthAccountDrawer,
+} from "@/components/budget/AddWealthAccountDrawer";
+import { BudgetGroupSection } from "@/components/budget/BudgetGroupSection";
 import { BudgetEntryList } from "@/components/budget/BudgetEntryList";
 import { AddBudgetEntryDrawer, EditBudgetTargetDrawer } from "@/components/budget/BudgetDrawers";
 import { RefreshButton } from "@/components/ui/refresh-button";
@@ -83,6 +87,8 @@ export default function BudgetPage() {
   const [manageOpen, setManageOpen] = useState(false);
   const [wealthBalanceOpen, setWealthBalanceOpen] = useState(false);
   const [wealthFocusAccountId, setWealthFocusAccountId] = useState<string | null>(null);
+  const [wealthAddOpen, setWealthAddOpen] = useState(false);
+  const [wealthEditId, setWealthEditId] = useState<string | null>(null);
   const [targetEdit, setTargetEdit] = useState<{ id: string; name: string; target: number } | null>(
     null
   );
@@ -109,7 +115,17 @@ export default function BudgetPage() {
     currency,
     profile?.id
   );
-  const { setOpeningBalance, setOpeningBalancesBatch } = useWealthMutations(currency, profile?.id);
+  const {
+    setOpeningBalance,
+    setOpeningBalancesBatch,
+    createWealthAccount,
+    updateWealthAccount,
+    deleteWealthAccount,
+  } = useWealthMutations(currency, profile?.id);
+
+  const wealthEditAccount = wealthEditId
+    ? wealthAccounts.find((a) => a.id === wealthEditId)
+    : undefined;
 
   function openWealthBalances(accountId: string | null) {
     setWealthFocusAccountId(accountId);
@@ -275,7 +291,9 @@ export default function BudgetPage() {
           <WealthAccountsPanel
             accounts={wealthAccounts}
             currency={currency}
+            onAddAccount={() => setWealthAddOpen(true)}
             onEditBalance={(accountId) => openWealthBalances(accountId)}
+            onEditAccount={(accountId) => setWealthEditId(accountId)}
           />
 
           <div className="space-y-3">
@@ -393,6 +411,40 @@ export default function BudgetPage() {
           }
         }}
       />
+
+      <AddWealthAccountDrawer
+        open={wealthAddOpen}
+        onClose={() => setWealthAddOpen(false)}
+        currency={currency}
+        isPending={createWealthAccount.isPending}
+        onSubmit={async (input) => {
+          await createWealthAccount.mutateAsync({
+            ...input,
+            region: currency === "PHP" ? "PH" : currency === "AED" ? "AE" : profile?.region,
+          });
+        }}
+      />
+
+      {wealthEditAccount && (
+        <EditWealthAccountDrawer
+          open={Boolean(wealthEditId)}
+          onClose={() => setWealthEditId(null)}
+          currency={currency}
+          accountName={wealthEditAccount.name}
+          institution={wealthEditAccount.institution}
+          isPending={updateWealthAccount.isPending}
+          isDeleting={deleteWealthAccount.isPending}
+          onSave={async (input) => {
+            await updateWealthAccount.mutateAsync({
+              accountId: wealthEditAccount.id,
+              ...input,
+            });
+          }}
+          onDelete={async () => {
+            await deleteWealthAccount.mutateAsync(wealthEditAccount.id);
+          }}
+        />
+      )}
 
       <EditBudgetTargetDrawer
         open={Boolean(targetEdit)}

@@ -10,6 +10,7 @@ import {
   BUDGET_GROUP_LABELS,
   BUDGET_GROUP_ORDER,
   WEALTH_ACCOUNT_KIND_LABELS,
+  WEALTH_ACCOUNT_KIND_OPTIONS,
   type BudgetCategory,
   type BudgetEntryTypeHint,
   type BudgetGroupKey,
@@ -345,14 +346,9 @@ export function ManageCategoriesDrawer({
                             }
                             className={inputClass}
                           >
-                            {(
-                              Object.entries(WEALTH_ACCOUNT_KIND_LABELS) as [
-                                WealthAccountKind,
-                                string,
-                              ][]
-                            ).map(([kind, label]) => (
+                            {WEALTH_ACCOUNT_KIND_OPTIONS.map((kind) => (
                               <option key={kind} value={kind}>
-                                {label}
+                                {WEALTH_ACCOUNT_KIND_LABELS[kind]}
                               </option>
                             ))}
                           </select>

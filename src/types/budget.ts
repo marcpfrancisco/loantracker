@@ -15,6 +15,8 @@ export type BudgetEntryTypeHint = BudgetEntryType;
 
 export type WealthAccountKind =
   | "savings"
+  | "salary"
+  | "e_wallet"
   | "emergency"
   | "mp2"
   | "uitf"
@@ -149,6 +151,8 @@ export const BUDGET_GROUP_LABELS: Record<BudgetGroupKey, string> = {
 
 export const WEALTH_ACCOUNT_KIND_LABELS: Record<WealthAccountKind, string> = {
   savings: "Savings",
+  salary: "Salary account",
+  e_wallet: "E-wallet",
   emergency: "Emergency fund",
   mp2: "MP2",
   uitf: "UITF",
@@ -157,6 +161,20 @@ export const WEALTH_ACCOUNT_KIND_LABELS: Record<WealthAccountKind, string> = {
   stocks: "Stocks",
   other: "Other",
 };
+
+/** Suggested kinds shown first in the add-account picker. */
+export const WEALTH_ACCOUNT_KIND_OPTIONS: WealthAccountKind[] = [
+  "savings",
+  "salary",
+  "e_wallet",
+  "emergency",
+  "mp2",
+  "uitf",
+  "reit",
+  "bond",
+  "stocks",
+  "other",
+];
 
 /** Currencies shown in the budget currency switcher for Phase 1. */
 export const BUDGET_CURRENCIES = ["PHP", "AED"] as const satisfies readonly CurrencyType[];

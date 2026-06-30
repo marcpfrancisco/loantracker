@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { getSeedCategories, getSeedWealthAccounts } from "@/lib/budgetSeed";
+import { getSeedCategories } from "@/lib/budgetSeed";
 import { normalizeMonthKey } from "@/lib/budgetRules";
 import type { CurrencyType } from "@/types/enums";
 import type { BudgetCategory, BudgetPeriod, WealthAccount } from "@/types/budget";
@@ -57,23 +57,6 @@ async function seedBudgetCurrency(currency: CurrencyType, userId: string): Promi
   const existing = await fetchCategories(currency);
   if (existing.length > 0) return;
 
-  const wealthSeeds = getSeedWealthAccounts(currency);
-  const { data: wealthRows, error: wealthError } = await supabase
-    .from("wealth_accounts")
-    .insert(
-      wealthSeeds.map((w) => ({
-        user_id: userId,
-        name: w.name,
-        currency,
-        account_kind: w.account_kind,
-        region: w.region ?? null,
-      }))
-    )
-    .select("id, name");
-
-  if (wealthError) throw wealthError;
-
-  const wealthByName = new Map((wealthRows ?? []).map((w) => [w.name, w.id]));
   const categorySeeds = getSeedCategories(currency);
 
   const { error: catError } = await supabase.from("budget_categories").insert(
@@ -84,9 +67,7 @@ async function seedBudgetCurrency(currency: CurrencyType, userId: string): Promi
       entry_type_hint: c.entry_type_hint,
       currency,
       sort_order: c.sort_order,
-      wealth_account_id: c.wealth_account_name
-        ? (wealthByName.get(c.wealth_account_name) ?? null)
-        : null,
+      wealth_account_id: null,
     }))
   );
 

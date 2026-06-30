@@ -16,6 +16,7 @@ export type BudgetEntryTypeHint = BudgetEntryType;
 export type WealthAccountKind =
   | "savings"
   | "salary"
+  | "cash"
   | "e_wallet"
   | "emergency"
   | "mp2"
@@ -152,6 +153,7 @@ export const BUDGET_GROUP_LABELS: Record<BudgetGroupKey, string> = {
 export const WEALTH_ACCOUNT_KIND_LABELS: Record<WealthAccountKind, string> = {
   savings: "Savings",
   salary: "Salary account",
+  cash: "Cash on hand",
   e_wallet: "E-wallet",
   emergency: "Emergency fund",
   mp2: "MP2",
@@ -166,6 +168,7 @@ export const WEALTH_ACCOUNT_KIND_LABELS: Record<WealthAccountKind, string> = {
 export const WEALTH_ACCOUNT_KIND_OPTIONS: WealthAccountKind[] = [
   "savings",
   "salary",
+  "cash",
   "e_wallet",
   "emergency",
   "mp2",

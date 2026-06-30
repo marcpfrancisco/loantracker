@@ -100,7 +100,7 @@ function AddWealthAccountDrawerContent({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className={inputClass}
-                placeholder="Mashreq Neo Savings, GCash, MP2…"
+                placeholder="Mashreq Neo Savings, Cash on hand, GCash…"
                 required
               />
             </div>

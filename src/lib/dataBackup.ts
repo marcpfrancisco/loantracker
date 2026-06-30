@@ -26,13 +26,24 @@ export async function exportSettingsBackup({
 
   if (profileError) throw profileError;
 
-  const { data: currencyRows, error: currencyError } = await supabase
-    .from("budget_currencies")
-    .select("currency, sort_order")
-    .eq("user_id", userId)
-    .order("sort_order", { ascending: true });
+  const [
+    { data: currencyRows, error: currencyError },
+    { data: cardCurrencyRows, error: cardCurrencyError },
+  ] = await Promise.all([
+    supabase
+      .from("budget_currencies")
+      .select("currency, sort_order")
+      .eq("user_id", userId)
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("card_currencies")
+      .select("currency, sort_order")
+      .eq("user_id", userId)
+      .order("sort_order", { ascending: true }),
+  ]);
 
   if (currencyError) throw currencyError;
+  if (cardCurrencyError) throw cardCurrencyError;
 
   const payload: SettingsBackupPayload = {
     version: SETTINGS_BACKUP_VERSION,
@@ -45,6 +56,7 @@ export async function exportSettingsBackup({
       avatar_url: profile.avatar_url,
     },
     budget_currencies: (currencyRows ?? []).map((r) => r.currency),
+    card_currencies: (cardCurrencyRows ?? []).map((r) => r.currency),
   };
 
   if (isAdmin && orgId) {
@@ -147,6 +159,7 @@ export async function restoreSettingsBackup({
   const result: SettingsRestoreResult = {
     profileUpdated: false,
     budgetCurrenciesUpdated: 0,
+    cardCurrenciesUpdated: 0,
     organizationUpdated: false,
     creditSourcesUpserted: 0,
     loanTypeDefaultsUpserted: 0,
@@ -187,6 +200,32 @@ export async function restoreSettingsBackup({
 
       if (insertError) throw insertError;
       result.budgetCurrenciesUpdated = toAdd.length;
+    }
+  }
+
+  if (data.card_currencies && data.card_currencies.length > 0) {
+    const { data: existingRows, error: fetchError } = await supabase
+      .from("card_currencies")
+      .select("currency")
+      .eq("user_id", userId);
+
+    if (fetchError) throw fetchError;
+
+    const existing = new Set((existingRows ?? []).map((r) => r.currency));
+    const toAdd = data.card_currencies.filter((c) => !existing.has(c));
+
+    if (toAdd.length > 0) {
+      const startOrder = existing.size;
+      const { error: insertError } = await supabase.from("card_currencies").insert(
+        toAdd.map((currency, index) => ({
+          user_id: userId,
+          currency,
+          sort_order: startOrder + index,
+        }))
+      );
+
+      if (insertError) throw insertError;
+      result.cardCurrenciesUpdated = toAdd.length;
     }
   }
 

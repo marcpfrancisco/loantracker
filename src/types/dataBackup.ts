@@ -31,6 +31,7 @@ export const settingsBackupSchema = z.object({
     avatar_url: z.string().nullable(),
   }),
   budget_currencies: z.array(z.string()).optional(),
+  card_currencies: z.array(z.string()).optional(),
   organization: z
     .object({
       name: z.string(),
@@ -46,6 +47,7 @@ export type SettingsBackupPayload = z.infer<typeof settingsBackupSchema>;
 export type SettingsRestoreResult = {
   profileUpdated: boolean;
   budgetCurrenciesUpdated: number;
+  cardCurrenciesUpdated: number;
   organizationUpdated: boolean;
   creditSourcesUpserted: number;
   loanTypeDefaultsUpserted: number;

@@ -1,9 +1,11 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
-import { inferEntryType, wealthTxnTypeForEntry } from "@/lib/budgetRules";
+import { cardBalanceDeltaForEntry, inferEntryType, wealthTxnTypeForEntry } from "@/lib/budgetRules";
 import { budgetKeys } from "@/hooks/useBudgetSetup";
+import { cardKeys } from "@/hooks/useCardAccounts";
 import type { BudgetCategory, BudgetEntryType } from "@/types/budget";
+import type { CardKind } from "@/types/cards";
 import type { CurrencyType } from "@/types/enums";
 
 interface AddEntryParams {
@@ -15,12 +17,54 @@ interface AddEntryParams {
   description?: string;
   notes?: string;
   wealthAccountId?: string | null;
+  cardAccountId?: string | null;
 }
 
 interface UpsertTargetParams {
   periodId: string;
   categoryId: string;
   amountLimit: number;
+}
+
+async function adjustCardBalance(cardAccountId: string, delta: number): Promise<void> {
+  const { data: card, error: fetchError } = await supabase
+    .from("card_accounts")
+    .select("outstanding_balance")
+    .eq("id", cardAccountId)
+    .single();
+
+  if (fetchError) throw fetchError;
+
+  const newBalance = Math.max(0, Number(card.outstanding_balance) + delta);
+  const { error } = await supabase
+    .from("card_accounts")
+    .update({
+      outstanding_balance: newBalance,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", cardAccountId);
+
+  if (error) throw error;
+}
+
+async function syncCardBalanceForEntry(
+  cardAccountId: string,
+  entryType: BudgetEntryType,
+  amount: number,
+  direction: "apply" | "reverse"
+): Promise<void> {
+  const { data: card, error } = await supabase
+    .from("card_accounts")
+    .select("card_kind")
+    .eq("id", cardAccountId)
+    .single();
+
+  if (error) throw error;
+
+  const delta = cardBalanceDeltaForEntry(entryType, card.card_kind as CardKind, amount, direction);
+  if (delta === null) return;
+
+  await adjustCardBalance(cardAccountId, delta);
 }
 
 export function useBudgetMutations(currency: CurrencyType, periodId: string | undefined) {
@@ -31,6 +75,8 @@ export function useBudgetMutations(currency: CurrencyType, periodId: string | un
     void qc.invalidateQueries({ queryKey: budgetKeys.targets(periodId ?? "") });
     void qc.invalidateQueries({ queryKey: budgetKeys.wealth(currency) });
     void qc.invalidateQueries({ queryKey: budgetKeys.categories(currency) });
+    void qc.invalidateQueries({ queryKey: cardKeys.byCurrency(currency) });
+    void qc.invalidateQueries({ queryKey: cardKeys.all });
     if (periodId) {
       void qc.invalidateQueries({ queryKey: budgetKeys.period(currency, "") });
     }
@@ -39,7 +85,11 @@ export function useBudgetMutations(currency: CurrencyType, periodId: string | un
   const addEntry = useMutation({
     mutationFn: async (params: AddEntryParams) => {
       const entryType: BudgetEntryType = inferEntryType(params.category);
-      const wealthAccountId = params.wealthAccountId ?? params.category.wealth_account_id ?? null;
+      const cardAccountId = params.cardAccountId ?? null;
+      const wealthAccountId =
+        cardAccountId && entryType === "expense"
+          ? null
+          : (params.wealthAccountId ?? params.category.wealth_account_id ?? null);
 
       const { data: entry, error } = await supabase
         .from("budget_entries")
@@ -53,6 +103,7 @@ export function useBudgetMutations(currency: CurrencyType, periodId: string | un
           description: params.description?.trim() || null,
           notes: params.notes?.trim() || null,
           wealth_account_id: wealthAccountId,
+          card_account_id: cardAccountId,
         })
         .select("id")
         .single();
@@ -73,6 +124,10 @@ export function useBudgetMutations(currency: CurrencyType, periodId: string | un
         if (txnError) throw txnError;
       }
 
+      if (cardAccountId) {
+        await syncCardBalanceForEntry(cardAccountId, entryType, params.amount, "apply");
+      }
+
       return entry;
     },
     onSuccess: () => {
@@ -84,12 +139,29 @@ export function useBudgetMutations(currency: CurrencyType, periodId: string | un
 
   const deleteEntry = useMutation({
     mutationFn: async (entryId: string) => {
+      const { data: entry, error: fetchError } = await supabase
+        .from("budget_entries")
+        .select("amount, entry_type, card_account_id, card_accounts(card_kind)")
+        .eq("id", entryId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
       const { error: txnDeleteError } = await supabase
         .from("wealth_transactions")
         .delete()
         .eq("budget_entry_id", entryId);
 
       if (txnDeleteError) throw txnDeleteError;
+
+      if (entry.card_account_id && entry.card_accounts) {
+        await syncCardBalanceForEntry(
+          entry.card_account_id,
+          entry.entry_type as BudgetEntryType,
+          Number(entry.amount),
+          "reverse"
+        );
+      }
 
       const { error } = await supabase.from("budget_entries").delete().eq("id", entryId);
       if (error) throw error;

@@ -22,7 +22,8 @@ async function fetchEntries(periodId: string): Promise<BudgetEntry[]> {
     .select(
       `*,
        budget_categories(name, group_key),
-       wealth_accounts(name)`
+       wealth_accounts(name),
+       card_accounts(name, card_kind)`
     )
     .eq("period_id", periodId)
     .order("entry_date", { ascending: false })

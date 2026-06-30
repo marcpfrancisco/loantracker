@@ -40,6 +40,7 @@ export function BudgetEntryList({ entries, currency, onDelete, isDeleting }: Bud
                 {date}
                 {entry.description ? ` · ${entry.description}` : ""}
                 {entry.wealth_accounts?.name ? ` · ${entry.wealth_accounts.name}` : ""}
+                {entry.card_accounts?.name ? ` · ${entry.card_accounts.name}` : ""}
               </p>
             </div>
             {onDelete && (

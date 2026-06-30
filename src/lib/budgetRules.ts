@@ -12,6 +12,7 @@ import type {
   WealthAccountKind,
 } from "@/types/budget";
 import { BUDGET_GROUP_ORDER } from "@/types/budget";
+import type { CardKind } from "@/types/cards";
 
 export function toFirstOfMonth(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`;
@@ -160,10 +161,41 @@ export function wealthAccountFieldLabel(entryType: BudgetEntryType): string {
     case "allocation":
       return "Contribute to account";
     case "transfer":
-      return "Transfer from account";
+      return "Pay from account";
     default:
       return "Pay from account";
   }
+}
+
+export function cardAccountFieldLabel(entryType: BudgetEntryType): string {
+  return entryType === "transfer" ? "Pay down card" : "Pay with card";
+}
+
+export function showsCardPicker(entryType: BudgetEntryType | null): boolean {
+  return entryType === "expense" || entryType === "transfer";
+}
+
+/** Expense paid on card should not also deduct from a wealth account. */
+export function wealthAndCardExclusive(entryType: BudgetEntryType | null): boolean {
+  return entryType === "expense";
+}
+
+/**
+ * Delta for card_accounts.outstanding_balance when linking a budget entry.
+ * Positive increases owed; negative pays down. Null = no card balance change.
+ */
+export function cardBalanceDeltaForEntry(
+  entryType: BudgetEntryType,
+  cardKind: CardKind,
+  amount: number,
+  direction: "apply" | "reverse" = "apply"
+): number | null {
+  if (cardKind !== "credit") return null;
+
+  const sign = direction === "reverse" ? -1 : 1;
+  if (entryType === "expense") return amount * sign;
+  if (entryType === "transfer") return -amount * sign;
+  return null;
 }
 
 export function isBurnGroup(group: BudgetGroupKey): boolean {

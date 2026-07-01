@@ -35,6 +35,16 @@ export interface LoanDetail {
   due_day_of_month: number | null;
   notes: string | null;
   first_due_strategy: FirstDueStrategy;
+  card_transaction_id: string | null;
+  card_transaction: {
+    id: string;
+    amount: number;
+    txn_date: string;
+    merchant: string | null;
+    description: string | null;
+    card_account_id: string;
+    card_accounts: { id: string; name: string; currency: string } | null;
+  } | null;
   credit_source: { name: string; type: CreditSourceType };
   borrower: { id: string; full_name: string } | null;
   installments: InstallmentDetail[];
@@ -44,7 +54,14 @@ async function fetchLoanDetail(id: string): Promise<LoanDetail> {
   const { data, error } = await supabase
     .from("loans")
     .select(
-      "id, loan_type, currency, principal, interest_rate, service_fee, installments_total, status, region, started_at, ended_at, due_day_of_month, notes, first_due_strategy, credit_sources!loans_source_id_fkey(name, type), profiles!loans_borrower_id_fkey(id, full_name), installments(id, installment_no, due_date, amount, status, paid_at, receipt_url)"
+      `id, loan_type, currency, principal, interest_rate, service_fee, installments_total, status, region, started_at, ended_at, due_day_of_month, notes, first_due_strategy, card_transaction_id,
+       card_transaction:card_transactions!loans_card_transaction_id_fkey(
+         id, amount, txn_date, merchant, description, card_account_id,
+         card_accounts(id, name, currency)
+       ),
+       credit_sources!loans_source_id_fkey(name, type),
+       profiles!loans_borrower_id_fkey(id, full_name),
+       installments(id, installment_no, due_date, amount, status, paid_at, receipt_url)`
     )
     .eq("id", id)
     .single();
@@ -63,6 +80,9 @@ async function fetchLoanDetail(id: string): Promise<LoanDetail> {
     }))
     .sort((a, b) => a.installment_no - b.installment_no);
 
+  const cardTxnRaw = data.card_transaction;
+  const cardTxn = Array.isArray(cardTxnRaw) ? cardTxnRaw[0] : cardTxnRaw;
+
   return {
     id: data.id,
     loan_type: data.loan_type,
@@ -78,6 +98,18 @@ async function fetchLoanDetail(id: string): Promise<LoanDetail> {
     due_day_of_month: data.due_day_of_month !== null ? Number(data.due_day_of_month) : null,
     notes: data.notes,
     first_due_strategy: data.first_due_strategy as FirstDueStrategy,
+    card_transaction_id: data.card_transaction_id,
+    card_transaction: cardTxn
+      ? {
+          id: cardTxn.id,
+          amount: Number(cardTxn.amount),
+          txn_date: cardTxn.txn_date,
+          merchant: cardTxn.merchant,
+          description: cardTxn.description,
+          card_account_id: cardTxn.card_account_id,
+          card_accounts: cardTxn.card_accounts ?? null,
+        }
+      : null,
     credit_source: {
       name: data.credit_sources?.name ?? "Unknown",
       type: data.credit_sources?.type ?? "custom",

@@ -50,14 +50,18 @@ export function buildInstallmentSchedule(
   const startYear = startDate.getFullYear();
   const startMonth = startDate.getMonth();
 
-  const firstOffset =
-    first_due_strategy === "same_month_if_possible"
-      ? due_day_of_month !== null && startDay <= due_day_of_month
-        ? 0
-        : 1
-      : first_due_strategy === "immediate_first_then_monthly"
-        ? 0
-        : 1;
+  const firstOffset = (() => {
+    if (first_due_strategy === "billing_cycle_based") {
+      if (due_day_of_month === null) return 1;
+      // Purchase before statement/payment day → first EPI on that day this month; on/after → next month
+      return startDay < due_day_of_month ? 0 : 1;
+    }
+    if (first_due_strategy === "same_month_if_possible") {
+      return due_day_of_month !== null && startDay <= due_day_of_month ? 0 : 1;
+    }
+    if (first_due_strategy === "immediate_first_then_monthly") return 0;
+    return 1;
+  })();
 
   const isImmediateFirst = first_due_strategy === "immediate_first_then_monthly";
 

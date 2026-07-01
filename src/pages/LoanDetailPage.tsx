@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, useNavigate } from "react-router";
+import { Link, useParams, useNavigate } from "react-router";
 import { motion } from "framer-motion";
 import {
   ArrowLeft,
@@ -12,6 +12,7 @@ import {
   Loader2,
   Pencil,
   Trash2,
+  CreditCard,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { cardVariants } from "@/lib/animations";
@@ -340,6 +341,33 @@ export default function LoanDetailPage() {
           <div className="border-border/40 flex items-start gap-2 border-t pt-3">
             <FileText className="text-muted-foreground mt-0.5 h-3.5 w-3.5 shrink-0" />
             <p className="text-muted-foreground text-xs">{loan.notes}</p>
+          </div>
+        )}
+
+        {loan.card_transaction && (
+          <div className="border-border/40 flex items-start gap-2 border-t pt-3">
+            <CreditCard className="text-muted-foreground mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <div className="min-w-0 text-xs">
+              <p className="text-muted-foreground text-[10px]">Linked card purchase</p>
+              <p className="text-foreground font-medium">
+                {loan.card_transaction.merchant?.trim() ||
+                  loan.card_transaction.description?.trim() ||
+                  "Card charge"}{" "}
+                · {formatCurrency(loan.card_transaction.amount, loan.currency)}
+              </p>
+              {loan.card_transaction.card_accounts && (
+                <Link
+                  to={`/cards/${loan.card_transaction.card_accounts.id}`}
+                  className="text-primary mt-0.5 inline-block hover:underline"
+                >
+                  {loan.card_transaction.card_accounts.name} ·{" "}
+                  {new Date(loan.card_transaction.txn_date + "T12:00:00").toLocaleDateString(
+                    "en-US",
+                    { month: "short", day: "numeric", year: "numeric" }
+                  )}
+                </Link>
+              )}
+            </div>
           </div>
         )}
       </motion.div>

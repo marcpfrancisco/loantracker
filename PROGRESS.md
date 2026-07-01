@@ -1,6 +1,6 @@
 # Global Loan Tracker — Progress & Roadmap
 
-> Last updated: 2026-06-30 (migrations 015–022 applied ✅)
+> Last updated: 2026-06-30 (migrations 015–023 applied ✅)
 
 ---
 
@@ -173,13 +173,13 @@ User-scoped RLS — private to each authenticated user; not visible to admin or 
 - [x] **Statements panel** — add statement cycles, mark paid (creates payment txn)
 - [x] **Cards list** — tap card to open detail; balance no longer edited directly on edit form
 
-#### Phase 3 — Loan-on-Card ⬜ Next
-- [ ] Optional `card_transaction_id` (or `budget_entry_id`) on `loans`
-- [ ] “Convert to installment plan” from a card charge → `AddLoanDrawer`
-- [ ] Loan detail ↔ card purchase link
-- [ ] Wire `billing_cycle_based` due dates in `generateInstallments.ts`
+#### Phase 3 — Loan-on-Card ✅
+- [x] **Migration `023_loan_on_card_link.sql`** — `card_transaction_id` on `loans` (unique per charge)
+- [x] **Convert to installment plan** — credit card charges on `/cards/:id` open `AddLoanDrawer` pre-filled (admin)
+- [x] **Loan detail ↔ card link** — linked purchase shown with link back to card
+- [x] **`billing_cycle_based` due dates** — first EPI aligns to card `statement_day` when converting
 
-#### Phase 4 — Investment Value Tracking ⬜
+#### Phase 4 — Investment Value Tracking ⬜ Next
 - [ ] Manual **market value** updates for UITF / REIT / Bond / Stocks accounts
 - [ ] Dividend / interest ledger entries on wealth accounts
 - [ ] Gain/loss vs contributions in wealth panel
@@ -246,11 +246,11 @@ Quick reference for what’s done vs what’s next:
 | **2** | Card accounts page, card currency CRUD, Finance hub + nav | ✅ Done |
 | **2b** | Budget entry ↔ card link (pay with card, pay down card) | ✅ Done |
 | **2c** | Card statements + transaction ledger + card detail page | ✅ Done |
-| **3** | Loan-on-card (purchase → installment plan) | ⬜ **Next** |
-| **4** | Investment market value, dividends, wealth ledger UI | ⬜ Planned |
+| **3** | Loan-on-card (purchase → installment plan) | ✅ Done |
+| **4** | Investment market value, dividends, wealth ledger UI | ⬜ **Next** |
 | **5** | FX rates, remittance planner, net-worth snapshot | ⬜ Optional |
 
-**Recommended next step:** **Phase 3** — link a card charge or budget entry to the Loans engine (“convert to installment plan”). Phase 2c is complete: every balance change is ledger-backed and auditable on `/cards/:id`.
+**Recommended next step:** **Phase 4** — manual market value updates and wealth transaction history per account.
 
 ---
 
@@ -258,9 +258,9 @@ Quick reference for what’s done vs what’s next:
 
 ### Next Up — Personal Finance
 
-1. **Phase 3 — Loan-on-card** — link card purchases to existing Loans engine
-2. **Phase 1 polish** — budget period close, wealth transaction history per account
-3. **Phase 4 — Investment tracking** — manual market value + dividend ledger
+1. **Phase 4 — Investment tracking** — manual market value + dividend ledger + wealth history UI
+2. **Phase 1 polish** — budget period close
+3. **Phase 5 — Cross-border intelligence** — FX rates, remittance planner (optional)
 
 ### Next Up — Core App (Loans / Admin)
 
@@ -442,6 +442,7 @@ supabase/
 │   ├── 020_card_currencies.sql
 │   └── 021_budget_entry_card_link.sql # Phase 2b
 │   └── 022_card_statements_transactions.sql # Phase 2c
+│   └── 023_loan_on_card_link.sql       # Phase 3
 └── email-templates/
     ├── invite-user.html
     └── reset-password.html

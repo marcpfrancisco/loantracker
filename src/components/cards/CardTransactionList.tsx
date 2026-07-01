@@ -1,6 +1,11 @@
-import { Trash2 } from "lucide-react";
+import { Link } from "react-router";
+import { Trash2, Split } from "lucide-react";
 import { formatCurrency } from "@/lib/formatCurrency";
-import { cardTxnIncreasesBalance, cardTxnTypeLabel } from "@/lib/cardRules";
+import {
+  canConvertTransactionToLoan,
+  cardTxnIncreasesBalance,
+  cardTxnTypeLabel,
+} from "@/lib/cardRules";
 import { cn } from "@/lib/utils";
 import type { CardTransaction } from "@/types/cards";
 
@@ -8,14 +13,18 @@ interface CardTransactionListProps {
   transactions: CardTransaction[];
   currency: string;
   onDelete?: (transactionId: string) => void;
+  onConvert?: (transaction: CardTransaction) => void;
   isDeleting?: boolean;
+  showConvertActions?: boolean;
 }
 
 export function CardTransactionList({
   transactions,
   currency,
   onDelete,
+  onConvert,
   isDeleting,
+  showConvertActions = false,
 }: CardTransactionListProps) {
   if (transactions.length === 0) {
     return (
@@ -38,6 +47,7 @@ export function CardTransactionList({
           month: "short",
           day: "numeric",
         });
+        const canConvert = showConvertActions && onConvert && canConvertTransactionToLoan(txn);
 
         return (
           <li key={txn.id} className="flex items-start gap-3 py-3">
@@ -57,10 +67,33 @@ export function CardTransactionList({
               <p className="text-muted-foreground text-xs">
                 {date} · {cardTxnTypeLabel(txn.txn_type)}
                 {txn.budget_entry_id ? " · from budget" : ""}
+                {txn.linked_loan ? (
+                  <>
+                    {" "}
+                    ·{" "}
+                    <Link
+                      to={`/loans/${txn.linked_loan.id}`}
+                      className="text-primary hover:underline"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {txn.linked_loan.installments_total}-mo plan · {txn.linked_loan.status}
+                    </Link>
+                  </>
+                ) : null}
                 {txn.description && txn.merchant ? ` · ${txn.description}` : ""}
               </p>
+              {canConvert && (
+                <button
+                  type="button"
+                  onClick={() => onConvert(txn)}
+                  className="text-primary mt-1.5 inline-flex items-center gap-1 text-[10px] font-medium hover:underline"
+                >
+                  <Split className="h-3 w-3" />
+                  Convert to installment plan
+                </button>
+              )}
             </div>
-            {onDelete && !txn.budget_entry_id && (
+            {onDelete && !txn.budget_entry_id && !txn.linked_loan && (
               <button
                 type="button"
                 disabled={isDeleting}

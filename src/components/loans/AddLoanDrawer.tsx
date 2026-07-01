@@ -16,6 +16,7 @@ import { useAllLoanTypeDefaults } from "@/hooks/useLoanTypeDefaults";
 import { getLoanTypesForSource, getLoanTypeConfig, type FirstDueStrategy } from "@/types/schema";
 import { LoanBreakdownSummary } from "@/components/loans/LoanBreakdownSummary";
 import type { LoanType, RegionType, CurrencyType } from "@/types/enums";
+import type { CardLoanConversionPrefill } from "@/types/cards";
 import { getDefaultCurrency, getFlagEmoji, getCountryName } from "@/lib/countries";
 import { INTEREST_RATE_INPUT_STEP } from "@/lib/interestRate";
 
@@ -110,17 +111,71 @@ const selectClass =
 interface AddLoanDrawerProps {
   open: boolean;
   onClose: () => void;
+  /** When set, pre-fills the form from a card ledger charge (Phase 3). */
+  cardConversion?: CardLoanConversionPrefill | null;
 }
 
-export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
-  const { activeRegions } = useAuth();
+function buildDefaultValues(cardConversion?: CardLoanConversionPrefill | null): FormData {
+  if (cardConversion) {
+    const noteParts = [cardConversion.merchant, cardConversion.description].filter(Boolean);
+    return {
+      borrower_id: "",
+      source_id: "",
+      loan_type: "credit_card",
+      principal: cardConversion.amount,
+      interest_rate: null,
+      service_fee: 0,
+      installments_total: 12,
+      started_at: cardConversion.txnDate,
+      due_day_of_month: cardConversion.statementDay,
+      notes: noteParts.length > 0 ? noteParts.join(" · ") : `Card: ${cardConversion.cardName}`,
+    };
+  }
+  return {
+    borrower_id: "",
+    source_id: "",
+    loan_type: "custom",
+    principal: "" as unknown as number,
+    interest_rate: null,
+    service_fee: 0,
+    installments_total: 1,
+    started_at: new Date().toISOString().split("T")[0],
+    due_day_of_month: null,
+    notes: "",
+  };
+}
+
+export function AddLoanDrawer({ open, onClose, cardConversion }: AddLoanDrawerProps) {
+  return (
+    <AnimatePresence>
+      {open && (
+        <AddLoanDrawerContent
+          key={cardConversion?.cardTransactionId ?? "standard"}
+          onClose={onClose}
+          cardConversion={cardConversion ?? null}
+        />
+      )}
+    </AnimatePresence>
+  );
+}
+
+function AddLoanDrawerContent({
+  onClose,
+  cardConversion,
+}: {
+  onClose: () => void;
+  cardConversion: CardLoanConversionPrefill | null;
+}) {
+  const { activeRegions, profile } = useAuth();
   const { data: allBorrowers = [] } = useAdminBorrowers();
   const borrowers = allBorrowers.filter((b) => b.isConfirmed);
   const { mutateAsync: createLoan, isPending } = useCreateLoan();
   const [dueDateOpen, setDueDateOpen] = useState(false);
   const [startDateOpen, setStartDateOpen] = useState(false);
   const [tabbyAmounts, setTabbyAmounts] = useState<number[]>([]);
-  const [selectedRegion, setSelectedRegion] = useState<RegionType | null>(null);
+  const [selectedRegion, setSelectedRegion] = useState<RegionType | null>(
+    cardConversion ? (cardConversion.region as RegionType) : null
+  );
 
   const {
     register,
@@ -131,18 +186,7 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
     formState: { errors },
   } = useForm<FormData>({
     resolver: zodResolver(addLoanSchema) as Resolver<FormData>,
-    defaultValues: {
-      borrower_id: "",
-      source_id: "",
-      loan_type: "custom",
-      principal: "" as unknown as number,
-      interest_rate: null,
-      service_fee: 0,
-      installments_total: 1,
-      started_at: new Date().toISOString().split("T")[0],
-      due_day_of_month: null,
-      notes: "",
-    },
+    defaultValues: buildDefaultValues(cardConversion),
   });
 
   const [
@@ -267,9 +311,10 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
           : schemaInterestRate;
 
     const finalDueDay =
-      ltDefault?.due_day != null
+      cardConversion?.statementDay ??
+      (ltDefault?.due_day != null
         ? ltDefault.due_day
-        : (selectedSource.default_due_day ?? schemaDueDay);
+        : (selectedSource.default_due_day ?? schemaDueDay));
 
     setValue("installments_total", finalInstallments, { shouldValidate: false });
     setValue("interest_rate", finalInterestRate, { shouldValidate: false });
@@ -277,6 +322,41 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
     setValue("due_day_of_month", finalDueDay, { shouldValidate: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchedLoanType, watchedSourceId, setValue]);
+
+  // Card conversion: match credit source by issuer and default borrower to self
+  useEffect(() => {
+    if (!cardConversion) return;
+
+    if (profile?.id) {
+      const selfBorrower = borrowers.find((b) => b.id === profile.id);
+      if (selfBorrower) {
+        setValue("borrower_id", selfBorrower.id, { shouldValidate: true });
+      }
+    }
+
+    if (creditSources.length === 0) return;
+
+    const issuer = cardConversion.issuer?.trim().toLowerCase();
+    const matched =
+      (issuer
+        ? creditSources.find(
+            (s) => s.name.toLowerCase().includes(issuer) || issuer.includes(s.name.toLowerCase())
+          )
+        : undefined) ?? creditSources.find((s) => s.type === "credit_card");
+
+    if (matched) {
+      setValue("source_id", matched.id, { shouldValidate: true });
+      const types = getLoanTypesForSource(matched.name);
+      const creditType = types.find((t) => t.loan_type === "credit_card") ?? types[0];
+      if (creditType) {
+        setValue("loan_type", creditType.loan_type, { shouldValidate: false });
+        if (!cardConversion.statementDay) {
+          setValue("installments_total", creditType.installments_total, { shouldValidate: false });
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cardConversion, creditSources, profile?.id, borrowers]);
 
   const isTabby = watchedLoanType === "tabby";
 
@@ -295,8 +375,8 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
   }, [isTabby, watchedPrincipal, watchedInstallments]);
 
   function handleClose() {
-    reset();
-    setSelectedRegion(null);
+    reset(buildDefaultValues(cardConversion));
+    setSelectedRegion(cardConversion ? (cardConversion.region as RegionType) : null);
     setDueDateOpen(false);
     setStartDateOpen(false);
     onClose();
@@ -348,7 +428,7 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
       source_id: data.source_id,
       loan_type: data.loan_type,
       region: selectedRegion,
-      currency: getDefaultCurrency(selectedRegion),
+      currency: cardConversion?.currency ?? getDefaultCurrency(selectedRegion),
       principal: data.principal,
       interest_rate: data.interest_rate,
       service_fee: data.service_fee ?? 0,
@@ -356,7 +436,10 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
       started_at: data.started_at,
       due_day_of_month: data.due_day_of_month ?? null,
       notes: data.notes ?? null,
-      first_due_strategy: data.first_due_strategy ?? "always_next_month",
+      first_due_strategy: cardConversion?.statementDay
+        ? "billing_cycle_based"
+        : (data.first_due_strategy ?? "always_next_month"),
+      card_transaction_id: cardConversion?.cardTransactionId ?? null,
       installment_overrides:
         isTabby && tabbyAmounts.length === data.installments_total ? tabbyAmounts : undefined,
     });
@@ -364,417 +447,411 @@ export function AddLoanDrawer({ open, onClose }: AddLoanDrawerProps) {
     handleClose();
   }
 
-  const currencyLabel = selectedRegion ? getDefaultCurrency(selectedRegion) : "—";
-  const showLoanTypeSelector = selectedSource && availableLoanTypes.length > 1;
+  const currencyLabel =
+    cardConversion?.currency ?? (selectedRegion ? getDefaultCurrency(selectedRegion) : "—");
+  const showLoanTypeSelector = selectedSource && availableLoanTypes.length > 1 && !cardConversion;
 
   return (
-    <AnimatePresence>
-      {open && (
-        <>
-          {/* Overlay */}
-          <motion.div
-            key="overlay"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
+    <>
+      {/* Overlay */}
+      <motion.div
+        key="overlay"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        onClick={handleClose}
+        className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+      />
+
+      {/* Drawer panel */}
+      <motion.div
+        key="panel"
+        initial={{ x: "100%" }}
+        animate={{ x: 0 }}
+        exit={{ x: "100%" }}
+        transition={{ type: "spring", bounce: 0.1, duration: 0.4 }}
+        className="bg-background border-border/60 fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l shadow-2xl sm:w-120"
+      >
+        {/* Header */}
+        <div className="border-border/60 flex shrink-0 items-center justify-between border-b px-5 py-4">
+          <div>
+            <h2 className="text-foreground font-semibold">
+              {cardConversion ? "Convert to installment plan" : "Add Loan"}
+            </h2>
+            {selectedRegion && (
+              <p className="text-muted-foreground mt-0.5 text-xs">
+                {getFlagEmoji(selectedRegion)} {getCountryName(selectedRegion)} · {currencyLabel}
+              </p>
+            )}
+          </div>
+          <button
             onClick={handleClose}
-            className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
-          />
-
-          {/* Drawer panel */}
-          <motion.div
-            key="panel"
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ type: "spring", bounce: 0.1, duration: 0.4 }}
-            className="bg-background border-border/60 fixed inset-y-0 right-0 z-50 flex w-full flex-col border-l shadow-2xl sm:w-120"
+            className="text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer rounded-lg p-1.5 transition-colors"
           >
-            {/* Header */}
-            <div className="border-border/60 flex shrink-0 items-center justify-between border-b px-5 py-4">
-              <div>
-                <h2 className="text-foreground font-semibold">Add Loan</h2>
-                {selectedRegion && (
-                  <p className="text-muted-foreground mt-0.5 text-xs">
-                    {getFlagEmoji(selectedRegion)} {getCountryName(selectedRegion)} ·{" "}
-                    {getDefaultCurrency(selectedRegion)}
-                  </p>
-                )}
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Form */}
+        <form
+          onSubmit={(e) => void handleSubmit(onSubmit)(e)}
+          className="flex flex-1 flex-col overflow-hidden"
+        >
+          <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
+            {cardConversion && (
+              <div className="border-primary/20 bg-primary/5 rounded-lg border px-3 py-2.5">
+                <p className="text-foreground text-xs font-medium">{cardConversion.cardName}</p>
+                <p className="text-muted-foreground mt-0.5 text-[10px] leading-relaxed">
+                  Linking card charge from {cardConversion.txnDate}
+                  {cardConversion.statementDay
+                    ? ` · installments align to statement day ${cardConversion.statementDay}`
+                    : ""}
+                </p>
               </div>
-              <button
-                onClick={handleClose}
-                className="text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer rounded-lg p-1.5 transition-colors"
+            )}
+            {/* ── Borrower + Credit Source ───────────────────────── */}
+            <section className="space-y-4">
+              <h3 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+                Borrower
+              </h3>
+
+              <FieldWrapper label="Borrower" error={errors.borrower_id?.message}>
+                <select {...register("borrower_id")} className={selectClass}>
+                  <option value="">Select borrower…</option>
+                  {borrowers.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.full_name} ({b.region})
+                    </option>
+                  ))}
+                </select>
+              </FieldWrapper>
+
+              <FieldWrapper
+                label="Credit Source"
+                error={sourcesError ? "Failed to load credit sources" : errors.source_id?.message}
+                hint={!selectedRegion ? "Select a borrower first" : undefined}
               >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
+                <select
+                  {...register("source_id")}
+                  disabled={!selectedRegion || sourcesLoading}
+                  className={cn(selectClass, (!selectedRegion || sourcesLoading) && "opacity-50")}
+                >
+                  <option value="">{sourcesLoading ? "Loading…" : "Select source…"}</option>
+                  {creditSources.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </FieldWrapper>
+            </section>
 
-            {/* Form */}
-            <form
-              onSubmit={(e) => void handleSubmit(onSubmit)(e)}
-              className="flex flex-1 flex-col overflow-hidden"
-            >
-              <div className="flex-1 space-y-5 overflow-y-auto px-5 py-5">
-                {/* ── Borrower + Credit Source ───────────────────────── */}
-                <section className="space-y-4">
-                  <h3 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
-                    Borrower
-                  </h3>
-
-                  <FieldWrapper label="Borrower" error={errors.borrower_id?.message}>
-                    <select {...register("borrower_id")} className={selectClass}>
-                      <option value="">Select borrower…</option>
-                      {borrowers.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.full_name} ({b.region})
-                        </option>
-                      ))}
-                    </select>
-                  </FieldWrapper>
-
-                  <FieldWrapper
-                    label="Credit Source"
-                    error={
-                      sourcesError ? "Failed to load credit sources" : errors.source_id?.message
-                    }
-                    hint={!selectedRegion ? "Select a borrower first" : undefined}
-                  >
-                    <select
-                      {...register("source_id")}
-                      disabled={!selectedRegion || sourcesLoading}
+            {/* ── Loan Currency (only when org has multiple active regions) ── */}
+            {activeRegions.length >= 2 && borrowerRegion && (
+              <section className="space-y-3">
+                <h3 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+                  Loan Currency
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {activeRegions.map((code) => (
+                    <button
+                      key={code}
+                      type="button"
+                      onClick={() => setSelectedRegion(code as RegionType)}
                       className={cn(
-                        selectClass,
-                        (!selectedRegion || sourcesLoading) && "opacity-50"
+                        "cursor-pointer rounded-lg border px-3 py-2 text-xs font-medium transition-colors",
+                        selectedRegion === code
+                          ? "bg-primary/15 border-primary/40 text-primary"
+                          : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
                       )}
                     >
-                      <option value="">{sourcesLoading ? "Loading…" : "Select source…"}</option>
-                      {creditSources.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
-                        </option>
-                      ))}
-                    </select>
-                  </FieldWrapper>
-                </section>
-
-                {/* ── Loan Currency (only when org has multiple active regions) ── */}
-                {activeRegions.length >= 2 && borrowerRegion && (
-                  <section className="space-y-3">
-                    <h3 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
-                      Loan Currency
-                    </h3>
-                    <div className="flex flex-wrap gap-2">
-                      {activeRegions.map((code) => (
-                        <button
-                          key={code}
-                          type="button"
-                          onClick={() => setSelectedRegion(code as RegionType)}
-                          className={cn(
-                            "cursor-pointer rounded-lg border px-3 py-2 text-xs font-medium transition-colors",
-                            selectedRegion === code
-                              ? "bg-primary/15 border-primary/40 text-primary"
-                              : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
-                          )}
-                        >
-                          {getFlagEmoji(code)} {getDefaultCurrency(code)}
-                          {code === borrowerRegion && (
-                            <span className="ml-1 opacity-60">(default)</span>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                    {selectedRegion !== borrowerRegion && borrowerRegion && (
-                      <p className="text-xs text-amber-400">
-                        Borrower's default region is {getFlagEmoji(borrowerRegion)}{" "}
-                        {getDefaultCurrency(borrowerRegion)}. Recording this loan in a different
-                        currency.
-                      </p>
-                    )}
-                  </section>
+                      {getFlagEmoji(code)} {getDefaultCurrency(code)}
+                      {code === borrowerRegion && (
+                        <span className="ml-1 opacity-60">(default)</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                {selectedRegion !== borrowerRegion && borrowerRegion && (
+                  <p className="text-xs text-amber-400">
+                    Borrower's default region is {getFlagEmoji(borrowerRegion)}{" "}
+                    {getDefaultCurrency(borrowerRegion)}. Recording this loan in a different
+                    currency.
+                  </p>
                 )}
+              </section>
+            )}
 
-                {/* ── Loan Type (only when source has multiple types) ── */}
-                {showLoanTypeSelector && (
-                  <section className="space-y-4">
-                    <h3 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
-                      Loan Type
-                    </h3>
-                    <div className="grid grid-cols-3 gap-2">
-                      {availableLoanTypes.map((opt) => (
-                        <button
-                          key={opt.loan_type}
-                          type="button"
-                          onClick={() =>
-                            setValue("loan_type", opt.loan_type, { shouldValidate: true })
-                          }
-                          className={cn(
-                            "cursor-pointer rounded-lg border px-3 py-2 text-xs font-medium transition-colors",
-                            watchedLoanType === opt.loan_type
-                              ? "bg-primary/15 border-primary/40 text-primary"
-                              : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
-                          )}
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-                  </section>
-                )}
+            {/* ── Loan Type (only when source has multiple types) ── */}
+            {showLoanTypeSelector && (
+              <section className="space-y-4">
+                <h3 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+                  Loan Type
+                </h3>
+                <div className="grid grid-cols-3 gap-2">
+                  {availableLoanTypes.map((opt) => (
+                    <button
+                      key={opt.loan_type}
+                      type="button"
+                      onClick={() => setValue("loan_type", opt.loan_type, { shouldValidate: true })}
+                      className={cn(
+                        "cursor-pointer rounded-lg border px-3 py-2 text-xs font-medium transition-colors",
+                        watchedLoanType === opt.loan_type
+                          ? "bg-primary/15 border-primary/40 text-primary"
+                          : "border-border/60 text-muted-foreground hover:border-border hover:text-foreground"
+                      )}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
 
-                {/* ── Loan Details ───────────────────────────────────── */}
-                <section className="space-y-4">
-                  <h3 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
-                    Loan Details
-                  </h3>
+            {/* ── Loan Details ───────────────────────────────────── */}
+            <section className="space-y-4">
+              <h3 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+                Loan Details
+              </h3>
 
-                  <FieldWrapper
-                    label={`Principal (${currencyLabel})`}
-                    error={errors.principal?.message}
+              <FieldWrapper
+                label={`Principal (${currencyLabel})`}
+                error={errors.principal?.message}
+              >
+                <input
+                  {...register("principal")}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  className={inputClass}
+                />
+              </FieldWrapper>
+
+              <div className="grid grid-cols-2 gap-3">
+                <FieldWrapper
+                  label="Interest Rate (%)"
+                  error={errors.interest_rate?.message}
+                  hint="Monthly add-on rate — up to 5 decimals for exact EMI (e.g. CashNow 3.83333)"
+                >
+                  <input
+                    {...register("interest_rate")}
+                    type="number"
+                    step={INTEREST_RATE_INPUT_STEP}
+                    min="0"
+                    max="100"
+                    placeholder="e.g. 2.95 or 3.83333"
+                    className={inputClass}
+                  />
+                </FieldWrapper>
+
+                <FieldWrapper
+                  label={feeFieldLabel}
+                  error={errors.service_fee?.message}
+                  hint={feeFieldHint}
+                >
+                  <input
+                    {...register("service_fee")}
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    className={inputClass}
+                  />
+                </FieldWrapper>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {/* Installments — select from available durations */}
+                <FieldWrapper label="Installments" error={errors.installments_total?.message}>
+                  <select
+                    {...register("installments_total")}
+                    disabled={availableDurations.length === 0}
+                    className={cn(selectClass, availableDurations.length === 0 && "opacity-50")}
                   >
-                    <input
-                      {...register("principal")}
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      placeholder="0.00"
-                      className={inputClass}
-                    />
-                  </FieldWrapper>
+                    {availableDurations.length === 0 ? (
+                      <option value="">—</option>
+                    ) : (
+                      availableDurations.map((d) => (
+                        <option key={d} value={d}>
+                          {d} {d === 4 && selectedSource?.name === "Tabby" ? "payments" : "months"}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </FieldWrapper>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <FieldWrapper
-                      label="Interest Rate (%)"
-                      error={errors.interest_rate?.message}
-                      hint="Monthly add-on rate — up to 5 decimals for exact EMI (e.g. CashNow 3.83333)"
+                {/* Due Day — calendar popover */}
+                <FieldWrapper label="Due Day of Month" error={errors.due_day_of_month?.message}>
+                  {/* Hidden input keeps RHF in sync */}
+                  <input type="hidden" {...register("due_day_of_month")} />
+
+                  <Popover open={dueDateOpen} onOpenChange={setDueDateOpen}>
+                    <PopoverTrigger
+                      className={cn(
+                        inputClass,
+                        "flex cursor-pointer items-center justify-between text-left",
+                        !watchedDueDay && "text-muted-foreground/50"
+                      )}
                     >
-                      <input
-                        {...register("interest_rate")}
-                        type="number"
-                        step={INTEREST_RATE_INPUT_STEP}
-                        min="0"
-                        max="100"
-                        placeholder="e.g. 2.95 or 3.83333"
-                        className={inputClass}
+                      <span>
+                        {watchedDueDay ? `${ordinal(watchedDueDay)} of the month` : "Pick a day…"}
+                      </span>
+                      <CalendarDays className="text-muted-foreground h-4 w-4 shrink-0" />
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="w-auto p-0"
+                      align="start"
+                      side="bottom"
+                      sideOffset={4}
+                    >
+                      <Calendar
+                        mode="single"
+                        selected={calendarSelected}
+                        onSelect={handleDaySelect}
+                        initialFocus
                       />
-                    </FieldWrapper>
+                      {watchedDueDay && (
+                        <div className="border-border/60 border-t px-3 py-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setValue("due_day_of_month", null, { shouldValidate: true });
+                              setDueDateOpen(false);
+                            }}
+                            className="text-muted-foreground hover:text-foreground cursor-pointer text-xs transition-colors"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      )}
+                    </PopoverContent>
+                  </Popover>
+                </FieldWrapper>
+              </div>
 
-                    <FieldWrapper
-                      label={feeFieldLabel}
-                      error={errors.service_fee?.message}
-                      hint={feeFieldHint}
-                    >
+              <FieldWrapper label="Start Date" error={errors.started_at?.message}>
+                {/* Hidden input keeps RHF in sync */}
+                <input type="hidden" {...register("started_at")} />
+
+                <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
+                  <PopoverTrigger
+                    className={cn(
+                      inputClass,
+                      "flex cursor-pointer items-center justify-between text-left",
+                      !watchedStartedAt && "text-muted-foreground/50"
+                    )}
+                  >
+                    <span>
+                      {watchedStartedAt ? formatStartDate(watchedStartedAt) : "Pick a date…"}
+                    </span>
+                    <CalendarDays className="text-muted-foreground h-4 w-4 shrink-0" />
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start" side="bottom" sideOffset={4}>
+                    <Calendar
+                      mode="single"
+                      selected={startDateSelected}
+                      onSelect={handleStartDateSelect}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+              </FieldWrapper>
+
+              <FieldWrapper label="Notes" error={errors.notes?.message}>
+                <textarea
+                  {...register("notes")}
+                  rows={2}
+                  placeholder="Optional notes…"
+                  className={cn(inputClass, "resize-none")}
+                />
+              </FieldWrapper>
+            </section>
+
+            {/* ── Tabby split amounts ────────────────────────────── */}
+            {isTabby && tabbyAmounts.length > 0 && (
+              <section className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
+                    Payment Splits
+                  </h3>
+                  <span className="text-muted-foreground text-[10px]">
+                    Match amounts shown in Tabby app
+                  </span>
+                </div>
+
+                <div className="border-border/60 space-y-2 rounded-lg border p-3">
+                  {tabbyAmounts.map((amt, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                      <span className="text-muted-foreground w-24 shrink-0 text-xs">
+                        {i === 0 ? "Now (paid)" : `Payment ${i + 1}`}
+                      </span>
                       <input
-                        {...register("service_fee")}
                         type="number"
                         step="0.01"
                         min="0"
-                        placeholder="0.00"
-                        className={inputClass}
+                        value={amt || ""}
+                        onChange={(e) => {
+                          const updated = [...tabbyAmounts];
+                          updated[i] = Number(e.target.value) || 0;
+                          setTabbyAmounts(updated);
+                        }}
+                        className={cn(inputClass, "flex-1")}
                       />
-                    </FieldWrapper>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    {/* Installments — select from available durations */}
-                    <FieldWrapper label="Installments" error={errors.installments_total?.message}>
-                      <select
-                        {...register("installments_total")}
-                        disabled={availableDurations.length === 0}
-                        className={cn(selectClass, availableDurations.length === 0 && "opacity-50")}
-                      >
-                        {availableDurations.length === 0 ? (
-                          <option value="">—</option>
-                        ) : (
-                          availableDurations.map((d) => (
-                            <option key={d} value={d}>
-                              {d}{" "}
-                              {d === 4 && selectedSource?.name === "Tabby" ? "payments" : "months"}
-                            </option>
-                          ))
-                        )}
-                      </select>
-                    </FieldWrapper>
-
-                    {/* Due Day — calendar popover */}
-                    <FieldWrapper label="Due Day of Month" error={errors.due_day_of_month?.message}>
-                      {/* Hidden input keeps RHF in sync */}
-                      <input type="hidden" {...register("due_day_of_month")} />
-
-                      <Popover open={dueDateOpen} onOpenChange={setDueDateOpen}>
-                        <PopoverTrigger
-                          className={cn(
-                            inputClass,
-                            "flex cursor-pointer items-center justify-between text-left",
-                            !watchedDueDay && "text-muted-foreground/50"
-                          )}
-                        >
-                          <span>
-                            {watchedDueDay
-                              ? `${ordinal(watchedDueDay)} of the month`
-                              : "Pick a day…"}
-                          </span>
-                          <CalendarDays className="text-muted-foreground h-4 w-4 shrink-0" />
-                        </PopoverTrigger>
-                        <PopoverContent
-                          className="w-auto p-0"
-                          align="start"
-                          side="bottom"
-                          sideOffset={4}
-                        >
-                          <Calendar
-                            mode="single"
-                            selected={calendarSelected}
-                            onSelect={handleDaySelect}
-                            initialFocus
-                          />
-                          {watchedDueDay && (
-                            <div className="border-border/60 border-t px-3 py-2">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setValue("due_day_of_month", null, { shouldValidate: true });
-                                  setDueDateOpen(false);
-                                }}
-                                className="text-muted-foreground hover:text-foreground cursor-pointer text-xs transition-colors"
-                              >
-                                Clear
-                              </button>
-                            </div>
-                          )}
-                        </PopoverContent>
-                      </Popover>
-                    </FieldWrapper>
-                  </div>
-
-                  <FieldWrapper label="Start Date" error={errors.started_at?.message}>
-                    {/* Hidden input keeps RHF in sync */}
-                    <input type="hidden" {...register("started_at")} />
-
-                    <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
-                      <PopoverTrigger
-                        className={cn(
-                          inputClass,
-                          "flex cursor-pointer items-center justify-between text-left",
-                          !watchedStartedAt && "text-muted-foreground/50"
-                        )}
-                      >
-                        <span>
-                          {watchedStartedAt ? formatStartDate(watchedStartedAt) : "Pick a date…"}
-                        </span>
-                        <CalendarDays className="text-muted-foreground h-4 w-4 shrink-0" />
-                      </PopoverTrigger>
-                      <PopoverContent
-                        className="w-auto p-0"
-                        align="start"
-                        side="bottom"
-                        sideOffset={4}
-                      >
-                        <Calendar
-                          mode="single"
-                          selected={startDateSelected}
-                          onSelect={handleStartDateSelect}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </FieldWrapper>
-
-                  <FieldWrapper label="Notes" error={errors.notes?.message}>
-                    <textarea
-                      {...register("notes")}
-                      rows={2}
-                      placeholder="Optional notes…"
-                      className={cn(inputClass, "resize-none")}
-                    />
-                  </FieldWrapper>
-                </section>
-
-                {/* ── Tabby split amounts ────────────────────────────── */}
-                {isTabby && tabbyAmounts.length > 0 && (
-                  <section className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-muted-foreground text-xs font-semibold tracking-wider uppercase">
-                        Payment Splits
-                      </h3>
-                      <span className="text-muted-foreground text-[10px]">
-                        Match amounts shown in Tabby app
-                      </span>
                     </div>
+                  ))}
 
-                    <div className="border-border/60 space-y-2 rounded-lg border p-3">
-                      {tabbyAmounts.map((amt, i) => (
-                        <div key={i} className="flex items-center gap-3">
-                          <span className="text-muted-foreground w-24 shrink-0 text-xs">
-                            {i === 0 ? "Now (paid)" : `Payment ${i + 1}`}
-                          </span>
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            value={amt || ""}
-                            onChange={(e) => {
-                              const updated = [...tabbyAmounts];
-                              updated[i] = Number(e.target.value) || 0;
-                              setTabbyAmounts(updated);
-                            }}
-                            className={cn(inputClass, "flex-1")}
-                          />
-                        </div>
-                      ))}
+                  {/* Sum vs principal indicator */}
+                  {(() => {
+                    const sum = tabbyAmounts.reduce((s, a) => s + a, 0);
+                    const principal = Number(watchedPrincipal) || 0;
+                    const diff = Math.round((sum - principal) * 100) / 100;
+                    if (diff === 0) return null;
+                    return (
+                      <p className="pt-1 text-xs text-rose-400">
+                        Sum ({sum.toFixed(2)}) {diff > 0 ? "exceeds" : "is less than"} principal by{" "}
+                        {Math.abs(diff).toFixed(2)}
+                      </p>
+                    );
+                  })()}
+                </div>
+              </section>
+            )}
 
-                      {/* Sum vs principal indicator */}
-                      {(() => {
-                        const sum = tabbyAmounts.reduce((s, a) => s + a, 0);
-                        const principal = Number(watchedPrincipal) || 0;
-                        const diff = Math.round((sum - principal) * 100) / 100;
-                        if (diff === 0) return null;
-                        return (
-                          <p className="pt-1 text-xs text-rose-400">
-                            Sum ({sum.toFixed(2)}) {diff > 0 ? "exceeds" : "is less than"} principal
-                            by {Math.abs(diff).toFixed(2)}
-                          </p>
-                        );
-                      })()}
-                    </div>
-                  </section>
-                )}
+            {/* ── Breakdown Summary ──────────────────────────────── */}
+            {selectedRegion && activeConfig && (
+              <LoanBreakdownSummary
+                loanTypeConfig={activeConfig}
+                principal={Number(watchedPrincipal) || 0}
+                interestRate={watchedInterestRate}
+                serviceFee={Number(watchedServiceFee) || 0}
+                installmentsTotal={Number(watchedInstallments) || 0}
+                currency={getDefaultCurrency(selectedRegion) as CurrencyType}
+              />
+            )}
+          </div>
 
-                {/* ── Breakdown Summary ──────────────────────────────── */}
-                {selectedRegion && activeConfig && (
-                  <LoanBreakdownSummary
-                    loanTypeConfig={activeConfig}
-                    principal={Number(watchedPrincipal) || 0}
-                    interestRate={watchedInterestRate}
-                    serviceFee={Number(watchedServiceFee) || 0}
-                    installmentsTotal={Number(watchedInstallments) || 0}
-                    currency={getDefaultCurrency(selectedRegion) as CurrencyType}
-                  />
-                )}
-              </div>
-
-              {/* Footer */}
-              <div className="border-border/60 flex shrink-0 items-center justify-end gap-3 border-t px-5 py-4">
-                <button
-                  type="button"
-                  onClick={handleClose}
-                  className="border-border/60 text-muted-foreground hover:text-foreground cursor-pointer rounded-lg border px-4 py-2 text-sm transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isPending || !selectedRegion}
-                  className="bg-primary text-primary-foreground flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-opacity disabled:opacity-50"
-                >
-                  {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                  {isPending ? "Creating…" : "Create Loan"}
-                </button>
-              </div>
-            </form>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+          {/* Footer */}
+          <div className="border-border/60 flex shrink-0 items-center justify-end gap-3 border-t px-5 py-4">
+            <button
+              type="button"
+              onClick={handleClose}
+              className="border-border/60 text-muted-foreground hover:text-foreground cursor-pointer rounded-lg border px-4 py-2 text-sm transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isPending || !selectedRegion}
+              className="bg-primary text-primary-foreground flex cursor-pointer items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-opacity disabled:opacity-50"
+            >
+              {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              {isPending ? "Creating…" : cardConversion ? "Create plan" : "Create Loan"}
+            </button>
+          </div>
+        </form>
+      </motion.div>
+    </>
   );
 }

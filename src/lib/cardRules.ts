@@ -1,5 +1,5 @@
 import type { BudgetEntryType } from "@/types/budget";
-import type { CardKind, CardStatementStatus, CardTxnType } from "@/types/cards";
+import type { CardKind, CardStatementStatus, CardTransaction, CardTxnType } from "@/types/cards";
 
 /** Maps a budget entry + card kind to a ledger transaction type, if any. */
 export function cardTxnTypeForBudgetEntry(
@@ -27,6 +27,12 @@ export function cardTxnTypeLabel(txnType: CardTxnType): string {
     case "fee":
       return "Fee";
   }
+}
+
+export function canConvertTransactionToLoan(
+  txn: Pick<CardTransaction, "txn_type" | "linked_loan">
+): boolean {
+  return (txn.txn_type === "charge" || txn.txn_type === "fee") && !txn.linked_loan;
 }
 
 export function cardStatementStatusLabel(status: CardStatementStatus): string {

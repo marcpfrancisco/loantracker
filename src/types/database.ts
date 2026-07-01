@@ -858,6 +858,7 @@ export type Database = {
       loans: {
         Row: {
           borrower_id: string
+          card_transaction_id: string | null
           created_at: string
           currency: string
           due_day_of_month: number | null
@@ -879,6 +880,7 @@ export type Database = {
         }
         Insert: {
           borrower_id: string
+          card_transaction_id?: string | null
           created_at?: string
           currency: string
           due_day_of_month?: number | null
@@ -900,6 +902,7 @@ export type Database = {
         }
         Update: {
           borrower_id?: string
+          card_transaction_id?: string | null
           created_at?: string
           currency?: string
           due_day_of_month?: number | null
@@ -925,6 +928,13 @@ export type Database = {
             columns: ["borrower_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loans_card_transaction_id_fkey"
+            columns: ["card_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "card_transactions"
             referencedColumns: ["id"]
           },
           {

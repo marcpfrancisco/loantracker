@@ -22,7 +22,11 @@ async function fetchCardAccount(cardId: string): Promise<CardAccount> {
 async function fetchCardTransactions(cardId: string): Promise<CardTransaction[]> {
   const { data, error } = await supabase
     .from("card_transactions")
-    .select("*, budget_categories(name)")
+    .select(
+      `*,
+       budget_categories(name),
+       linked_loan:loans!loans_card_transaction_id_fkey(id, status, installments_total)`
+    )
     .eq("card_account_id", cardId)
     .order("txn_date", { ascending: false })
     .order("created_at", { ascending: false });
@@ -31,6 +35,7 @@ async function fetchCardTransactions(cardId: string): Promise<CardTransaction[]>
   return (data ?? []).map((row) => ({
     ...row,
     amount: Number(row.amount),
+    linked_loan: Array.isArray(row.linked_loan) ? (row.linked_loan[0] ?? null) : row.linked_loan,
   })) as CardTransaction[];
 }
 

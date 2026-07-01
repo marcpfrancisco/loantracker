@@ -75,6 +75,7 @@ export interface CardTransaction {
   notes: string | null;
   created_at: string;
   budget_categories?: { name: string } | null;
+  linked_loan?: CardTransactionLinkedLoan | null;
 }
 
 export interface CardStatementFormInput {
@@ -94,6 +95,27 @@ export interface CardTransactionFormInput {
   description?: string;
   statement_id?: string | null;
   notes?: string;
+}
+
+/** Prefill for AddLoanDrawer when converting a card charge to an installment plan. */
+export interface CardLoanConversionPrefill {
+  cardTransactionId: string;
+  cardAccountId: string;
+  cardName: string;
+  amount: number;
+  txnDate: string;
+  merchant?: string | null;
+  description?: string | null;
+  currency: CurrencyType;
+  region: string;
+  statementDay: number | null;
+  issuer: string | null;
+}
+
+export interface CardTransactionLinkedLoan {
+  id: string;
+  status: string;
+  installments_total: number;
 }
 
 export const CARD_TXN_TYPE_LABELS: Record<CardTxnType, string> = {

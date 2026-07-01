@@ -13,9 +13,11 @@ import {
   UpdateCardBalanceDrawer,
 } from "@/components/cards/CardTransactionDrawers";
 import { EditCardDrawer } from "@/components/cards/CardDrawers";
+import { AddLoanDrawer } from "@/components/loans/AddLoanDrawer";
 import { useCardMutations } from "@/hooks/useCardMutations";
 import { RefreshButton } from "@/components/ui/refresh-button";
 import { CARD_KIND_LABELS } from "@/types/cards";
+import type { CardLoanConversionPrefill, CardTransaction } from "@/types/cards";
 import type { CurrencyType } from "@/types/enums";
 
 export default function CardDetailPage() {
@@ -26,6 +28,10 @@ export default function CardDetailPage() {
   const [addTxnOpen, setAddTxnOpen] = useState(false);
   const [balanceOpen, setBalanceOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [convertPrefill, setConvertPrefill] = useState<CardLoanConversionPrefill | null>(null);
+  const [convertOpen, setConvertOpen] = useState(false);
+
+  const isAdmin = profile?.role === "admin";
 
   const {
     data: card,
@@ -56,6 +62,25 @@ export default function CardDetailPage() {
     void refetchTxns();
     void refetchStmts();
   };
+
+  function handleConvertTransaction(txn: CardTransaction) {
+    if (!card) return;
+    setConvertPrefill({
+      cardTransactionId: txn.id,
+      cardAccountId: card.id,
+      cardName: card.name,
+      amount: Number(txn.amount),
+      txnDate: txn.txn_date,
+      merchant: txn.merchant,
+      description: txn.description,
+      currency: card.currency as CurrencyType,
+      region:
+        card.region ?? (card.currency === "PHP" ? "PH" : card.currency === "AED" ? "AE" : "AE"),
+      statementDay: card.statement_day,
+      issuer: card.issuer,
+    });
+    setConvertOpen(true);
+  }
 
   if (cardLoading) {
     return (
@@ -194,6 +219,8 @@ export default function CardDetailPage() {
         <CardTransactionList
           transactions={transactions}
           currency={currency}
+          showConvertActions={isAdmin && card.card_kind === "credit"}
+          onConvert={handleConvertTransaction}
           onDelete={(txnId) => deleteTransaction.mutate(txnId)}
           isDeleting={deleteTransaction.isPending}
         />
@@ -249,6 +276,18 @@ export default function CardDetailPage() {
           navigate("/cards");
         }}
       />
+
+      {isAdmin && (
+        <AddLoanDrawer
+          open={convertOpen}
+          onClose={() => {
+            setConvertOpen(false);
+            setConvertPrefill(null);
+            refreshAll();
+          }}
+          cardConversion={convertPrefill}
+        />
+      )}
     </div>
   );
 }

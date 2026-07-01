@@ -1,6 +1,7 @@
 import { CREDIT_SOURCE_CONFIGS, type FirstDueStrategy } from "./../types/schema";
 import { buildInstallmentSchedule } from "@/lib/generateInstallments";
 import { roundInterestRatePercent } from "@/lib/interestRate";
+import { cardKeys } from "@/hooks/useCardAccounts";
 import type { TablesInsert } from "@/types/database";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -21,6 +22,7 @@ export interface CreateLoanPayload {
   due_day_of_month: number | null;
   notes: string | null;
   first_due_strategy: FirstDueStrategy;
+  card_transaction_id?: string | null;
   /**
    * When provided, overrides the computed per-installment amounts.
    * Length must equal installments_total.
@@ -68,7 +70,7 @@ async function createLoan(payload: CreateLoanPayload): Promise<{ loanId: string 
 
   const resolvedPayload: CreateLoanPayload = {
     ...payload,
-    first_due_strategy: loanConfig.first_due_strategy,
+    first_due_strategy: payload.first_due_strategy ?? loanConfig.first_due_strategy,
     interest_rate: roundInterestRatePercent(payload.interest_rate),
   };
 
@@ -89,6 +91,7 @@ async function createLoan(payload: CreateLoanPayload): Promise<{ loanId: string 
       due_day_of_month: resolvedPayload.due_day_of_month,
       notes: resolvedPayload.notes,
       first_due_strategy: resolvedPayload.first_due_strategy,
+      card_transaction_id: resolvedPayload.card_transaction_id ?? null,
     })
     .select("id")
     .single();
@@ -109,13 +112,18 @@ export function useCreateLoan() {
 
   return useMutation({
     mutationFn: createLoan,
-    onSuccess: ({ loanId }) => {
+    onSuccess: ({ loanId }, variables) => {
       toast.success("Loan created successfully.");
       void queryClient.invalidateQueries({ queryKey: ["loans"] });
+      void queryClient.invalidateQueries({ queryKey: ["loan", loanId] });
       void queryClient.invalidateQueries({ queryKey: ["admin", "stats"] });
       void queryClient.invalidateQueries({ queryKey: ["admin", "borrowers"] });
       void queryClient.invalidateQueries({ queryKey: ["my-loans"] });
       void queryClient.invalidateQueries({ queryKey: ["upcoming-installments"] });
+      if (variables.card_transaction_id) {
+        void queryClient.invalidateQueries({ queryKey: cardKeys.all });
+        void queryClient.invalidateQueries({ queryKey: cardKeys.transactions("") });
+      }
       void supabase.functions.invoke("notify-loan-created", { body: { loanId } });
     },
     onError: () => {

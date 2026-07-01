@@ -192,7 +192,7 @@ User-scoped RLS — private to each authenticated user; not visible to admin or 
 - [ ] Dashboard widget: budget health + wealth + card due dates
 
 #### Phase 1 polish (remaining) ⬜
-- [ ] **Budget period close** — mark month `closed` so totals lock
+- [x] **Budget period close** — mark month `closed` to lock entries and targets; reopen anytime
 - [ ] Smoother allocation → wealth account picker UX on add entry
 - [ ] `get_budget_summary` RPC (currently computed client-side in `budgetRules.ts`)
 

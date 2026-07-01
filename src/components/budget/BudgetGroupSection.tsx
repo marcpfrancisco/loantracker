@@ -68,6 +68,7 @@ interface BudgetGroupSectionProps {
   categories: CategorySummary[];
   currency: string;
   defaultOpen?: boolean;
+  readOnly?: boolean;
   onEditTarget?: (categoryId: string, currentTarget: number) => void;
 }
 
@@ -77,6 +78,7 @@ export function BudgetGroupSection({
   categories,
   currency,
   defaultOpen = true,
+  readOnly = false,
   onEditTarget,
 }: BudgetGroupSectionProps) {
   const [open, setOpen] = useState(defaultOpen);
@@ -105,7 +107,7 @@ export function BudgetGroupSection({
               key={cat.category_id}
               summary={cat}
               currency={currency}
-              onEditTarget={onEditTarget}
+              onEditTarget={readOnly ? undefined : onEditTarget}
             />
           ))}
         </div>

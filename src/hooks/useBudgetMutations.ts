@@ -1,6 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { inferEntryType, wealthTxnTypeForEntry } from "@/lib/budgetRules";
+import {
+  inferEntryType,
+  wealthTxnTypeForEntry,
+  getBudgetPeriodClosedMessage,
+} from "@/lib/budgetRules";
 import { cardTxnTypeForBudgetEntry } from "@/lib/cardRules";
 import { budgetKeys } from "@/hooks/useBudgetSetup";
 import { cardKeys } from "@/hooks/useCardAccounts";
@@ -64,8 +68,31 @@ async function syncCardLedgerForEntry(
   });
 }
 
-export function useBudgetMutations(currency: CurrencyType, periodId: string | undefined) {
+async function assertPeriodOpen(periodId: string): Promise<void> {
+  const { data, error } = await supabase
+    .from("budget_periods")
+    .select("status")
+    .eq("id", periodId)
+    .single();
+
+  if (error) throw error;
+  if (data.status === "closed") {
+    throw new Error(getBudgetPeriodClosedMessage());
+  }
+}
+
+export function useBudgetMutations(
+  currency: CurrencyType,
+  periodId: string | undefined,
+  monthKey?: string
+) {
   const qc = useQueryClient();
+
+  const invalidatePeriod = () => {
+    if (monthKey) {
+      void qc.invalidateQueries({ queryKey: budgetKeys.period(currency, monthKey) });
+    }
+  };
 
   const invalidate = (cardAccountId?: string | null) => {
     void qc.invalidateQueries({ queryKey: budgetKeys.entries(periodId ?? "") });
@@ -78,13 +105,13 @@ export function useBudgetMutations(currency: CurrencyType, periodId: string | un
       void qc.invalidateQueries({ queryKey: cardKeys.detail(cardAccountId) });
       void qc.invalidateQueries({ queryKey: cardKeys.transactions(cardAccountId) });
     }
-    if (periodId) {
-      void qc.invalidateQueries({ queryKey: budgetKeys.period(currency, "") });
-    }
+    invalidatePeriod();
   };
 
   const addEntry = useMutation({
     mutationFn: async (params: AddEntryParams) => {
+      await assertPeriodOpen(params.periodId);
+
       const entryType: BudgetEntryType = inferEntryType(params.category);
       const cardAccountId = params.cardAccountId ?? null;
       const wealthAccountId =
@@ -149,6 +176,9 @@ export function useBudgetMutations(currency: CurrencyType, periodId: string | un
 
   const deleteEntry = useMutation({
     mutationFn: async (entryId: string) => {
+      if (!periodId) throw new Error("No budget period selected");
+      await assertPeriodOpen(periodId);
+
       const { data: entry, error: fetchError } = await supabase
         .from("budget_entries")
         .select("card_account_id")
@@ -180,6 +210,8 @@ export function useBudgetMutations(currency: CurrencyType, periodId: string | un
 
   const upsertTarget = useMutation({
     mutationFn: async (params: UpsertTargetParams) => {
+      await assertPeriodOpen(params.periodId);
+
       const { error } = await supabase.from("budget_targets").upsert(
         {
           period_id: params.periodId,
@@ -198,5 +230,30 @@ export function useBudgetMutations(currency: CurrencyType, periodId: string | un
     onError: (err: Error) => toast.error(err.message),
   });
 
-  return { addEntry, deleteEntry, upsertTarget };
+  const togglePeriodStatus = useMutation({
+    mutationFn: async ({
+      periodId: id,
+      status,
+    }: {
+      periodId: string;
+      status: "open" | "closed";
+    }) => {
+      const { error } = await supabase
+        .from("budget_periods")
+        .update({
+          status,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: (_data, { status }) => {
+      invalidatePeriod();
+      toast.success(status === "closed" ? "Budget month closed" : "Budget month reopened");
+    },
+    onError: (err: Error) => toast.error(err.message),
+  });
+
+  return { addEntry, deleteEntry, upsertTarget, togglePeriodStatus };
 }

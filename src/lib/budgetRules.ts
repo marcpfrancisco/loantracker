@@ -10,6 +10,7 @@ import type {
   CategorySummary,
   PeriodSummary,
   WealthAccountKind,
+  BudgetPeriod,
 } from "@/types/budget";
 import { BUDGET_GROUP_ORDER } from "@/types/budget";
 import type { CardKind } from "@/types/cards";
@@ -45,6 +46,18 @@ export function formatMonthShort(monthKey: string): string {
     month: "short",
     year: "2-digit",
   });
+}
+
+export function isBudgetPeriodClosed(period: Pick<BudgetPeriod, "status">): boolean {
+  return period.status === "closed";
+}
+
+export function getBudgetPeriodClosedMessage(): string {
+  return "This budget month is closed — reopen it to add entries or change targets.";
+}
+
+export function isPastBudgetMonth(monthKey: string): boolean {
+  return normalizeMonthKey(monthKey) < currentMonthStr();
 }
 
 function sumByGroup(

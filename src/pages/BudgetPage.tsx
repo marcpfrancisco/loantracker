@@ -9,6 +9,7 @@ import {
   currentMonthStr,
   formatMonthLabel,
   getActiveGroupOrder,
+  isBudgetPeriodClosed,
 } from "@/lib/budgetRules";
 import { formatCurrency } from "@/lib/formatCurrency";
 import { getDefaultCurrency } from "@/lib/countries";
@@ -36,6 +37,7 @@ import {
   EditWealthAccountDrawer,
 } from "@/components/budget/AddWealthAccountDrawer";
 import { BudgetMonthPicker } from "@/components/budget/BudgetMonthPicker";
+import { BudgetPeriodStatusBar } from "@/components/budget/BudgetPeriodStatusBar";
 import { BudgetGroupSection } from "@/components/budget/BudgetGroupSection";
 import { BudgetEntryList } from "@/components/budget/BudgetEntryList";
 import { AddBudgetEntryDrawer, EditBudgetTargetDrawer } from "@/components/budget/BudgetDrawers";
@@ -130,7 +132,11 @@ export default function BudgetPage() {
   const { data: targets = [] } = useBudgetTargets(periodId);
   const { data: entries = [] } = useBudgetEntries(periodId);
 
-  const { addEntry, deleteEntry, upsertTarget } = useBudgetMutations(resolvedCurrency, periodId);
+  const { addEntry, deleteEntry, upsertTarget, togglePeriodStatus } = useBudgetMutations(
+    resolvedCurrency,
+    periodId,
+    monthKey
+  );
   const { createCategory, updateCategory, deleteCategory } = useCategoryMutations(
     resolvedCurrency,
     profile?.id
@@ -169,6 +175,7 @@ export default function BudgetPage() {
   }, [categories, targets, entries]);
 
   const targetCategoryName = targetEdit && categories.find((c) => c.id === targetEdit.id)?.name;
+  const periodClosed = period ? isBudgetPeriodClosed(period) : false;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">
@@ -245,6 +252,18 @@ export default function BudgetPage() {
         </div>
       )}
 
+      {!periodLoading && period && !periodError && (
+        <BudgetPeriodStatusBar
+          period={period}
+          monthKey={monthKey}
+          isPending={togglePeriodStatus.isPending}
+          onToggleStatus={(status) => {
+            if (!periodId) return;
+            togglePeriodStatus.mutate({ periodId, status });
+          }}
+        />
+      )}
+
       {!periodLoading && period && !periodError && !summary && (
         <div className="border-border/60 rounded-xl border border-dashed p-8 text-center">
           <p className="text-muted-foreground text-sm">No categories for {resolvedCurrency} yet.</p>
@@ -319,6 +338,7 @@ export default function BudgetPage() {
                 categories={summary.categories}
                 currency={resolvedCurrency}
                 defaultOpen={groupKey !== "transfers" && groupKey !== "debt"}
+                readOnly={periodClosed}
                 onEditTarget={(categoryId, currentTarget) => {
                   const cat = categories.find((c) => c.id === categoryId);
                   setTargetEdit({
@@ -334,36 +354,40 @@ export default function BudgetPage() {
           <section className="border-border/60 bg-card rounded-xl border p-4">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-foreground text-sm font-semibold">Recent entries</h2>
-              <button
-                type="button"
-                onClick={() => setAddOpen(true)}
-                className="bg-primary text-primary-foreground inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium"
-              >
-                <Plus className="h-3.5 w-3.5" />
-                Add
-              </button>
+              {!periodClosed && (
+                <button
+                  type="button"
+                  onClick={() => setAddOpen(true)}
+                  className="bg-primary text-primary-foreground inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Add
+                </button>
+              )}
             </div>
             <BudgetEntryList
               entries={entries.slice(0, 20)}
               currency={resolvedCurrency}
-              onDelete={(id) => deleteEntry.mutate(id)}
+              onDelete={periodClosed ? undefined : (id) => deleteEntry.mutate(id)}
               isDeleting={deleteEntry.isPending}
             />
           </section>
         </>
       )}
 
-      <button
-        type="button"
-        onClick={() => setAddOpen(true)}
-        className="bg-primary text-primary-foreground fixed right-6 bottom-20 z-30 flex h-14 w-14 items-center justify-center rounded-full shadow-lg md:bottom-8"
-        aria-label="Add budget entry"
-      >
-        <Plus className="h-6 w-6" />
-      </button>
+      {!periodClosed && (
+        <button
+          type="button"
+          onClick={() => setAddOpen(true)}
+          className="bg-primary text-primary-foreground fixed right-6 bottom-20 z-30 flex h-14 w-14 items-center justify-center rounded-full shadow-lg md:bottom-8"
+          aria-label="Add budget entry"
+        >
+          <Plus className="h-6 w-6" />
+        </button>
+      )}
 
       <AddBudgetEntryDrawer
-        open={addOpen}
+        open={addOpen && !periodClosed}
         onClose={() => setAddOpen(false)}
         categories={categories}
         wealthAccounts={wealthAccounts}
